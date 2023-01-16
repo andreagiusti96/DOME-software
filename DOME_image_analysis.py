@@ -20,26 +20,88 @@ import matplotlib.pyplot as plt
 import random
 import math 
 import pandas 
+from dataclasses import dataclass
+from typing import List
 
+@dataclass
+class Object:
+    id : int = -1
+    position : [float, float] = [float('nan'), float('nan')]
+    velocity : [float, float] = [float('nan'), float('nan')]
+    contour : np.ndarray([1])
+
+
+def build_background(fileLocation : str, images_number : int):
+    paths=glob.glob(fileLocation +  '/*.jpeg')
+    
+    images = np.ndarray([images_number, 1080, 1920], dtype=np.uint8)
+    indices = np.linspace(0, len(paths)-1, num=images_number, dtype=int)
+
+    selected_paths = [paths[i] for i in indices]
+
+    counter=0
+    for filename in selected_paths:
+        img = cv2.imread(filename)
+        # Convert the frame to grayscale
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        images[counter] = gray
+        counter+=1
+    
+    # compute median
+    background = np.median(images, axis=0)
+    background = background.round().astype(np.uint8)
+    background = np.squeeze(background)
+    plt.title('background'); plt.imshow(background, cmap='gray', vmin=0, vmax=255); plt.show()
+    return background
 
 #reads in new images and performs image analysis to find which contours relate to agents
-def image_analysis(img, img_init):
-    frame_new = img
+def get_contours(img, min_area : float, min_compactness : float, background_model=None):
     contoursFiltered=[]
-    b,g,r = cv2.split(frame_new)
-    ret, thresh2 = cv2.threshold(r,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    contours, hierarchy = cv2.findContours(thresh2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    plt.title('img'); plt.imshow(img); plt.show()
+    
+    # Convert the frame to grayscale and apply histogram equalization
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #equalized = cv2.equalizeHist(gray)
+    plt.title('gray');  plt.imshow(gray, cmap='gray', vmin=0, vmax=255); plt.show()
+    
+    # Subtract the background from the frame
+    if type(background_model)==type(None): background_model= np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
+    foreground = cv2.absdiff(gray, background_model)
+    plt.title('foreground'); plt.imshow(foreground, cmap='gray', vmin=0, vmax=255); plt.show()
+
+    # Apply thresholding to the foreground image to create a binary mask
+    ret, mask = cv2.threshold(foreground, 100, 255, cv2.THRESH_BINARY)
+    plt.title('mask'); plt.imshow(mask, cmap='gray', vmin=0, vmax=255); plt.show()
+    
+    # Find contours of objects
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours_img=img.copy()
+    cv2.drawContours(contours_img, contours, -1, (0,255,0), 3)
+    plt.title('contours'); plt.imshow(contours_img); plt.show()
+    
+    contoursFiltered=[]
     for contour in contours:
         area = cv2.contourArea(contour)
         perimeter = cv2.arcLength(contour,True)
-        if area > 100:
-            compactness=(4*np.pi*area)/(perimeter**2)
-            if compactness > 0.5:
-                (x,y,w,h) = cv2.boundingRect(contour)
-                contoursFiltered.append([x+int(w/2),y+int(h/2),w,h,1,0])
-    contoursFiltered=np.array(contoursFiltered)
+        if area > min_area:
+            compactness=(4*np.pi*area)/(perimeter**2) #Polsby–Popper test
+            if compactness > min_compactness:
+                contoursFiltered.append(contour)
+    
+    #contoursFiltered=np.array(contoursFiltered)
+    contoursFiltered_img=img.copy()
+    cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
+    plt.title('contoursFiltered'); plt.imshow(contoursFiltered_img); plt.show()
+    
     return contoursFiltered
 
+def get_positions(contours):
+    positions = []
+    for contour in contours:
+        (x,y,w,h) = cv2.boundingRect(contour)
+        positions.append([x+int(w/2),y+int(h/2)])
+    
+    return positions
 
 #find the best match between agents in frames to assign continous ID
 def agentMatching(past_contours, img_contours):
@@ -103,46 +165,39 @@ def get_time_from_title(filename: str):
     file_name = file_name.split(".jpeg")[0]
     time = float(file_name)
     return time
-    
+
 def imageImport(fileLocation):
-    counter = 0 
     velocity_list=[]
     
-    fileNames = sorted(glob.glob(fileLocation +  '/*.jpeg'))
-    
-    for filename in fileNames:
+    background = build_background(fileLocation, 20)
+
+    counter = 0 
+    for filename in glob.glob(fileLocation +  '/*.jpeg'):
         img = cv2.imread(filename)
         time = get_time_from_title(filename)
         blank = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
-        
-        # for first instance of loop, initialise time zero
-        if counter == 0: 
-            img_init = img
-            time_zero = time
-        
-        # for all other loop instances, match agents and calculate velocity or displacement
-        else:
-            time_difference = (time-time_zero)*10
-            img_contours = image_analysis(img, img_init)
-            if counter == 1: 
-                agents_predictive = img_contours
-                for i in range(len(agents_predictive)):
-                    velocity_list.append([])
-            else:
-                img_contours = agentMatching(past_contours, img_contours)
-                velocity_list = displacement_calculation(velocity_list, past_contours, img_contours, time_difference, counter)
             
-            agent_id = 0
-            for c in img_contours:
-                active_status = c[4]
-                if active_status == 1:
-                    (Cx,Cy) = (c[0],c[1]+int(c[2]/2))
-                    radius  = 10
-                    cv2.putText(img, str(agent_id), (Cx,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,2)
-                agent_id += 1 
-            cv2.imshow("Image", img)
-            cv2.waitKey(33)
-            past_contours = img_contours
+        # match agents and calculate velocity or displacement
+        contours = get_contours(img, min_area=100, min_compactness=0.25, background_model=background)
+        positions = get_positions(contours)
+
+        if counter == 1: 
+            objects = [Object(i, pos, contour=con) for pos in positions for con in contours for i in range(0,len(positions))]
+        else:
+            img_contours = agentMatching(past_contours, img_contours)
+            velocity_list = displacement_calculation(velocity_list, past_contours, img_contours, time, counter)
+        
+        agent_id = 0
+        for c in img_contours:
+            active_status = c[4]
+            if active_status == 1:
+                (Cx,Cy) = (c[0],c[1]+int(c[2]/2))
+                radius  = 10
+                cv2.putText(img, str(agent_id), (Cx,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,2)
+            agent_id += 1 
+        cv2.imshow("Image", img)
+        cv2.waitKey(33)
+        past_contours = img_contours
         
         counter += 1
         #k=cv2.waitKey(0)
@@ -159,8 +214,12 @@ def write_to_file(velocity_list):
     df = pandas.DataFrame(velocity_list) 
     df.to_csv('velocity_list.csv') 
 
+
+# MAIN
+
 filePath = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments/2022_12_19_Euglena_3'
+objects:List[Object] = []
 velocity_list = imageImport(filePath)
-write_to_file(velocity_list)
+
 
 
