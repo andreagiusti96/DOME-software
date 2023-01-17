@@ -97,43 +97,6 @@ def get_positions(contours):
     return positions
 
 # #find the best match between agents in frames to assign continous ID
-# def agentMatching(past_contours, img_contours):
-#     #initalise agent matching array
-#     matched_agents = np.copy(past_contours)
-#     #set propagating agents to 1
-#     #caculate length of deactivity, becomes increasingly negative the more frames are dropped
-#     #note that if the countour is matched in the subsequent section, is will reset to zero
-#     for agent in matched_agents:
-#         agent[5]=agent[5]+(agent[4]-1)
-#     #set current activity to deactice for all agents
-#     matched_agents[0:len(matched_agents), 4]=0
-#     for agent in img_contours:
-#         position_difference_match = 10000 #defines how close agents can be to be considered the same agent
-#         agent_id = 0
-#         for past_agent in past_contours:
-#             #excludes long term deactivated agents
-#             if past_agent[5] > -3:
-#                 position_difference=(abs(agent[0]-past_agent[0]), abs(agent[1]-past_agent[1]))
-#                 position_difference=sum(position_difference)
-#                 if position_difference < position_difference_match:
-#                     contour_match = agent
-#                     past_contours_match = past_agent
-#                     matched_agent_id = agent_id
-#                     position_difference_match=position_difference  
-#             else:
-#                 pass
-#             agent_id+=1
-#         #print("MATCH CON\n", past_contours_match, "CONFIDENCE", position_difference_match, "ID", matched_agent_id)
-#         #if the agent falls outside of a given confidence inteval, assume new agents and append to the end of the array 
-#         if position_difference_match > 30:
-#             contour_match = np.array([contour_match])
-#             matched_agents= np.append(matched_agents, contour_match, axis = 0)
-#         else:
-#             matched_agents[matched_agent_id]=contour_match
-#     #carry over propogation number
-#     return matched_agents
-
-# #find the best match between agents in frames to assign continous ID
 # def agentMatching(new_positions, old_positions, old_ids):
 #     new_ids=[]
 #    
@@ -148,7 +111,7 @@ def get_positions(contours):
 def agentMatching(new_positions, old_positions, old_ids):
     new_ids=[]
     distances = np.ndarray([len(new_positions), len(old_positions)])
-    costs_newid = np.ndarray([len(new_positions), round(len(new_positions)/2)])
+    costs_newid = np.ndarray([len(new_positions), len(new_positions)])
     
     newly_allocable_ids_range = range(np.max(old_ids)+1, np.max(old_ids)+costs_newid.shape[1]+1)
     available_ids = old_ids + list(newly_allocable_ids_range)
@@ -157,11 +120,10 @@ def agentMatching(new_positions, old_positions, old_ids):
     i=0
     for pos in new_positions:
         distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], old_positions))
-        costs_newid[i,:] = np.ones([round(len(new_positions)/2)]) * distance_from_edges(pos) + 30
+        cost_newid = np.min([distance_from_edges(pos), 100]) + 50
+        costs_newid[i,:] = np.ones([len(new_positions)]) * cost_newid
         i+=1
-    
-    #costs_newid = np.ones([len(new_positions), round(len(new_positions)/2)]) * np.mean(distances)
-    
+        
     costs = np.concatenate((distances, costs_newid), axis=1)
     
     # Hungarian optimization algorithm
@@ -172,7 +134,7 @@ def agentMatching(new_positions, old_positions, old_ids):
     new_ids = [available_ids[i] for i in col_ind]
     
     print('avg cost = ' + str(cost/len(new_ids)))
-    newly_allocated_ids = [i for i in col_ind if i in newly_allocable_ids_range]
+    newly_allocated_ids = [i for i in new_ids if i not in old_ids]
     lost_ids = [i for i in old_ids if i not in new_ids]
     print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
     print('lost ids = ' + str(lost_ids) + '\t tot = '+ str( len(lost_ids)) )
@@ -229,12 +191,13 @@ def imageImport(fileLocation):
         print('t = ' + str(time))
             
         # collect contours and positions from new image
-        new_contours = get_contours(img, min_area=100, min_compactness=0.25, background_model=background)
+        new_contours = get_contours(img, min_area=200, min_compactness=0.25, background_model=background)
         new_positions = get_positions(new_contours)
         
         # on first iteration assign new susequent ids to all agents
         if counter == 0: 
             new_ids = list(range(0, len(new_positions)))
+            
         
         # on following iterations perform tracking
         else:
