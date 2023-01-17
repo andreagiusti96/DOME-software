@@ -15,20 +15,13 @@ Created by Andrea
 
 import cv2
 import numpy as np
+import scipy
 import glob
 import matplotlib.pyplot as plt
 import random
 import math 
 import pandas 
-from dataclasses import dataclass
 from typing import List
-
-@dataclass
-class Object:
-    id : int = -1
-    position : [float, float] = [float('nan'), float('nan')]
-    velocity : [float, float] = [float('nan'), float('nan')]
-    contour : np.ndarray([1])
 
 
 def build_background(fileLocation : str, images_number : int):
@@ -57,27 +50,27 @@ def build_background(fileLocation : str, images_number : int):
 #reads in new images and performs image analysis to find which contours relate to agents
 def get_contours(img, min_area : float, min_compactness : float, background_model=None):
     contoursFiltered=[]
-    plt.title('img'); plt.imshow(img); plt.show()
+    #plt.title('img'); plt.imshow(img); plt.show()
     
     # Convert the frame to grayscale and apply histogram equalization
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     #equalized = cv2.equalizeHist(gray)
-    plt.title('gray');  plt.imshow(gray, cmap='gray', vmin=0, vmax=255); plt.show()
+    #plt.title('gray');  plt.imshow(gray, cmap='gray', vmin=0, vmax=255); plt.show()
     
     # Subtract the background from the frame
     if type(background_model)==type(None): background_model= np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
     foreground = cv2.absdiff(gray, background_model)
-    plt.title('foreground'); plt.imshow(foreground, cmap='gray', vmin=0, vmax=255); plt.show()
+    #plt.title('foreground'); plt.imshow(foreground, cmap='gray', vmin=0, vmax=255); plt.show()
 
     # Apply thresholding to the foreground image to create a binary mask
     ret, mask = cv2.threshold(foreground, 100, 255, cv2.THRESH_BINARY)
-    plt.title('mask'); plt.imshow(mask, cmap='gray', vmin=0, vmax=255); plt.show()
+    #plt.title('mask'); plt.imshow(mask, cmap='gray', vmin=0, vmax=255); plt.show()
     
     # Find contours of objects
     contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours_img=img.copy()
     cv2.drawContours(contours_img, contours, -1, (0,255,0), 3)
-    plt.title('contours'); plt.imshow(contours_img); plt.show()
+    #plt.title('contours'); plt.imshow(contours_img); plt.show()
     
     contoursFiltered=[]
     for contour in contours:
@@ -91,7 +84,7 @@ def get_contours(img, min_area : float, min_compactness : float, background_mode
     #contoursFiltered=np.array(contoursFiltered)
     contoursFiltered_img=img.copy()
     cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
-    plt.title('contoursFiltered'); plt.imshow(contoursFiltered_img); plt.show()
+    #plt.title('contoursFiltered'); plt.imshow(contoursFiltered_img); plt.show()
     
     return contoursFiltered
 
@@ -103,42 +96,53 @@ def get_positions(contours):
     
     return positions
 
+# #find the best match between agents in frames to assign continous ID
+# def agentMatching(past_contours, img_contours):
+#     #initalise agent matching array
+#     matched_agents = np.copy(past_contours)
+#     #set propagating agents to 1
+#     #caculate length of deactivity, becomes increasingly negative the more frames are dropped
+#     #note that if the countour is matched in the subsequent section, is will reset to zero
+#     for agent in matched_agents:
+#         agent[5]=agent[5]+(agent[4]-1)
+#     #set current activity to deactice for all agents
+#     matched_agents[0:len(matched_agents), 4]=0
+#     for agent in img_contours:
+#         position_difference_match = 10000 #defines how close agents can be to be considered the same agent
+#         agent_id = 0
+#         for past_agent in past_contours:
+#             #excludes long term deactivated agents
+#             if past_agent[5] > -3:
+#                 position_difference=(abs(agent[0]-past_agent[0]), abs(agent[1]-past_agent[1]))
+#                 position_difference=sum(position_difference)
+#                 if position_difference < position_difference_match:
+#                     contour_match = agent
+#                     past_contours_match = past_agent
+#                     matched_agent_id = agent_id
+#                     position_difference_match=position_difference  
+#             else:
+#                 pass
+#             agent_id+=1
+#         #print("MATCH CON\n", past_contours_match, "CONFIDENCE", position_difference_match, "ID", matched_agent_id)
+#         #if the agent falls outside of a given confidence inteval, assume new agents and append to the end of the array 
+#         if position_difference_match > 30:
+#             contour_match = np.array([contour_match])
+#             matched_agents= np.append(matched_agents, contour_match, axis = 0)
+#         else:
+#             matched_agents[matched_agent_id]=contour_match
+#     #carry over propogation number
+#     return matched_agents
+
 #find the best match between agents in frames to assign continous ID
-def agentMatching(past_contours, img_contours):
-    #initalise agent matching array
-    matched_agents = np.copy(past_contours)
-    #set propagating agents to 1
-    #caculate length of deactivity, becomes increasingly negative the more frames are dropped
-    #note that if the countour is matched in the subsequent section, is will reset to zero
-    for agent in matched_agents:
-        agent[5]=agent[5]+(agent[4]-1)
-    #set current activity to deactice for all agents
-    matched_agents[0:len(matched_agents), 4]=0
-    for agent in img_contours:
-        position_difference_match = 10000 #defines how close agents can be to be considered the same agent
-        agent_id = 0
-        for past_agent in past_contours:
-            #excludes long term deactivated agents
-            if past_agent[5] > -3:
-                position_difference=(abs(agent[0]-past_agent[0]), abs(agent[1]-past_agent[1]))
-                position_difference=sum(position_difference)
-                if position_difference < position_difference_match:
-                    contour_match = agent
-                    past_contours_match = past_agent
-                    matched_agent_id = agent_id
-                    position_difference_match=position_difference  
-            else:
-                pass
-            agent_id+=1
-        #print("MATCH CON\n", past_contours_match, "CONFIDENCE", position_difference_match, "ID", matched_agent_id)
-        #if the agent falls outside of a given confidence inteval, assume new agents and append to the end of the array 
-        if position_difference_match > 30:
-            contour_match = np.array([contour_match])
-            matched_agents= np.append(matched_agents, contour_match, axis = 0)
-        else:
-            matched_agents[matched_agent_id]=contour_match
-    #carry over propogation number
-    return matched_agents
+def agentMatching(new_positions, old_positions, old_ids):
+    new_ids=[]
+    
+    for agent in new_positions:
+        distances = np.squeeze(scipy.spatial.distance.cdist([agent], old_positions))
+        for new_id in new_ids: distances[old_ids.index(new_id)]=np.inf 
+        new_ids.append(old_ids[np.argmin(distances)])
+
+    return new_ids
 
 
 def displacement_calculation(velocity_list, past_contours, img_contours, time_difference, counter):
@@ -168,46 +172,38 @@ def get_time_from_title(filename: str):
 
 def imageImport(fileLocation):
     velocity_list=[]
+    old_contours=[];
+    old_positions=[];
     
     background = build_background(fileLocation, 20)
 
+    files=sorted(glob.glob(fileLocation +  '/*.jpeg'))
     counter = 0 
-    for filename in glob.glob(fileLocation +  '/*.jpeg'):
+    for filename in files:
         img = cv2.imread(filename)
         time = get_time_from_title(filename)
         blank = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
             
         # match agents and calculate velocity or displacement
-        contours = get_contours(img, min_area=100, min_compactness=0.25, background_model=background)
-        positions = get_positions(contours)
+        new_contours = get_contours(img, min_area=100, min_compactness=0.25, background_model=background)
+        new_positions = get_positions(new_contours)
 
-        if counter == 1: 
-            objects = [Object(i, pos, contour=con) for pos in positions for con in contours for i in range(0,len(positions))]
+        if counter == 0: 
+            old_contours = new_contours.copy()        
+            old_positions = new_positions.copy()
+            new_ids = list(range(0, len(old_positions)))
+            old_ids = new_ids.copy()
         else:
-            img_contours = agentMatching(past_contours, img_contours)
-            velocity_list = displacement_calculation(velocity_list, past_contours, img_contours, time, counter)
+            new_ids = agentMatching(new_positions, old_positions, old_ids)
+            #velocity_list = displacement_calculation(velocity_list, old_contours, new_contours, time, counter)
         
-        agent_id = 0
-        for c in img_contours:
-            active_status = c[4]
-            if active_status == 1:
-                (Cx,Cy) = (c[0],c[1]+int(c[2]/2))
-                radius  = 10
-                cv2.putText(img, str(agent_id), (Cx,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,2)
-            agent_id += 1 
-        cv2.imshow("Image", img)
-        cv2.waitKey(33)
-        past_contours = img_contours
+        for i in range(len(new_positions)):
+            (Cx,Cy) = (new_positions[i][0],new_positions[i][1]+20)
+            cv2.putText(img, str(new_ids[i]), (Cx,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
+        cv2.drawContours(img, new_contours, -1, (0,255,0), 3)
+        plt.title('time='+str(time)); plt.imshow(img); plt.show()
         
         counter += 1
-        #k=cv2.waitKey(0)
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord("q"):
-            break
-        if counter == 20:
-            break
-    for item in velocity_list:
-        print(len(item))
     return velocity_list
 
 def write_to_file(velocity_list):
@@ -218,7 +214,6 @@ def write_to_file(velocity_list):
 # MAIN
 
 filePath = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments/2022_12_19_Euglena_3'
-objects:List[Object] = []
 velocity_list = imageImport(filePath)
 
 
