@@ -22,6 +22,7 @@ import random
 import math 
 import pandas 
 from typing import List
+import re
 
 
 def build_background(fileLocation : str, images_number : int):
@@ -97,30 +98,32 @@ def get_positions(contours):
     return positions
 
 # #find the best match between agents in frames to assign continous ID
-# def agentMatching(new_positions, old_positions, old_ids):
+# def agentMatching(new_positions, positions, ids):
 #     new_ids=[]
 #    
 #     for agent in new_positions:
-#         distances = np.squeeze(scipy.spatial.distance.cdist([agent], old_positions))
-#         for new_id in new_ids: distances[old_ids.index(new_id)]=np.inf 
-#         new_ids.append(old_ids[np.argmin(distances)])
+#         distances = np.squeeze(scipy.spatial.distance.cdist([agent], positions))
+#         for new_id in new_ids: distances[ids.index(new_id)]=np.inf 
+#         new_ids.append(ids[np.argmin(distances)])
 #
 #     return new_ids
 
 # Tracking (Hungarian method)
-def agentMatching(new_positions, old_positions, old_ids):
+def agentMatching(new_positions, positions, ids, inactivity):
     new_ids=[]
-    distances = np.ndarray([len(new_positions), len(old_positions)])
+    distances = np.ndarray([len(new_positions), len(positions)])
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
     
-    newly_allocable_ids_range = range(np.max(old_ids)+1, np.max(old_ids)+costs_newid.shape[1]+1)
-    available_ids = old_ids + list(newly_allocable_ids_range)
+    newly_allocable_ids_range = range(np.max(ids)+1, np.max(ids)+costs_newid.shape[1]+1)
+    available_ids = ids + list(newly_allocable_ids_range)
     
     # build the matrix of costs
     i=0
     for pos in new_positions:
-        distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], old_positions))
-        cost_newid = np.min([distance_from_edges(pos), 100]) + 50
+        distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], positions))
+        inactivity_cost = (np.array(inactivity)**2) * 25
+        distances[i,:] += inactivity_cost
+        cost_newid = np.min([distance_from_edges(pos), 100])*2 + 50
         costs_newid[i,:] = np.ones([len(new_positions)]) * cost_newid
         i+=1
         
@@ -134,8 +137,8 @@ def agentMatching(new_positions, old_positions, old_ids):
     new_ids = [available_ids[i] for i in col_ind]
     
     print('avg cost = ' + str(cost/len(new_ids)))
-    newly_allocated_ids = [i for i in new_ids if i not in old_ids]
-    lost_ids = [i for i in old_ids if i not in new_ids]
+    newly_allocated_ids = [i for i in new_ids if i not in ids]
+    lost_ids = [i for i in ids if i not in new_ids]
     print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
     print('lost ids = ' + str(lost_ids) + '\t tot = '+ str( len(lost_ids)) )
     
@@ -176,13 +179,15 @@ def get_time_from_title(filename: str):
 
 def imageImport(fileLocation):
     velocity_list=[]
-    old_contours=[];
-    old_positions=[];
-    old_ids=[];
+    contours=[];
+    positions=[];
+    inactivity=[];
+    ids=[];
     
     background = build_background(fileLocation, 20)
 
-    files=sorted(glob.glob(fileLocation +  '/*.jpeg'))
+    files = glob.glob(fileLocation +  '/*.jpeg')
+    files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
     counter = 0 
     for filename in files:
         # declare vars
@@ -191,29 +196,46 @@ def imageImport(fileLocation):
         print('t = ' + str(time))
             
         # collect contours and positions from new image
-        new_contours = get_contours(img, min_area=200, min_compactness=0.25, background_model=background)
+        new_contours = get_contours(img, min_area=150, min_compactness=0.25, background_model=background)
         new_positions = get_positions(new_contours)
         
         # on first iteration assign new susequent ids to all agents
         if counter == 0: 
             new_ids = list(range(0, len(new_positions)))
-            
         
         # on following iterations perform tracking
         else:
-            new_ids = agentMatching(new_positions, old_positions, old_ids)
-            #velocity_list = displacement_calculation(velocity_list, old_contours, new_contours, time, counter)
+            new_ids = agentMatching(new_positions, positions, ids, inactivity)
+            #velocity_list = displacement_calculation(velocity_list, contours, new_contours, time, counter)
         
-        # update old data
-        old_contours = new_contours.copy()        
-        old_positions = new_positions.copy()
-        old_ids = new_ids.copy()
+        # # update data
+        # contours = new_contours.copy()        
+        # positions = new_positions.copy()
+        # ids = new_ids.copy()
+        
+        # update data
+        for new_id in new_ids:
+            if new_id in ids:
+                positions[ids.index(new_id)] = new_positions[new_ids.index(new_id)]
+                contours[ids.index(new_id)] = new_contours[new_ids.index(new_id)]
+                inactivity[ids.index(new_id)] = 0
+            else:
+                positions.append(new_positions[new_ids.index(new_id)])
+                contours.append(new_contours[new_ids.index(new_id)])
+                inactivity.append(0)
+                ids.append(new_id)
+        
+        # increase inactivity of lost objects
+        for lost_id in (lost_id for lost_id in ids if lost_id not in new_ids):
+            inactivity[ids.index(lost_id)] += 1
+                
         
         # print image with ids and contours
-        for i in range(len(new_positions)):
-            (Cx,Cy) = (new_positions[i][0], new_positions[i][1]+40)
-            cv2.putText(img, str(new_ids[i]), (Cx,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
-        cv2.drawContours(img, new_contours, -1, (0,255,0), 4)
+        for i in range(len(positions)):
+            (Cx,Cy) = positions[i]
+            cv2.putText(img, str(ids[i]), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
+            cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
+        cv2.drawContours(img, contours, -1, (0,255,0), 4)
         plt.title('time='+str(time)); plt.imshow(img); plt.show()
         
         counter += 1
