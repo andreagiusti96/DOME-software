@@ -111,7 +111,8 @@ def get_positions(contours):
 # Tracking (Hungarian method)
 def agentMatching(new_positions, positions, ids, inactivity):
     new_ids=[]
-    distances = np.ndarray([len(new_positions), len(positions)])
+    number_of_objects = sum(positions>=0)[0]
+    distances = np.ndarray([len(new_positions), number_of_objects])
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
     
     newly_allocable_ids_range = range(np.max(ids)+1, np.max(ids)+costs_newid.shape[1]+1)
@@ -152,24 +153,24 @@ def distance_from_edges(pos : List):
     assert(dis>=0)
     return dis
 
-def displacement_calculation(velocity_list, past_contours, img_contours, time_difference, counter):
-    new_agents = len(img_contours)- len(past_contours)
-    if new_agents > 0:
-        for i in range(new_agents):
-            velocity_list.append([])
-    try:
-        for i in range(len(img_contours)):
-            if img_contours[i][5]>-3:
-                (x,y) = img_contours[i][0], img_contours[i][1]
-                (x_past, y_past) = past_contours[i][0], past_contours[i][1]
-                #velocity_direction=[img_contours[i][0]-past_contours[i][0], img_contours[i][1]-past_contours[i][1]]
-                displacement=(x-x_past , y- y_past)
-                total_displacement = math.sqrt(displacement[0]**2+displacement[1]**2)
-                #velocity = total_displacement/time_difference
-                velocity_list[i].append((total_displacement, time_difference, counter))
-    except:
-        print("Agent", i, "not found")
-    return velocity_list
+# def displacement_calculation(velocity_list, past_contours, img_contours, time_difference, counter):
+#     new_agents = len(img_contours)- len(past_contours)
+#     if new_agents > 0:
+#         for i in range(new_agents):
+#             velocity_list.append([])
+#     try:
+#         for i in range(len(img_contours)):
+#             if img_contours[i][5]>-3:
+#                 (x,y) = img_contours[i][0], img_contours[i][1]
+#                 (x_past, y_past) = past_contours[i][0], past_contours[i][1]
+#                 #velocity_direction=[img_contours[i][0]-past_contours[i][0], img_contours[i][1]-past_contours[i][1]]
+#                 displacement=(x-x_past , y- y_past)
+#                 total_displacement = math.sqrt(displacement[0]**2+displacement[1]**2)
+#                 #velocity = total_displacement/time_difference
+#                 velocity_list[i].append((total_displacement, time_difference, counter))
+#     except:
+#         print("Agent", i, "not found")
+#     return velocity_list
 
 def get_time_from_title(filename: str):
     file_name = filename.split("fig_")[-1]
@@ -177,17 +178,31 @@ def get_time_from_title(filename: str):
     time = float(file_name)
     return time
 
+def estimate_position(old_pos : List):
+    assert(len(old_pos)==2)
+    
+    estimated_pos = old_pos
+    
+    return estimated_pos
+
 def imageImport(fileLocation):
-    velocity_list=[]
-    contours=[];
-    positions=[];
-    inactivity=[];
-    ids=[];
     
     background = build_background(fileLocation, 20)
 
     files = glob.glob(fileLocation +  '/*.jpeg')
     files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+    
+    frames_number = len(files)
+    number_of_objects=0
+    
+    velocity_list=[]
+    contours=[];
+    positions=np.empty([frames_number, 50, 2], dtype=int );
+    positions.fill(-1)
+    #positions=[[]];
+    inactivity=[];
+    ids=[];
+    
     counter = 0 
     for filename in files:
         # declare vars
@@ -205,37 +220,46 @@ def imageImport(fileLocation):
         
         # on following iterations perform tracking
         else:
-            new_ids = agentMatching(new_positions, positions, ids, inactivity)
+            old_positions=positions[counter-1]                  # select positions at previous time instant
+            old_positions=old_positions[(old_positions>0)[:,0]] # select valid positions
+            new_ids = agentMatching(new_positions, old_positions, ids, inactivity)
             #velocity_list = displacement_calculation(velocity_list, contours, new_contours, time, counter)
-        
-        # # update data
-        # contours = new_contours.copy()        
-        # positions = new_positions.copy()
-        # ids = new_ids.copy()
         
         # update data
         for new_id in new_ids:
+            # for already detected objects update data
             if new_id in ids:
-                positions[ids.index(new_id)] = new_positions[new_ids.index(new_id)]
+                positions[counter, ids.index(new_id)] = new_positions[new_ids.index(new_id)]
                 contours[ids.index(new_id)] = new_contours[new_ids.index(new_id)]
                 inactivity[ids.index(new_id)] = 0
+                
+            # for new objects allocate new data
             else:
-                positions.append(new_positions[new_ids.index(new_id)])
+                positions[counter, number_of_objects] = new_positions[new_ids.index(new_id)]
+                #positions[counter].append(new_positions[new_ids.index(new_id)])
                 contours.append(new_contours[new_ids.index(new_id)])
                 inactivity.append(0)
                 ids.append(new_id)
+                number_of_objects += 1
         
-        # increase inactivity of lost objects
+        # for lost objects estimate position and increase inactivity
         for lost_id in (lost_id for lost_id in ids if lost_id not in new_ids):
+            old_pos = positions[counter-1, ids.index(lost_id)]
+            positions[counter, ids.index(lost_id)] = estimate_position(old_pos)
             inactivity[ids.index(lost_id)] += 1
                 
         
         # print image with ids and contours
-        for i in range(len(positions)):
-            (Cx,Cy) = positions[i]
+        for i in range(number_of_objects):
+            (Cx,Cy) = positions[counter][i]
             cv2.putText(img, str(ids[i]), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
-            cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
-        cv2.drawContours(img, contours, -1, (0,255,0), 4)
+            
+            if inactivity[i] >0:
+                cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
+                cv2.drawContours(img, contours, i, (0,255,255), 4)
+            else :
+                cv2.drawContours(img, contours, i, (0,255,0), 4)
+            
         plt.title('time='+str(time)); plt.imshow(img); plt.show()
         
         counter += 1
