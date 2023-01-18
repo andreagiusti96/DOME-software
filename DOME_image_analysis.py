@@ -97,26 +97,11 @@ def get_positions(contours):
     
     return positions
 
-# #find the best match between agents in frames to assign continous ID
-# def agentMatching(new_positions, positions, ids):
-#     new_ids=[]
-#    
-#     for agent in new_positions:
-#         distances = np.squeeze(scipy.spatial.distance.cdist([agent], positions))
-#         for new_id in new_ids: distances[ids.index(new_id)]=np.inf 
-#         new_ids.append(ids[np.argmin(distances)])
-#
-#     return new_ids
-
 # Tracking (Hungarian method)
-def agentMatching(new_positions, positions, ids, inactivity):
-    new_ids=[]
+def agentMatching(new_positions, positions, inactivity):
     number_of_objects = sum(positions>=0)[0]
     distances = np.ndarray([len(new_positions), number_of_objects])
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
-    
-    newly_allocable_ids_range = range(np.max(ids)+1, np.max(ids)+costs_newid.shape[1]+1)
-    available_ids = ids + list(newly_allocable_ids_range)
     
     # build the matrix of costs
     i=0
@@ -135,13 +120,9 @@ def agentMatching(new_positions, positions, ids, inactivity):
     cost = costs[row_ind, col_ind].sum()
     
     # update ids
-    new_ids = [available_ids[i] for i in col_ind]
+    new_ids = [i for i in col_ind]
     
-    print('avg cost = ' + str(cost/len(new_ids)))
-    newly_allocated_ids = [i for i in new_ids if i not in ids]
-    lost_ids = [i for i in ids if i not in new_ids]
-    print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
-    print('lost ids = ' + str(lost_ids) + '\t tot = '+ str( len(lost_ids)) )
+    print('matching cost = ' + str(round(cost)) + '\t avg = ' + str(round(cost/len(new_ids))))
     
     return new_ids
 
@@ -199,7 +180,6 @@ def imageImport(fileLocation):
     contours=[];
     positions=np.empty([frames_number, 0, 2], dtype=int );
     positions.fill(-1)
-    #positions=[[]];
     inactivity=[];
     ids=[];
     
@@ -222,16 +202,20 @@ def imageImport(fileLocation):
         else:
             old_positions=positions[counter-1]                  # select positions at previous time instant
             old_positions=old_positions[(old_positions>0)[:,0]] # select valid positions
-            new_ids = agentMatching(new_positions, old_positions, ids, inactivity)
+            new_ids = agentMatching(new_positions, old_positions, inactivity)
             #velocity_list = displacement_calculation(velocity_list, contours, new_contours, time, counter)
+        
+        # discern 
+        newly_allocated_ids = [i for i in new_ids if i not in range(number_of_objects)]
+        lost_obj_ids = [i for i in range(number_of_objects) if i not in new_ids]
         
         # update data
         for new_id in new_ids:
             # for already detected objects update data
-            if new_id in ids:
-                positions[counter, ids.index(new_id)] = new_positions[new_ids.index(new_id)]
-                contours[ids.index(new_id)] = new_contours[new_ids.index(new_id)]
-                inactivity[ids.index(new_id)] = 0
+            if new_id < number_of_objects:
+                positions[counter, new_id] = new_positions[new_ids.index(new_id)]
+                contours[new_id] = new_contours[new_ids.index(new_id)]
+                inactivity[new_id] = 0
                 
             # for new objects allocate new data
             else:
@@ -240,20 +224,19 @@ def imageImport(fileLocation):
                 #positions[counter].append(new_positions[new_ids.index(new_id)])                
                 contours.append(new_contours[new_ids.index(new_id)])
                 inactivity.append(0)
-                ids.append(new_id)
                 number_of_objects += 1
         
         # for lost objects estimate position and increase inactivity
-        for lost_id in (lost_id for lost_id in ids if lost_id not in new_ids):
-            old_pos = positions[counter-1, ids.index(lost_id)]
-            positions[counter, ids.index(lost_id)] = estimate_position(old_pos)
-            inactivity[ids.index(lost_id)] += 1
+        for lost_id in lost_obj_ids:
+            old_pos = positions[counter-1, lost_id]
+            positions[counter, lost_id] = estimate_position(old_pos)
+            inactivity[lost_id] += 1
                 
         
         # print image with ids and contours
         for i in range(number_of_objects):
             (Cx,Cy) = positions[counter][i]
-            cv2.putText(img, str(ids[i]), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
+            cv2.putText(img, str(i), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
             
             if inactivity[i] >0:
                 cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
@@ -262,6 +245,11 @@ def imageImport(fileLocation):
                 cv2.drawContours(img, contours, i, (0,255,0), 4)
             
         plt.title('time='+str(time)); plt.imshow(img); plt.show()
+        
+        # print info
+        print('number of objects = '+ str( number_of_objects) )
+        print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
+        print('lost ids = ' + str(lost_obj_ids) + '\t tot = '+ str( len(lost_obj_ids)) )
         
         counter += 1
     
