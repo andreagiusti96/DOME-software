@@ -197,7 +197,7 @@ def imageImport(fileLocation):
     
     velocity_list=[]
     contours=[];
-    positions=np.empty([frames_number, 50, 2], dtype=int );
+    positions=np.empty([frames_number, 0, 2], dtype=int );
     positions.fill(-1)
     #positions=[[]];
     inactivity=[];
@@ -235,8 +235,9 @@ def imageImport(fileLocation):
                 
             # for new objects allocate new data
             else:
+                positions = np.concatenate([positions, np.empty([frames_number, 1, 2], dtype=int )], axis=1)
                 positions[counter, number_of_objects] = new_positions[new_ids.index(new_id)]
-                #positions[counter].append(new_positions[new_ids.index(new_id)])
+                #positions[counter].append(new_positions[new_ids.index(new_id)])                
                 contours.append(new_contours[new_ids.index(new_id)])
                 inactivity.append(0)
                 ids.append(new_id)
@@ -256,7 +257,7 @@ def imageImport(fileLocation):
             
             if inactivity[i] >0:
                 cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
-                cv2.drawContours(img, contours, i, (0,255,255), 4)
+                cv2.drawContours(img, contours, i, (255,0,0), 4)
             else :
                 cv2.drawContours(img, contours, i, (0,255,0), 4)
             
