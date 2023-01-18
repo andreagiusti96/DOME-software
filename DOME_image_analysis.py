@@ -159,10 +159,22 @@ def get_time_from_title(filename: str):
     time = float(file_name)
     return time
 
-def estimate_position(old_pos : List):
+def estimate_velocity(positions : np.array):
+    if min(positions.shape) < 2:
+        velocity = np.array([0, 0])
+        
+    elif min(positions.shape) == 2:
+        velocity = positions[-1] - positions[-2]
+    
+    return velocity
+
+def estimate_position(old_pos : np.array, velocity : np.array):
     assert(len(old_pos)==2)
     
-    estimated_pos = old_pos
+    estimated_pos = old_pos + velocity
+    
+    if estimated_pos[0] not in range(1920) or estimated_pos[1] not in range(1080):
+        estimated_pos = estimated_pos - velocity
     
     return estimated_pos
 
@@ -200,12 +212,17 @@ def imageImport(fileLocation):
         
         # on following iterations perform tracking
         else:
-            old_positions=positions[counter-1]                  # select positions at previous time instant
-            old_positions=old_positions[(old_positions>0)[:,0]] # select valid positions
-            new_ids = agentMatching(new_positions, old_positions, inactivity)
+            for obj in range(number_of_objects):
+                old_pos = positions[counter-1, obj]
+                vel = estimate_velocity(positions[0:counter-1, obj])
+                positions[counter, obj] = estimate_position(old_pos, vel)
+            
+            est_positions=positions[counter]                  # select positions at previous time instant
+            est_positions=est_positions[(est_positions>0)[:,0]] # select valid positions
+            new_ids = agentMatching(new_positions, est_positions, inactivity)
             #velocity_list = displacement_calculation(velocity_list, contours, new_contours, time, counter)
         
-        # discern 
+        # discern new and lost objects
         newly_allocated_ids = [i for i in new_ids if i not in range(number_of_objects)]
         lost_obj_ids = [i for i in range(number_of_objects) if i not in new_ids]
         
@@ -229,7 +246,8 @@ def imageImport(fileLocation):
         # for lost objects estimate position and increase inactivity
         for lost_id in lost_obj_ids:
             old_pos = positions[counter-1, lost_id]
-            positions[counter, lost_id] = estimate_position(old_pos)
+            vel = estimate_velocity(positions[0:counter-1, lost_id])
+            positions[counter, lost_id] = estimate_position(old_pos, vel)
             inactivity[lost_id] += 1
                 
         
@@ -241,6 +259,8 @@ def imageImport(fileLocation):
             if inactivity[i] >0:
                 cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
                 cv2.drawContours(img, contours, i, (255,0,0), 4)
+                for t in range(inactivity[i]):
+                    cv2.circle(img, positions[counter-t][i], 5, (255,0,0), 4)
             else :
                 cv2.drawContours(img, contours, i, (0,255,0), 4)
             
