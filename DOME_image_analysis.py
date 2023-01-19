@@ -18,14 +18,30 @@ import numpy as np
 import scipy
 import glob
 import matplotlib.pyplot as plt
-import random
-import math 
 import pandas 
 from typing import List
 import re
 
 
 def build_background(fileLocation : str, images_number : int):
+    """
+    Extract the background from a set of images excluding moving objects.
+    Background is computed as the median pixel-wise of the images.
+    Camera has to be static.
+    
+    Parameters
+    ----------
+    fileLocation : str
+        Path of the folder containing the images.
+    images_number : int
+        Number of images to use to build the background.
+
+    Returns
+    -------
+    background : np.array
+        Gray scale image of the background.
+
+    """
     paths=glob.glob(fileLocation +  '/*.jpeg')
     
     images = np.ndarray([images_number, 1080, 1920], dtype=np.uint8)
@@ -48,8 +64,28 @@ def build_background(fileLocation : str, images_number : int):
     plt.title('background'); plt.imshow(background, cmap='gray', vmin=0, vmax=255); plt.show()
     return background
 
-#reads in new images and performs image analysis to find which contours relate to agents
-def get_contours(img, min_area : float, min_compactness : float, background_model=None):
+def get_contours(img : np.array, min_area : float, min_compactness : float, background_model=None):
+    """
+    Thresholding based object detection.
+
+    Parameters
+    ----------
+    img : np.array
+        Image to analyse.
+    min_area : float
+        Minimum area of objects in pixels.
+    min_compactness : float
+        Minimum compactness of objects [0, 1].
+    background_model : np.array, optional
+        Image of the background to perform background subtraction. 
+        The default is None.
+
+    Returns
+    -------
+    contoursFiltered : List
+        Contours of the detected objects.
+
+    """
     contoursFiltered=[]
     #plt.title('img'); plt.imshow(img); plt.show()
     
@@ -90,6 +126,20 @@ def get_contours(img, min_area : float, min_compactness : float, background_mode
     return contoursFiltered
 
 def get_positions(contours):
+    """
+    Get the centers of contours resulting from image analysis
+
+    Parameters
+    ----------
+    contours : List
+        Contours of the detected objects. (Shape=Nx2)
+
+    Returns
+    -------
+    positions : List
+        Position of the center of each object. (Shape=Nx2)
+
+    """
     positions = []
     for contour in contours:
         (x,y,w,h) = cv2.boundingRect(contour)
@@ -97,19 +147,38 @@ def get_positions(contours):
     
     return positions
 
-# Tracking (Hungarian method)
-def agentMatching(new_positions, positions, inactivity):
-    number_of_objects = sum(positions>=0)[0]
+def agentMatching(new_positions : np.array, positions : np.array, inactivity : List):
+    """
+    Track the objects in subsequent time instants assigning IDs.
+    The IDs assignment is formulated as a linear optimization problem and solved with the Hungarian method.
+    New IDs can be allocated.
+    
+    Parameters
+    ----------
+    new_positions : np.array (Shape=N)
+        Positions of detected objects.
+    positions : np.array
+        Positions of previously detected objects. (Shape=Mx2)
+    inactivity : List
+        Inactivity counters of the objects. (Shape=M)
+
+    Returns
+    -------
+    new_ids : List
+        IDs assigned to the detected positions. (Shape=N)
+
+    """
+    number_of_objects = sum(valid_positions(positions))
     distances = np.ndarray([len(new_positions), number_of_objects])
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
     
     # build the matrix of costs
     i=0
     for pos in new_positions:
-        distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], positions))
-        inactivity_cost = (np.array(inactivity)**2) * 25
+        distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], positions))**2
+        inactivity_cost = (np.array(inactivity)**2) * 10
         distances[i,:] += inactivity_cost
-        cost_newid = np.min([distance_from_edges(pos), 100])*2 + 50
+        cost_newid = np.min([distance_from_edges(pos), 100])**2 + 25
         costs_newid[i,:] = np.ones([len(new_positions)]) * cost_newid
         i+=1
         
@@ -122,11 +191,25 @@ def agentMatching(new_positions, positions, inactivity):
     # update ids
     new_ids = [i for i in col_ind]
     
-    print('matching cost = ' + str(round(cost)) + '\t avg = ' + str(round(cost/len(new_ids))))
+    print('matching cost = ' + str(round(cost)) + '\t avg = ' + str(round(cost/(len(new_ids)+0.001))))
     
     return new_ids
 
 def distance_from_edges(pos : List):
+    """
+    Get the distance from the closest edge of the picture frame.
+
+    Parameters
+    ----------
+    pos : List
+        Position. Shape=(2)
+
+    Returns
+    -------
+    dis : float or int depending on the input
+        Distances from the closest edge.
+
+    """
     assert(len(pos)==2)
     
     dis= np.min([pos[0], pos[1], 1920-pos[0], 1080-pos[1]])
@@ -134,49 +217,108 @@ def distance_from_edges(pos : List):
     assert(dis>=0)
     return dis
 
-# def displacement_calculation(velocity_list, past_contours, img_contours, time_difference, counter):
-#     new_agents = len(img_contours)- len(past_contours)
-#     if new_agents > 0:
-#         for i in range(new_agents):
-#             velocity_list.append([])
-#     try:
-#         for i in range(len(img_contours)):
-#             if img_contours[i][5]>-3:
-#                 (x,y) = img_contours[i][0], img_contours[i][1]
-#                 (x_past, y_past) = past_contours[i][0], past_contours[i][1]
-#                 #velocity_direction=[img_contours[i][0]-past_contours[i][0], img_contours[i][1]-past_contours[i][1]]
-#                 displacement=(x-x_past , y- y_past)
-#                 total_displacement = math.sqrt(displacement[0]**2+displacement[1]**2)
-#                 #velocity = total_displacement/time_difference
-#                 velocity_list[i].append((total_displacement, time_difference, counter))
-#     except:
-#         print("Agent", i, "not found")
-#     return velocity_list
-
 def get_time_from_title(filename: str):
+    """
+    Extract time from a string.
+
+    Parameters
+    ----------
+    filename : str
+        String to extract the time from.
+
+    Returns
+    -------
+    time : float
+        Time sxtracted from the string.
+
+    """
     file_name = filename.split("fig_")[-1]
     file_name = file_name.split(".jpeg")[0]
     time = float(file_name)
     return time
 
-def estimate_velocity(positions : np.array):
-    if min(positions.shape) < 2:
-        velocity = np.array([0, 0])
-        
-    elif min(positions.shape) == 2:
-        velocity = positions[-1] - positions[-2]
-    
-    return velocity
+def estimate_velocities(positions : np.array):
+    """
+    Given the past positions of the objects estimates their velocities.
 
-def estimate_position(old_pos : np.array, velocity : np.array):
-    assert(len(old_pos)==2)
+    Parameters
+    ----------
+    positions : np.array
+        Past positions of the objects. Shape=(MxNx2)
+        If M<2 all velocities are [0, 0].
+        Non valid position are discarded.
+    Returns
+    -------
+    velocities : np.array
+        Velocities of the objects. Shape=(Nx2)
+
+    """
+    assert len(positions.shape) == 3
+    assert positions.shape[2] == 2
+
+    velocities = np.zeros(positions.shape[1:3])
+    
+    if positions.shape[0] >=2:
+        valid_pos_idx = valid_positions(positions[-2])
+        velocities[valid_pos_idx] = positions[-1, valid_pos_idx] - positions[-2, valid_pos_idx]
+    
+    speeds = np.linalg.norm(velocities, axis=1)
+    
+    print("avg speed = " + str(round(np.mean(speeds))) + "\tmax = " + str(round(max(speeds))) + "\tid =" + str(np.argmax(speeds)))
+    
+    assert velocities.shape[1] == 2
+    return velocities
+
+def estimate_positions(old_pos : np.array, velocity : np.array):
+    """
+    Given the current positions and velocities returns the future estimated positions of objects.
+    Positions are validated to be in the range [0, 1920][0, 1080]
+
+    Parameters
+    ----------
+    old_pos : np.array
+        Last positions of the objects. Shape=(Nx2)
+    velocity : np.array
+        Velocities of the objects. Shape=(Nx2)
+
+    Returns
+    -------
+    estimated_pos : np.array
+        Next positions of the objects. Shape=(Nx2).
+
+    """
+    assert len(old_pos.shape) == 2
+    assert len(velocity.shape) == 2
+    assert old_pos.shape[1] == 2
     
     estimated_pos = old_pos + velocity
     
-    if estimated_pos[0] not in range(1920) or estimated_pos[1] not in range(1080):
-        estimated_pos = estimated_pos - velocity
+    non_valid_pos_idx = ~ valid_positions(estimated_pos)
+    estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx]  - velocity[non_valid_pos_idx] 
     
     return estimated_pos
+
+def valid_positions(positions : np.array):
+    """
+    Get the indices of valid positions, i.e. positions in the range [0, 1920][0, 1080]
+
+    Parameters
+    ----------
+    positions : np.array
+        Array of positions. Shape=(Nx2)
+
+    Returns
+    -------
+    validity : np.array
+        Array of bool telling whether the corresponding position is valid.
+
+    """
+    validity0=(positions[:,0] >= 0) & (positions[:,0] <= 1920)
+    validity1=(positions[:,1] >= 0) & (positions[:,1] <= 1080)
+    validity = validity0 * validity1
+    
+    assert len(validity) == positions.shape[0]
+    return validity
 
 def imageImport(fileLocation):
     
@@ -188,19 +330,16 @@ def imageImport(fileLocation):
     frames_number = len(files)
     number_of_objects=0
     
-    velocity_list=[]
     contours=[];
-    positions=np.empty([frames_number, 0, 2], dtype=int );
-    positions.fill(-1)
-    inactivity=[];
-    ids=[];
+    positions= - np.ones([frames_number, 0, 2], dtype=int );
+    inactivity=[]; 
     
     counter = 0 
     for filename in files:
         # declare vars
         img = cv2.imread(filename)
         time = get_time_from_title(filename)
-        print('t = ' + str(time))
+        print('\nt = ' + str(time))
             
         # collect contours and positions from new image
         new_contours = get_contours(img, min_area=150, min_compactness=0.25, background_model=background)
@@ -212,15 +351,9 @@ def imageImport(fileLocation):
         
         # on following iterations perform tracking
         else:
-            for obj in range(number_of_objects):
-                old_pos = positions[counter-1, obj]
-                vel = estimate_velocity(positions[0:counter-1, obj])
-                positions[counter, obj] = estimate_position(old_pos, vel)
-            
             est_positions=positions[counter]                  # select positions at previous time instant
-            est_positions=est_positions[(est_positions>0)[:,0]] # select valid positions
+            est_positions=est_positions[valid_positions(est_positions)] # select valid positions
             new_ids = agentMatching(new_positions, est_positions, inactivity)
-            #velocity_list = displacement_calculation(velocity_list, contours, new_contours, time, counter)
         
         # discern new and lost objects
         newly_allocated_ids = [i for i in new_ids if i not in range(number_of_objects)]
@@ -236,44 +369,48 @@ def imageImport(fileLocation):
                 
             # for new objects allocate new data
             else:
-                positions = np.concatenate([positions, np.empty([frames_number, 1, 2], dtype=int )], axis=1)
+                empty_row= - np.ones([frames_number, 1, 2], dtype=int)
+                positions = np.concatenate([positions,  empty_row], axis=1)
                 positions[counter, number_of_objects] = new_positions[new_ids.index(new_id)]
-                #positions[counter].append(new_positions[new_ids.index(new_id)])                
                 contours.append(new_contours[new_ids.index(new_id)])
                 inactivity.append(0)
                 number_of_objects += 1
         
         # for lost objects estimate position and increase inactivity
         for lost_id in lost_obj_ids:
-            old_pos = positions[counter-1, lost_id]
-            vel = estimate_velocity(positions[0:counter-1, lost_id])
-            positions[counter, lost_id] = estimate_position(old_pos, vel)
             inactivity[lost_id] += 1
-                
         
+        # estimate velocities and future positions
+        up_to_now_positions=positions[0:counter+1]             # select positions up to current time instant
+        velocities = estimate_velocities(up_to_now_positions)
+        if counter < frames_number-1:
+            positions[counter+1] = estimate_positions(positions[counter], velocities)
+        
+        # check data integrity
+        assert all(valid_positions(positions[counter]))
+                
         # print image with ids and contours
         for i in range(number_of_objects):
-            (Cx,Cy) = positions[counter][i]
-            cv2.putText(img, str(i), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
-            
-            if inactivity[i] >0:
-                cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
-                cv2.drawContours(img, contours, i, (255,0,0), 4)
-                for t in range(inactivity[i]):
-                    cv2.circle(img, positions[counter-t][i], 5, (255,0,0), 4)
-            else :
-                cv2.drawContours(img, contours, i, (0,255,0), 4)
-            
+            if inactivity[i] <=5:
+                (Cx,Cy) = positions[counter][i]
+                cv2.putText(img, str(i), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
+                
+                if inactivity[i] >0:
+                    cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
+                    cv2.drawContours(img, contours, i, (255,0,0), 4)
+                    for t in range(inactivity[i]):
+                        cv2.circle(img, positions[counter-t][i], 5, (255,0,0), 4)
+                else :
+                    cv2.drawContours(img, contours, i, (0,255,0), 4)
+        plt.figure(1,figsize=(20,20),dpi=72)
         plt.title('time='+str(time)); plt.imshow(img); plt.show()
         
         # print info
         print('number of objects = '+ str( number_of_objects) )
         print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
-        print('lost ids = ' + str(lost_obj_ids) + '\t tot = '+ str( len(lost_obj_ids)) )
+        print('lost ids = '+ str( len(lost_obj_ids)) )
         
         counter += 1
-    
-    return velocity_list
 
 def write_to_file(velocity_list):
     df = pandas.DataFrame(velocity_list) 
@@ -283,7 +420,7 @@ def write_to_file(velocity_list):
 # MAIN
 
 filePath = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments/2022_12_19_Euglena_3'
-velocity_list = imageImport(filePath)
+imageImport(filePath)
 
 
 
