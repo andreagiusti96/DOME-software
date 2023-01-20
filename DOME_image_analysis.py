@@ -22,6 +22,58 @@ import pandas
 from typing import List
 import re
 
+def draw_image(img : np.array, title : str =""):
+    plt.figure(1,figsize=(20,20),dpi=72)
+    plt.title(title); 
+    
+    if len(img.shape)==2:
+        plt.imshow(img, cmap='gray', vmin=0, vmax=255)
+    else:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        plt.imshow(img)
+    
+    plt.show()
+
+def histogram(img : np.array):
+    plt.title("Histogram");
+    plt.hist(img.ravel(),256,[0,256]); plt.show()
+    
+def elaborate_img(img : np.array, color : str = "", blur  : int = 0, gain  : float = 1., contrast : bool =False, equalize : bool =False, plot : bool =False):
+    
+    if color == "gray":
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    elif color == "blue" or color == "b":
+        b, g, r = cv2.split(img)
+        img = b
+    elif color == "green" or color == "g":
+        b, g, r = cv2.split(img)
+        img = g
+    elif color == "red" or color == "r":
+        b, g, r = cv2.split(img)
+        img = r
+    
+    if plot: draw_image(img, "img - " + color)
+    
+    if blur:
+        img=cv2.medianBlur(img, blur)
+        if plot: draw_image(img, "blured")
+    
+    if gain != 1.0:
+        if gain < 0: gain=255.0/(img.max()+0.1)
+        img = cv2.convertScaleAbs(img, alpha= gain)
+        if plot: draw_image(img, "scaled")
+        
+    if equalize:
+        img = cv2.equalizeHist(img)
+        if plot: draw_image(img, "equalized")
+        
+    if contrast:
+        #clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        clahe = cv2.createCLAHE(clipLimit=10.0, tileGridSize=(16,16))
+        img=clahe.apply(img)
+        if plot: draw_image(img, "contrasted")
+        
+    return img
 
 def build_background(fileLocation : str, images_number : int):
     """
@@ -53,18 +105,21 @@ def build_background(fileLocation : str, images_number : int):
     for filename in selected_paths:
         img = cv2.imread(filename)
         # Convert the frame to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        images[counter] = gray
+        elaborated_img = elaborate_img(img, color=DEFAULT_COLOR, blur=DEFAULT_BLUR)
+        images[counter] = elaborated_img
         counter+=1
     
     # compute median
     background = np.median(images, axis=0)
     background = background.round().astype(np.uint8)
     background = np.squeeze(background)
-    plt.title('background'); plt.imshow(background, cmap='gray', vmin=0, vmax=255); plt.show()
+    
+    draw_image(background, "background from color "+DEFAULT_COLOR)
+    
     return background
-
-def get_contours(img : np.array, min_area : float, min_compactness : float, background_model=None):
+   
+    
+def get_contours(img : np.array, area_r : List, compactness_r : List, background_model=None):
     """
     Thresholding based object detection.
 
@@ -87,42 +142,51 @@ def get_contours(img : np.array, min_area : float, min_compactness : float, back
 
     """
     contoursFiltered=[]
-    #plt.title('img'); plt.imshow(img); plt.show()
-    
-    # Convert the frame to grayscale and apply histogram equalization
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    #equalized = cv2.equalizeHist(gray)
-    #plt.title('gray');  plt.imshow(gray, cmap='gray', vmin=0, vmax=255); plt.show()
-    
+    draw_image(img, "img")
+
+    elaborated_img = elaborate_img(img, color=DEFAULT_COLOR, blur=DEFAULT_BLUR, plot=True)
+
     # Subtract the background from the frame
     if type(background_model)==type(None): background_model= np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
-    foreground = cv2.absdiff(gray, background_model)
-    #plt.title('foreground'); plt.imshow(foreground, cmap='gray', vmin=0, vmax=255); plt.show()
+    foreground = cv2.min(cv2.absdiff(elaborated_img, background_model), elaborated_img)
+    draw_image(foreground, "foreground")
+    
+    foreground = elaborate_img(foreground, blur=DEFAULT_BLUR, gain=-1)
+    draw_image(foreground, "elaborated foreground")
 
     # Apply thresholding to the foreground image to create a binary mask
-    ret, mask = cv2.threshold(foreground, 100, 255, cv2.THRESH_BINARY)
-    #plt.title('mask'); plt.imshow(mask, cmap='gray', vmin=0, vmax=255); plt.show()
-    
+    ret, mask = cv2.threshold(foreground, 125, 255, cv2.THRESH_BINARY)
+    draw_image(mask, "mask")
+
     # Find contours of objects
     contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours_img=img.copy()
     cv2.drawContours(contours_img, contours, -1, (0,255,0), 3)
-    #plt.title('contours'); plt.imshow(contours_img); plt.show()
-    
+
     contoursFiltered=[]
-    for contour in contours:
+    for i in range(len(contours)):
+        contour=contours[i]
         area = cv2.contourArea(contour)
-        perimeter = cv2.arcLength(contour,True)
-        if area > min_area:
+        
+        # print contours info
+        (Cx,Cy) = np.squeeze(get_positions(contours[i:i+1]))
+        cv2.putText(contours_img, "A="+str(round(area)), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
+        
+        if area_r[0] <= area <= area_r[1]:
+            perimeter = cv2.arcLength(contour,True)
             compactness=(4*np.pi*area)/(perimeter**2) #Polsby–Popper test
-            if compactness > min_compactness:
+            cv2.putText(contours_img, "C="+str(round(compactness,2)), (Cx+20,Cy+30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
+            
+            if compactness_r[0] <= compactness <= compactness_r[1]:
                 contoursFiltered.append(contour)
     
-    #contoursFiltered=np.array(contoursFiltered)
+    draw_image(contours_img, "contours")
+
+    
     contoursFiltered_img=img.copy()
     cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
-    #plt.title('contoursFiltered'); plt.imshow(contoursFiltered_img); plt.show()
-    
+    draw_image(contoursFiltered_img, "contoursFiltered")
+
     return contoursFiltered
 
 def get_positions(contours):
@@ -178,7 +242,7 @@ def agentMatching(new_positions : np.array, positions : np.array, inactivity : L
         distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], positions))**2
         inactivity_cost = (np.array(inactivity)**2) * 10
         distances[i,:] += inactivity_cost
-        cost_newid = np.min([distance_from_edges(pos), 100])**2 + 25
+        cost_newid = np.min([distance_from_edges(pos), 100])**2 + 50
         costs_newid[i,:] = np.ones([len(new_positions)]) * cost_newid
         i+=1
         
@@ -322,7 +386,7 @@ def valid_positions(positions : np.array):
 
 def imageImport(fileLocation):
     
-    background = build_background(fileLocation, 20)
+    background = build_background(fileLocation, 50)
 
     files = glob.glob(fileLocation +  '/*.jpeg')
     files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
@@ -342,7 +406,7 @@ def imageImport(fileLocation):
         print('\nt = ' + str(time))
             
         # collect contours and positions from new image
-        new_contours = get_contours(img, min_area=150, min_compactness=0.25, background_model=background)
+        new_contours = get_contours(img, area_r=AREA_RANGE, compactness_r=COMPAC_RANGE, background_model=background)
         new_positions = get_positions(new_contours)
         
         # on first iteration assign new susequent ids to all agents
@@ -402,8 +466,7 @@ def imageImport(fileLocation):
                         cv2.circle(img, positions[counter-t][i], 5, (255,0,0), 4)
                 else :
                     cv2.drawContours(img, contours, i, (0,255,0), 4)
-        plt.figure(1,figsize=(20,20),dpi=72)
-        plt.title('time='+str(time)); plt.imshow(img); plt.show()
+        draw_image(img, 'time='+str(time) )
         
         # print info
         print('number of objects = '+ str( number_of_objects) )
@@ -420,6 +483,12 @@ def write_to_file(velocity_list):
 # MAIN
 
 filePath = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments/2022_12_19_Euglena_3'
+
+DEFAULT_COLOR = "green"
+DEFAULT_BLUR = 9
+AREA_RANGE = [100, 600]
+COMPAC_RANGE = [0.5, 0.9]
+
 imageImport(filePath)
 
 
