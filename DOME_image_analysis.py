@@ -130,7 +130,7 @@ def build_background(fileLocation : str, images_number : int):
     return background
    
     
-def get_contours(img : np.array, area_r : List, compactness_r : List, background_model=None):
+def get_contours(img : np.array, area_r : List, compactness_r : List, background_model=None, old_obj_number : int =0): 
     """
     Thresholding based object detection.
 
@@ -164,39 +164,52 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
     
     foreground = process_img(foreground, blur=DEFAULT_BLUR)
     # draw_image(foreground, "elaborated foreground")
-
-    # Apply thresholding to the foreground image to create a binary mask
-    ret, mask = cv2.threshold(foreground, 125, 255, cv2.THRESH_BINARY)
-    #draw_image(mask, "mask")
-
-    # Find contours of objects
-    contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    contours_img=img.copy()
-    cv2.drawContours(contours_img, contours, -1, (0,255,0), 3)
-
-    contoursFiltered=[]
-    for i in range(len(contours)):
-        contour=contours[i]
-        area = cv2.contourArea(contour)
+    
+    threshold = 122
+    first_time=True
+    while first_time or (len(contoursFiltered) < old_obj_number/2 and threshold > 55) or (len(contoursFiltered) > old_obj_number*1.5 and threshold<200):
+        first_time=False
         
-        # print contours info
-        (Cx,Cy) = np.squeeze(get_positions(contours[i:i+1]))
-        cv2.putText(contours_img, "A="+str(round(area)), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
-        
-        if area_r[0] <= area <= area_r[1]:
-            perimeter = cv2.arcLength(contour,True)
-            compactness=(4*np.pi*area)/(perimeter**2) #Polsby–Popper test
-            cv2.putText(contours_img, "C="+str(round(compactness,2)), (Cx+20,Cy+30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
+        # Apply thresholding to the foreground image to create a binary mask
+        ret, mask = cv2.threshold(foreground, threshold, 255, cv2.THRESH_BINARY)
+        #draw_image(mask, "mask")
+    
+        # Find contours of objects
+        contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours_img=img.copy()
+        cv2.drawContours(contours_img, contours, -1, (0,255,0), 3)
+    
+        contoursFiltered=[]
+        for i in range(len(contours)):
+            contour=contours[i]
+            area = cv2.contourArea(contour)
             
-            if compactness_r[0] <= compactness <= compactness_r[1]:
-                contoursFiltered.append(contour)
-    
-    #draw_image(contours_img, "contours")
+            # print contours info
+            (Cx,Cy) = np.squeeze(get_positions(contours[i:i+1]))
+            cv2.putText(contours_img, "A="+str(round(area)), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
+            
+            if area_r[0] <= area <= area_r[1]:
+                perimeter = cv2.arcLength(contour,True)
+                compactness=(4*np.pi*area)/(perimeter**2) #Polsby–Popper test
+                cv2.putText(contours_img, "C="+str(round(compactness,2)), (Cx+20,Cy+30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
+                
+                if compactness_r[0] <= compactness <= compactness_r[1]:
+                    contoursFiltered.append(contour)
+        
+        
+        if old_obj_number==0: old_obj_number = len(contoursFiltered)
+        
+        print("thresh="+ str(threshold) +"\t objects=" + str(len(contoursFiltered))+"\t old objects=" + str(old_obj_number))
+        if len(contoursFiltered) < old_obj_number/2:
+            threshold=threshold-20
+        elif len(contoursFiltered) > old_obj_number*1.5:
+            threshold=threshold+20
+        print("new thresh="+ str(threshold) )
 
-    
-    contoursFiltered_img=img.copy()
-    cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
-    #draw_image(contoursFiltered_img, "contoursFiltered")
+        #draw_image(contours_img, "contours with thresh=" +str(threshold))
+        contoursFiltered_img=img.copy()
+        cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
+        draw_image(contoursFiltered_img, "contoursFiltered")
 
     return contoursFiltered
 
@@ -404,7 +417,8 @@ def imageImport(fileLocation):
     
     frames_number = len(files)
     number_of_objects=0
-    
+    n_detected_objects=0
+
     contours=[];
     positions= - np.ones([frames_number, 0, 2], dtype=int );
     inactivity=[]; 
@@ -415,14 +429,15 @@ def imageImport(fileLocation):
         img = cv2.imread(filename)
         time = get_time_from_title(filename)
         print('\nt = ' + str(time))
-            
+        
         # collect contours and positions from new image
-        new_contours = get_contours(img, area_r=AREA_RANGE, compactness_r=COMPAC_RANGE, background_model=background)
+        new_contours = get_contours(img, area_r=AREA_RANGE, compactness_r=COMPAC_RANGE, background_model=background, old_obj_number=n_detected_objects)
         new_positions = get_positions(new_contours)
+        n_detected_objects=len(new_positions)
         
         # on first iteration assign new susequent ids to all agents
         if counter == 0: 
-            new_ids = list(range(0, len(new_positions)))
+            new_ids = list(range(0, n_detected_objects))
         
         # on following iterations perform tracking
         else:
@@ -481,7 +496,7 @@ def imageImport(fileLocation):
         
         # print info
         print('total number of objects = '+ str( number_of_objects) )
-        print('detected objects = '+ str( len(new_positions)) )
+        print('detected objects = '+ str( n_detected_objects) )
         print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
         print('total lost ids = '+ str( len(lost_obj_ids)) )
         
