@@ -38,7 +38,7 @@ def histogram(img : np.array):
     plt.title("Histogram");
     plt.hist(img.ravel(),256,[0,256]); plt.show()
     
-def elaborate_img(img : np.array, color : str = "", blur  : int = 0, gain  : float = 1., contrast : bool =False, equalize : bool =False, plot : bool =False):
+def process_img(img : np.array, color : str = "", blur  : int = 0, gain  : float = 1., contrast : bool =False, equalize : bool =False, plot : bool =False):
     
     if color == "gray":
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -54,12 +54,15 @@ def elaborate_img(img : np.array, color : str = "", blur  : int = 0, gain  : flo
     
     if plot: draw_image(img, "img - " + color)
     
-    if blur:
-        img=cv2.medianBlur(img, blur)
-        if plot: draw_image(img, "blured")
-    
     if gain != 1.0:
-        if gain < 0: gain=255.0/(img.max()+0.1)
+        if gain < 0: 
+            min_val=img[640:1280, 360:720].min()
+            #img = cv2.convertScaleAbs(img, beta=-min_val)
+            img = cv2.max(float(min_val), img)
+            img = img-min_val
+            max_val=img[640:1280, 360:720].max()
+            gain=255.0/(max_val+0.1)
+            
         img = cv2.convertScaleAbs(img, alpha= gain)
         if plot: draw_image(img, "scaled")
         
@@ -72,6 +75,10 @@ def elaborate_img(img : np.array, color : str = "", blur  : int = 0, gain  : flo
         clahe = cv2.createCLAHE(clipLimit=10.0, tileGridSize=(16,16))
         img=clahe.apply(img)
         if plot: draw_image(img, "contrasted")
+        
+    if blur:
+        img=cv2.medianBlur(img, blur)
+        if plot: draw_image(img, "blured")
         
     return img
 
@@ -95,9 +102,11 @@ def build_background(fileLocation : str, images_number : int):
 
     """
     paths=glob.glob(fileLocation +  '/*.jpeg')
-    
+    paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+
     images = np.ndarray([images_number, 1080, 1920], dtype=np.uint8)
     indices = np.linspace(0, len(paths)-1, num=images_number, dtype=int)
+    #indices = np.linspace(0, images_number-1, num=images_number, dtype=int)
 
     selected_paths = [paths[i] for i in indices]
 
@@ -105,12 +114,14 @@ def build_background(fileLocation : str, images_number : int):
     for filename in selected_paths:
         img = cv2.imread(filename)
         # Convert the frame to grayscale
-        elaborated_img = elaborate_img(img, color=DEFAULT_COLOR, blur=DEFAULT_BLUR)
+        elaborated_img = process_img(img, color=DEFAULT_COLOR, blur=DEFAULT_BLUR, gain=AUTO_SCALING)
+        #draw_image(elaborated_img, "img "+str(counter))
         images[counter] = elaborated_img
         counter+=1
     
-    # compute median
+    # compute background
     background = np.median(images, axis=0)
+    #background = np.mean(images, axis=0)
     background = background.round().astype(np.uint8)
     background = np.squeeze(background)
     
@@ -142,21 +153,21 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
 
     """
     contoursFiltered=[]
-    draw_image(img, "img")
+    #draw_image(img, "img")
 
-    elaborated_img = elaborate_img(img, color=DEFAULT_COLOR, blur=DEFAULT_BLUR, plot=True)
+    elaborated_img = process_img(img, color=DEFAULT_COLOR, blur=DEFAULT_BLUR, gain=AUTO_SCALING)
 
     # Subtract the background from the frame
     if type(background_model)==type(None): background_model= np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
     foreground = cv2.min(cv2.absdiff(elaborated_img, background_model), elaborated_img)
-    draw_image(foreground, "foreground")
+    #draw_image(foreground, "foreground")
     
-    foreground = elaborate_img(foreground, blur=DEFAULT_BLUR, gain=-1)
-    draw_image(foreground, "elaborated foreground")
+    foreground = process_img(foreground, blur=DEFAULT_BLUR)
+    # draw_image(foreground, "elaborated foreground")
 
     # Apply thresholding to the foreground image to create a binary mask
     ret, mask = cv2.threshold(foreground, 125, 255, cv2.THRESH_BINARY)
-    draw_image(mask, "mask")
+    #draw_image(mask, "mask")
 
     # Find contours of objects
     contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -180,12 +191,12 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
             if compactness_r[0] <= compactness <= compactness_r[1]:
                 contoursFiltered.append(contour)
     
-    draw_image(contours_img, "contours")
+    #draw_image(contours_img, "contours")
 
     
     contoursFiltered_img=img.copy()
     cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
-    draw_image(contoursFiltered_img, "contoursFiltered")
+    #draw_image(contoursFiltered_img, "contoursFiltered")
 
     return contoursFiltered
 
@@ -386,7 +397,7 @@ def valid_positions(positions : np.array):
 
 def imageImport(fileLocation):
     
-    background = build_background(fileLocation, 50)
+    background = build_background(fileLocation, 25)
 
     files = glob.glob(fileLocation +  '/*.jpeg')
     files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
@@ -469,9 +480,10 @@ def imageImport(fileLocation):
         draw_image(img, 'time='+str(time) )
         
         # print info
-        print('number of objects = '+ str( number_of_objects) )
+        print('total number of objects = '+ str( number_of_objects) )
+        print('detected objects = '+ str( len(new_positions)) )
         print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
-        print('lost ids = '+ str( len(lost_obj_ids)) )
+        print('total lost ids = '+ str( len(lost_obj_ids)) )
         
         counter += 1
 
@@ -486,6 +498,7 @@ filePath = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFede
 
 DEFAULT_COLOR = "green"
 DEFAULT_BLUR = 9
+AUTO_SCALING = -1
 AREA_RANGE = [100, 600]
 COMPAC_RANGE = [0.5, 0.9]
 
