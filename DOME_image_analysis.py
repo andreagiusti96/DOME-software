@@ -130,7 +130,7 @@ def build_background(fileLocation : str, images_number : int):
     return background
    
     
-def get_contours(img : np.array, area_r : List, compactness_r : List, background_model=None, old_obj_number : int =0): 
+def get_contours(img : np.array, area_r : List, compactness_r : List, background_model=None, expected_obj_number : int =0): 
     """
     Thresholding based object detection.
 
@@ -166,8 +166,13 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
     # draw_image(foreground, "elaborated foreground")
     
     threshold = 122
+    a_r=area_r.copy()
+    c_r=compactness_r.copy()
+    
     first_time=True
-    while first_time or (len(contoursFiltered) < old_obj_number/2 and threshold > 55) or (len(contoursFiltered) > old_obj_number*1.5 and threshold<200):
+    margin_factor = 0.25
+    adjustment_factor = 0.05
+    while first_time or (len(contoursFiltered) < expected_obj_number * (1-margin_factor) and threshold > 55) or (len(contoursFiltered) > expected_obj_number * (1+margin_factor) and threshold<200):
         first_time=False
         
         # Apply thresholding to the foreground image to create a binary mask
@@ -188,29 +193,36 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
             (Cx,Cy) = np.squeeze(get_positions(contours[i:i+1]))
             cv2.putText(contours_img, "A="+str(round(area)), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
             
-            if area_r[0] <= area <= area_r[1]:
+            if a_r[0] <= area <= a_r[1]:
                 perimeter = cv2.arcLength(contour,True)
                 compactness=(4*np.pi*area)/(perimeter**2) #Polsby–Popper test
                 cv2.putText(contours_img, "C="+str(round(compactness,2)), (Cx+20,Cy+30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
                 
-                if compactness_r[0] <= compactness <= compactness_r[1]:
+                if c_r[0] <= compactness <= c_r[1]:
                     contoursFiltered.append(contour)
         
         
-        if old_obj_number==0: old_obj_number = len(contoursFiltered)
+        if expected_obj_number==0: expected_obj_number = len(contoursFiltered)
         
-        print("thresh="+ str(threshold) +"\t objects=" + str(len(contoursFiltered))+"\t old objects=" + str(old_obj_number))
-        if len(contoursFiltered) < old_obj_number/2:
-            threshold=threshold-20
-        elif len(contoursFiltered) > old_obj_number*1.5:
-            threshold=threshold+20
-        print("new thresh="+ str(threshold) )
-
         #draw_image(contours_img, "contours with thresh=" +str(threshold))
-        contoursFiltered_img=img.copy()
+        contoursFiltered_img=cv2.cvtColor(foreground,cv2.COLOR_GRAY2RGB)
         cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
-        draw_image(contoursFiltered_img, "contoursFiltered")
-
+        draw_image(contoursFiltered_img, "contoursFiltered with thresh=" +str(threshold))
+        
+        print("thresh="+ str(round(threshold)) +"\t area_r="+ str(np.around(a_r)) +"\t compactness_r="+ str(np.around(c_r,2)) +"\t objects=" + str(len(contoursFiltered))+"\t exp objects=" + str(expected_obj_number))
+        if len(contoursFiltered) < expected_obj_number * (1-margin_factor) :
+            threshold=threshold * (1-adjustment_factor)
+            a_r[0]=a_r[0] * (1-adjustment_factor)
+            a_r[1]=a_r[1] * (1+adjustment_factor)            
+            c_r[0]=c_r[0] * (1-adjustment_factor)
+            c_r[1]=c_r[1] * (1+adjustment_factor)
+        elif len(contoursFiltered) > expected_obj_number * (1+margin_factor) :
+            threshold=threshold * (1+adjustment_factor)
+            a_r[0]=a_r[0] * (1+adjustment_factor)
+            a_r[1]=a_r[1] * (1-adjustment_factor)            
+            c_r[0]=c_r[0] * (1+adjustment_factor)
+            c_r[1]=c_r[1] * (1-adjustment_factor)
+        
     return contoursFiltered
 
 def get_positions(contours):
@@ -423,15 +435,15 @@ def imageImport(fileLocation):
     positions= - np.ones([frames_number, 0, 2], dtype=int );
     inactivity=[]; 
     
-    counter = 0 
-    for filename in files:
+    for counter in range(len(files)):
         # declare vars
+        filename = files[counter]
         img = cv2.imread(filename)
         time = get_time_from_title(filename)
         print('\nt = ' + str(time))
         
         # collect contours and positions from new image
-        new_contours = get_contours(img, area_r=AREA_RANGE, compactness_r=COMPAC_RANGE, background_model=background, old_obj_number=n_detected_objects)
+        new_contours = get_contours(img, area_r=AREA_RANGE, compactness_r=COMPAC_RANGE, background_model=background, expected_obj_number=n_detected_objects)
         new_positions = get_positions(new_contours)
         n_detected_objects=len(new_positions)
         
@@ -500,8 +512,6 @@ def imageImport(fileLocation):
         print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
         print('total lost ids = '+ str( len(lost_obj_ids)) )
         
-        counter += 1
-
 def write_to_file(velocity_list):
     df = pandas.DataFrame(velocity_list) 
     df.to_csv('velocity_list.csv') 
