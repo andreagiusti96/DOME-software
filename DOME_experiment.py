@@ -19,7 +19,6 @@ import time
 import os
 import signal
 import atexit
-from pathlib import Path
 from datetime import datetime
 from datetime import date
 from scipy import signal as sig
@@ -461,7 +460,7 @@ def terminate_experiment():
     print('Experiment stopped.\n')
     stop_rec()
     print('Saving data...\n')
-    current_experiment.save_data(activation_times=activation_times, images=images, patterns=patterns)
+    current_experiment.save_data(title="data", activation_times=activation_times, images=images, patterns=patterns)
     current_experiment=None
     
 def get_index_for_time(time : float):

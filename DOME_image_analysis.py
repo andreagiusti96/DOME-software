@@ -19,8 +19,12 @@ import scipy
 import glob
 import matplotlib.pyplot as plt
 import pandas 
-from typing import List
 import re
+import os
+from typing import List
+import DOME_experiment_manager as DOMEexp
+
+
 
 def draw_image(img : np.array, title : str =""):
     plt.figure(1,figsize=(20,20),dpi=72)
@@ -180,7 +184,7 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
         #draw_image(mask, "mask")
     
         # Find contours of objects
-        contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours_img=img.copy()
         cv2.drawContours(contours_img, contours, -1, (0,255,0), 3)
     
@@ -207,7 +211,7 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
         #draw_image(contours_img, "contours with thresh=" +str(threshold))
         contoursFiltered_img=cv2.cvtColor(foreground,cv2.COLOR_GRAY2RGB)
         cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
-        draw_image(contoursFiltered_img, "contoursFiltered with thresh=" +str(threshold))
+        #draw_image(contoursFiltered_img, "contoursFiltered with thresh=" +str(threshold))
         
         print("thresh="+ str(round(threshold)) +"\t area_r="+ str(np.around(a_r)) +"\t compactness_r="+ str(np.around(c_r,2)) +"\t objects=" + str(len(contoursFiltered))+"\t exp objects=" + str(expected_obj_number))
         if len(contoursFiltered) < expected_obj_number * (1-margin_factor) :
@@ -435,12 +439,13 @@ def imageImport(fileLocation):
     positions= - np.ones([frames_number, 0, 2], dtype=int );
     inactivity=[]; 
     
-    for counter in range(len(files)):
+    #for counter in range(len(files)):
+    for counter in range(20):
         # declare vars
         filename = files[counter]
         img = cv2.imread(filename)
         time = get_time_from_title(filename)
-        print('\nt = ' + str(time))
+        print('t = ' + str(time))
         
         # collect contours and positions from new image
         new_contours = get_contours(img, area_r=AREA_RANGE, compactness_r=COMPAC_RANGE, background_model=background, expected_obj_number=n_detected_objects)
@@ -510,16 +515,12 @@ def imageImport(fileLocation):
         print('total number of objects = '+ str( number_of_objects) )
         print('detected objects = '+ str( n_detected_objects) )
         print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
-        print('total lost ids = '+ str( len(lost_obj_ids)) )
+        print('total lost ids = '+ str( len(lost_obj_ids)) + '\n')
         
-def write_to_file(velocity_list):
-    df = pandas.DataFrame(velocity_list) 
-    df.to_csv('velocity_list.csv') 
+    return positions, inactivity
 
 
 # MAIN
-
-filePath = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments/2022_12_19_Euglena_3'
 
 DEFAULT_COLOR = "green"
 DEFAULT_BLUR = 9
@@ -527,7 +528,15 @@ AUTO_SCALING = -1
 AREA_RANGE = [100, 600]
 COMPAC_RANGE = [0.5, 0.9]
 
-imageImport(filePath)
+experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
+experiment_name = "2022_12_19_Euglena_3"
+
+current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
+
+positions, inactivity = imageImport(os.path.join(experiments_directory, experiment_name))
+
+current_experiment.save_data(title="analysis_data", positions=positions, inactivity=inactivity)
+
 
 
 

@@ -81,13 +81,13 @@ class ExperimentManager:
         else:
             self.start_time=datetime.strptime(time, '%H:%M:%S')
     
-    def save_data(self, *args, **kwds):
-        '''
-        Add detail to the experiment log.
-        ---
-        Parameters
-        '''
-        file_path = os.path.join(self.path, 'data.npz')
+    def save_data(self, title : str, *args, **kwds):
+        
+        file_path = os.path.join(self.path, title + ".npz")
+        
+        if os.path.isfile(file_path):
+            print(f'File {file_path} already exists!\n')
+            return
         
         if self.name=='default':
             print('First create an experiment with new_experiment().\n')
@@ -96,11 +96,6 @@ class ExperimentManager:
         np.savez(file_path, *args, **kwds)
         
     def get_data(self):
-        '''
-        Add detail to the experiment log.
-        ---
-        Parameters
-        '''
         file_path = os.path.join(self.path, 'data.npz')
         
         if not os.path.exists(file_path):
@@ -172,7 +167,7 @@ def open_experiment(experiment_name : str, output_directory='/home/pi/Documents/
         experiment = ExperimentManager()
         experiment.name=experiment_name
         experiment.path=path
-        print(f'Now working in {path} \nRead the starting time from the log file and set it using reset_starting_time().\n')
+        print(f'Now working in {path}. \n')
     else:
         print(f'{path} not found !\n')
     
