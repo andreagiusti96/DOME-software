@@ -15,18 +15,14 @@ Created by Andrea
 
 import cv2
 import numpy as np
-import scipy
 import glob
 import matplotlib.pyplot as plt
-import pandas 
 import re
-import os
 from typing import List
-import DOME_experiment_manager as DOMEexp
 
 
 
-def draw_image(img : np.array, title : str =""):
+def draw_image(img : np.array = np.zeros([1080, 1920]), title : str =""):
     plt.figure(1,figsize=(20,20),dpi=72)
     plt.title(title); 
     
@@ -133,7 +129,36 @@ def build_background(fileLocation : str, images_number : int):
     
     return background
    
+def get_img_at_time(fileLocation : str, image_time : float):
+    paths=glob.glob(fileLocation +  '/*.jpeg')
+    paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+
+    for filename in paths:
+        if get_time_from_title(filename) == image_time:
+            img = cv2.imread(filename)
+            
+    return img
     
+def get_time_from_title(filename: str):
+    """
+    Extract time from a string.
+
+    Parameters
+    ----------
+    filename : str
+        String to extract the time from.
+
+    Returns
+    -------
+    time : float
+        Time sxtracted from the string.
+
+    """
+    file_name = filename.split("fig_")[-1]
+    file_name = file_name.split(".jpeg")[0]
+    time = float(file_name)
+    return time
+
 def get_contours(img : np.array, area_r : List, compactness_r : List, background_model=None, expected_obj_number : int =0): 
     """
     Thresholding based object detection.
@@ -251,54 +276,6 @@ def get_positions(contours):
     
     return positions
 
-def agentMatching(new_positions : np.array, positions : np.array, inactivity : List):
-    """
-    Track the objects in subsequent time instants assigning IDs.
-    The IDs assignment is formulated as a linear optimization problem and solved with the Hungarian method.
-    New IDs can be allocated.
-    
-    Parameters
-    ----------
-    new_positions : np.array (Shape=N)
-        Positions of detected objects.
-    positions : np.array
-        Positions of previously detected objects. (Shape=Mx2)
-    inactivity : List
-        Inactivity counters of the objects. (Shape=M)
-
-    Returns
-    -------
-    new_ids : List
-        IDs assigned to the detected positions. (Shape=N)
-
-    """
-    number_of_objects = sum(valid_positions(positions))
-    distances = np.ndarray([len(new_positions), number_of_objects])
-    costs_newid = np.ndarray([len(new_positions), len(new_positions)])
-    
-    # build the matrix of costs
-    i=0
-    for pos in new_positions:
-        distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], positions))**2
-        inactivity_cost = (np.array(inactivity)**2) * 10
-        distances[i,:] += inactivity_cost
-        cost_newid = np.min([distance_from_edges(pos), 100])**2 + 50
-        costs_newid[i,:] = np.ones([len(new_positions)]) * cost_newid
-        i+=1
-        
-    costs = np.concatenate((distances, costs_newid), axis=1)
-    
-    # Hungarian optimization algorithm
-    row_ind, col_ind = scipy.optimize.linear_sum_assignment(costs)
-    cost = costs[row_ind, col_ind].sum()
-    
-    # update ids
-    new_ids = [i for i in col_ind]
-    
-    print('matching cost = ' + str(round(cost)) + '\t avg = ' + str(round(cost/(len(new_ids)+0.001))))
-    
-    return new_ids
-
 def distance_from_edges(pos : List):
     """
     Get the distance from the closest edge of the picture frame.
@@ -321,86 +298,6 @@ def distance_from_edges(pos : List):
     assert(dis>=0)
     return dis
 
-def get_time_from_title(filename: str):
-    """
-    Extract time from a string.
-
-    Parameters
-    ----------
-    filename : str
-        String to extract the time from.
-
-    Returns
-    -------
-    time : float
-        Time sxtracted from the string.
-
-    """
-    file_name = filename.split("fig_")[-1]
-    file_name = file_name.split(".jpeg")[0]
-    time = float(file_name)
-    return time
-
-def estimate_velocities(positions : np.array):
-    """
-    Given the past positions of the objects estimates their velocities.
-
-    Parameters
-    ----------
-    positions : np.array
-        Past positions of the objects. Shape=(MxNx2)
-        If M<2 all velocities are [0, 0].
-        Non valid position are discarded.
-    Returns
-    -------
-    velocities : np.array
-        Velocities of the objects. Shape=(Nx2)
-
-    """
-    assert len(positions.shape) == 3
-    assert positions.shape[2] == 2
-
-    velocities = np.zeros(positions.shape[1:3])
-    
-    if positions.shape[0] >=2:
-        valid_pos_idx = valid_positions(positions[-2])
-        velocities[valid_pos_idx] = positions[-1, valid_pos_idx] - positions[-2, valid_pos_idx]
-    
-    speeds = np.linalg.norm(velocities, axis=1)
-    
-    print("avg speed = " + str(round(np.mean(speeds))) + "\tmax = " + str(round(max(speeds))) + "\tid =" + str(np.argmax(speeds)))
-    
-    assert velocities.shape[1] == 2
-    return velocities
-
-def estimate_positions(old_pos : np.array, velocity : np.array):
-    """
-    Given the current positions and velocities returns the future estimated positions of objects.
-    Positions are validated to be in the range [0, 1920][0, 1080]
-
-    Parameters
-    ----------
-    old_pos : np.array
-        Last positions of the objects. Shape=(Nx2)
-    velocity : np.array
-        Velocities of the objects. Shape=(Nx2)
-
-    Returns
-    -------
-    estimated_pos : np.array
-        Next positions of the objects. Shape=(Nx2).
-
-    """
-    assert len(old_pos.shape) == 2
-    assert len(velocity.shape) == 2
-    assert old_pos.shape[1] == 2
-    
-    estimated_pos = old_pos + velocity
-    
-    non_valid_pos_idx = ~ valid_positions(estimated_pos)
-    estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx]  - velocity[non_valid_pos_idx] 
-    
-    return estimated_pos
 
 def valid_positions(positions : np.array):
     """
@@ -424,119 +321,16 @@ def valid_positions(positions : np.array):
     assert len(validity) == positions.shape[0]
     return validity
 
-def imageImport(fileLocation):
-    
-    background = build_background(fileLocation, 25)
+def std_color_for_index(index : int):
+    index = index%len(STD_COLORS)
+    color = STD_COLORS[index]
+    return color
 
-    files = glob.glob(fileLocation +  '/*.jpeg')
-    files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
-    
-    frames_number = len(files)
-    number_of_objects=0
-    n_detected_objects=0
-
-    contours=[];
-    positions= - np.ones([frames_number, 0, 2], dtype=int );
-    inactivity=[]; 
-    
-    #for counter in range(len(files)):
-    for counter in range(20):
-        # declare vars
-        filename = files[counter]
-        img = cv2.imread(filename)
-        time = get_time_from_title(filename)
-        print('t = ' + str(time))
-        
-        # collect contours and positions from new image
-        new_contours = get_contours(img, area_r=AREA_RANGE, compactness_r=COMPAC_RANGE, background_model=background, expected_obj_number=n_detected_objects)
-        new_positions = get_positions(new_contours)
-        n_detected_objects=len(new_positions)
-        
-        # on first iteration assign new susequent ids to all agents
-        if counter == 0: 
-            new_ids = list(range(0, n_detected_objects))
-        
-        # on following iterations perform tracking
-        else:
-            est_positions=positions[counter]                  # select positions at previous time instant
-            est_positions=est_positions[valid_positions(est_positions)] # select valid positions
-            new_ids = agentMatching(new_positions, est_positions, inactivity)
-        
-        # discern new and lost objects
-        newly_allocated_ids = [i for i in new_ids if i not in range(number_of_objects)]
-        lost_obj_ids = [i for i in range(number_of_objects) if i not in new_ids]
-        
-        # update data
-        for new_id in new_ids:
-            # for already detected objects update data
-            if new_id < number_of_objects:
-                positions[counter, new_id] = new_positions[new_ids.index(new_id)]
-                contours[new_id] = new_contours[new_ids.index(new_id)]
-                inactivity[new_id] = 0
-                
-            # for new objects allocate new data
-            else:
-                empty_row= - np.ones([frames_number, 1, 2], dtype=int)
-                positions = np.concatenate([positions,  empty_row], axis=1)
-                positions[counter, number_of_objects] = new_positions[new_ids.index(new_id)]
-                contours.append(new_contours[new_ids.index(new_id)])
-                inactivity.append(0)
-                number_of_objects += 1
-        
-        # for lost objects estimate position and increase inactivity
-        for lost_id in lost_obj_ids:
-            inactivity[lost_id] += 1
-        
-        # estimate velocities and future positions
-        up_to_now_positions=positions[0:counter+1]             # select positions up to current time instant
-        velocities = estimate_velocities(up_to_now_positions)
-        if counter < frames_number-1:
-            positions[counter+1] = estimate_positions(positions[counter], velocities)
-        
-        # check data integrity
-        assert all(valid_positions(positions[counter]))
-                
-        # print image with ids and contours
-        for i in range(number_of_objects):
-            if inactivity[i] <=5:
-                (Cx,Cy) = positions[counter][i]
-                cv2.putText(img, str(i), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
-                
-                if inactivity[i] >0:
-                    cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
-                    cv2.drawContours(img, contours, i, (255,0,0), 4)
-                    for t in range(inactivity[i]):
-                        cv2.circle(img, positions[counter-t][i], 5, (255,0,0), 4)
-                else :
-                    cv2.drawContours(img, contours, i, (0,255,0), 4)
-        draw_image(img, 'time='+str(time) )
-        
-        # print info
-        print('total number of objects = '+ str( number_of_objects) )
-        print('detected objects = '+ str( n_detected_objects) )
-        print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
-        print('total lost ids = '+ str( len(lost_obj_ids)) + '\n')
-        
-    return positions, inactivity
-
-
-# MAIN
-
+# CONSTANTS
 DEFAULT_COLOR = "green"
 DEFAULT_BLUR = 9
 AUTO_SCALING = -1
-AREA_RANGE = [100, 600]
-COMPAC_RANGE = [0.5, 0.9]
 
-experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-experiment_name = "2022_12_19_Euglena_3"
-
-current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
-
-positions, inactivity = imageImport(os.path.join(experiments_directory, experiment_name))
-
-current_experiment.save_data(title="analysis_data", positions=positions, inactivity=inactivity)
-
-
+STD_COLORS = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 

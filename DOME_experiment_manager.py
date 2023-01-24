@@ -95,8 +95,8 @@ class ExperimentManager:
         
         np.savez(file_path, *args, **kwds)
         
-    def get_data(self):
-        file_path = os.path.join(self.path, 'data.npz')
+    def get_data(self, title : str = 'data.npz'):
+        file_path = os.path.join(self.path, title)
         
         if not os.path.exists(file_path):
             raise(Exception(f'{file_path} not found !\n'))
