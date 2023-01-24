@@ -145,7 +145,7 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
 
     contours=[];
     positions= - np.ones([frames_number, 0, 2], dtype=int );
-    inactivity=[]; 
+    inactivity= - np.ones([frames_number, 0], dtype=int );
     
     print("Performing detection and tracking...")
     #for counter in range(len(files)):
@@ -169,7 +169,7 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
         else:
             est_positions=positions[counter]                  # select positions at previous time instant
             est_positions=est_positions[DOMEgraphics.valid_positions(est_positions)] # select valid positions
-            new_ids = agentMatching(new_positions, est_positions, inactivity[counter])
+            new_ids = agentMatching(new_positions, est_positions, inactivity[counter-1])
         
         # discern new and lost objects
         newly_allocated_ids = [i for i in new_ids if i not in range(number_of_objects)]
@@ -189,12 +189,14 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
                 positions = np.concatenate([positions,  empty_row], axis=1)
                 positions[counter, number_of_objects] = new_positions[new_ids.index(new_id)]
                 contours.append(new_contours[new_ids.index(new_id)])
-                inactivity.append(0)
+                empty_row= - np.ones([frames_number, 1], dtype=int)
+                inactivity = np.concatenate([inactivity,  empty_row], axis=1)
+                inactivity[counter, new_id] = 0
                 number_of_objects += 1
         
         # for lost objects estimate position and increase inactivity
         for lost_id in lost_obj_ids:
-            inactivity[lost_id] += 1
+            inactivity[counter, lost_id] = inactivity[counter-1, lost_id] + 1
         
         # estimate velocities and future positions
         up_to_now_positions=positions[0:counter+1]             # select positions up to current time instant
@@ -207,14 +209,14 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
                 
         # print image with ids and contours
         for i in range(number_of_objects):
-            if inactivity[i] <=5:
+            if inactivity[counter, i] <=5:
                 (Cx,Cy) = positions[counter][i]
                 cv2.putText(img, str(i), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
                 
-                if inactivity[i] >0:
-                    cv2.putText(img, str(inactivity[i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
+                if inactivity[counter, i] >0:
+                    cv2.putText(img, str(inactivity[counter, i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
                     cv2.drawContours(img, contours, i, (255,0,0), 4)
-                    for t in range(inactivity[i]):
+                    for t in range(inactivity[counter, i]):
                         cv2.circle(img, positions[counter-t][i], 5, (255,0,0), 4)
                 else :
                     cv2.drawContours(img, contours, i, (0,255,0), 4)
