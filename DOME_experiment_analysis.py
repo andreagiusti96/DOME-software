@@ -46,6 +46,9 @@ else:
 positions[positions==-1]=np.nan
 
 
+positions[inactivity!=0]=np.nan
+
+
 # Plot trajectories
 fig=plt.figure(figsize=(20,20),dpi=72)
 img = DOMEgraphics.get_img_at_time(os.path.join(experiments_directory, experiment_name), 0)
