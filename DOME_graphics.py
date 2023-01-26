@@ -201,6 +201,9 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
     first_time=True
     margin_factor = 0.25
     adjustment_factor = 0.05
+    
+    # Perform brightness and shape thresholding.
+    # Iterate as long as the number of detected objects is not close to the expected one.
     while first_time or (len(contoursFiltered) < expected_obj_number * (1-margin_factor) and threshold > 55) or (len(contoursFiltered) > expected_obj_number * (1+margin_factor) and threshold<200):
         first_time=False
         
@@ -212,7 +215,8 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours_img=img.copy()
         cv2.drawContours(contours_img, contours, -1, (0,255,0), 3)
-    
+        
+        # Select objects with the right size and compactness
         contoursFiltered=[]
         for i in range(len(contours)):
             contour=contours[i]
@@ -238,6 +242,7 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
         cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
         #draw_image(contoursFiltered_img, "contoursFiltered with thresh=" +str(threshold))
         
+        # If the number of detected objects is not close to the expected one adjust the thresholds and iterate
         print("thresh="+ str(round(threshold)) +"\t area_r="+ str(np.around(a_r)) +"\t compactness_r="+ str(np.around(c_r,2)) +"\t objects=" + str(len(contoursFiltered))+"\t exp objects=" + str(expected_obj_number))
         if len(contoursFiltered) < expected_obj_number * (1-margin_factor) :
             threshold=threshold * (1-adjustment_factor)
