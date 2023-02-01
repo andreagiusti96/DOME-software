@@ -412,8 +412,8 @@ def start_experiment():
     global current_experiment
     
     current_experiment=new_experiment(date, species, culture, output_directory)
-    current_experiment.add_detail(f'Sample: '+sample)
-    current_experiment.add_detail(f'Duration={totalT}s')
+    current_experiment.add_detail(f'Sample: '+sample, include_in_exp_list=True)
+    current_experiment.add_detail(f'Duration={totalT}s', include_in_exp_list=True)
     current_experiment.add_detail(f'Sampling time={deltaT}s\n')
     current_experiment.add_detail('Camera settings:\n'+dome_camera.print_settings()+'\n')
     current_experiment.add_detail(f'camera_bright_reduction={camera_bright_reduction}\n')
@@ -470,10 +470,10 @@ def get_index_for_time(time : float):
 if __name__ == '__main__':
     
     # details of the experiment
-    date='2022_12_20'    # date of the experiment. Use format YYYY_MM_DD
-    species='PBursaria'     # species used in the experiment
-    culture='25/11/22 original'     # culture used in the experiment
-    sample='100uL, slide with frame'
+    date='today'    # date of the experiment. Use format YYYY_MM_DD
+    species='EuglenaG'     # species used in the experiment
+    culture='20/12/22 B'     # culture used in the experiment
+    sample='Mag x90, 10uL, no frame'
     
     output_directory='/home/pi/Documents/experiments'
     
@@ -496,13 +496,14 @@ if __name__ == '__main__':
     blue = np.array([1, 0, 0])
     red = np.array([0, 0, 1])
     green= np.array([0, 1, 0])
-    
-    on_value = blue
+
     off_value = red*0.2
+    on_value = blue + off_value
     
     camera_bright_base=40
-    camera_bright_reduction=10
+    camera_bright_reduction=0
     
+    # experiment description
     time_instants=np.linspace(0,totalT, max_time_index)
     outputs=[0]*max_time_index
     outputs[get_index_for_time(10):get_index_for_time(15)]=sig.square(2*np.pi*(time_instants[get_index_for_time(10):get_index_for_time(15)]+deltaT/2))*0.5+0.5

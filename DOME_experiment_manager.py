@@ -13,7 +13,7 @@ import time
 import os
 from pathlib import Path
 from datetime import datetime
-from datetime import date
+#from datetime import date
 import numpy as np
 
 
@@ -29,6 +29,10 @@ class ExperimentManager:
         self.start_time = datetime.now()
         self.name=''
         self.path=''
+        self.master_directory = output_directory
+        
+        if date == '' or date == 'today':
+            date = datetime.today().strftime('%Y_%m_%d')
         
         if species != '' and date != '': 
             self.name = date + '_' + species
@@ -48,7 +52,7 @@ class ExperimentManager:
                 file.write(f'Experiment \n\nDate={date} \nSpecies={species} \nCulture={culture} \nTrial={counter}\n\nCreated='+self.start_time.strftime('%H:%M:%S')+'\n')    
             
             with open(os.path.join(output_directory, 'experiments_list.txt'), 'a') as file:
-                file.write(f'{date},\t{species},\t{culture},\t{counter}\n')    
+                file.write(f'\n{date},\t{species},\t{culture},\t{counter}')    
     
     
     def __enter__(self):
@@ -105,7 +109,7 @@ class ExperimentManager:
         return data
 
     
-    def add_detail(self, message : str):
+    def add_detail(self, message : str, include_in_exp_list : bool =False):
         '''
         Add detail to the experiment log.
         ---
@@ -113,17 +117,29 @@ class ExperimentManager:
             message : str
                 message to append
         '''
-        file_path = os.path.join(self.path, 'experiment_log.txt')
         
         if self.name=='default':
             print('First create an experiment with new_experiment().\n')
             return
+        
+        file_path = os.path.join(self.path, 'experiment_log.txt')
         
         if not os.path.exists(file_path):
             raise(Exception(f'{file_path} not found !\n'))
         
         with open(file_path, 'a') as file:
             file.write('\n' + message)
+        
+        if not include_in_exp_list:
+            return
+        
+        list_file_path = os.path.join(self.master_directory, 'experiments_list.txt')
+        
+        if not os.path.exists(list_file_path):
+            raise(Exception(f'{file_path} not found !\n'))
+        
+        with open(list_file_path, 'a') as file:
+            file.write(',\t' + message)   
     
     def add_log_entry(self, message : str):
         '''
