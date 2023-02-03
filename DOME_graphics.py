@@ -20,7 +20,35 @@ import matplotlib.pyplot as plt
 import re
 from typing import List
 
-
+def draw_trajectories(positions : np.array, inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = 3):
+    plt.figure(1,figsize=(20,20),dpi=72)
+    plt.title(title); 
+    
+    if len(img.shape)==2:
+        plt.imshow(img, cmap='gray', vmin=0, vmax=255)
+    else:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        plt.imshow(img)
+    
+    # discard longly inactive objects
+    obsolete_obgs = np.max(inactivity,axis=0) > max_inactivity
+    pos = positions.copy()
+    pos[:,obsolete_obgs,:]=np.nan
+    
+    # Plot trajectories
+    plt.plot(pos[:,:,0],pos[:,:,1],'o-', markersize=3)
+    
+    # mark estimated or interpolated positions
+    est_positions = pos.copy().astype(float)
+    est_positions[inactivity==0] = np.nan
+    plt.gca().set_prop_cycle(None)
+    plt.plot(est_positions[:,:,0], est_positions[:,:,1], 'x', markersize=10)
+    
+    for obj in range(pos.shape[1]):
+        last_index = pos.shape[0] - (~np.isnan(pos[:,obj,0]))[::-1].argmax(0) -1
+        if not np.isnan(pos[last_index,obj,0]):
+            plt.text(pos[last_index,obj,0], pos[last_index,obj,1], str(obj), fontsize = 22, color = std_color_for_index(obj))
+    plt.show()
 
 def draw_image(img : np.array = np.zeros([1080, 1920]), title : str =""):
     plt.figure(1,figsize=(20,20),dpi=72)
@@ -159,7 +187,7 @@ def get_time_from_title(filename: str):
     time = float(file_name)
     return time
 
-def get_contours(img : np.array, area_r : List, compactness_r : List, background_model=None, expected_obj_number : int =0): 
+def get_contours(img : np.array, area_r : List, compactness_r : List, background_model=None, expected_obj_number : int =0, plot : bool = False): 
     """
     Thresholding based object detection.
 
@@ -182,19 +210,19 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
 
     """
     contoursFiltered=[]
-    #draw_image(img, "img")
+    if plot: draw_image(img, "img")
 
     elaborated_img = process_img(img, color=DEFAULT_COLOR, blur=DEFAULT_BLUR, gain=AUTO_SCALING)
 
     # Subtract the background from the frame
     if type(background_model)==type(None): background_model= np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
     foreground = cv2.min(cv2.absdiff(elaborated_img, background_model), elaborated_img)
-    #draw_image(foreground, "foreground")
+    if plot: draw_image(foreground, "foreground")
     
     foreground = process_img(foreground, blur=DEFAULT_BLUR)
-    # draw_image(foreground, "elaborated foreground")
+    if plot:  draw_image(foreground, "elaborated foreground")
     
-    threshold = 122
+    threshold = 100
     a_r=area_r.copy()
     c_r=compactness_r.copy()
     
@@ -209,7 +237,7 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
         
         # Apply thresholding to the foreground image to create a binary mask
         ret, mask = cv2.threshold(foreground, threshold, 255, cv2.THRESH_BINARY)
-        #draw_image(mask, "mask")
+        if plot: draw_image(mask, "mask")
     
         # Find contours of objects
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -223,7 +251,7 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
             area = cv2.contourArea(contour)
             
             # print contours info
-            (Cx,Cy) = np.squeeze(get_positions(contours[i:i+1]))
+            (Cx,Cy) = np.squeeze(get_positions(contours[i:i+1])).astype(int)
             cv2.putText(contours_img, "A="+str(round(area)), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,4)
             
             if a_r[0] <= area <= a_r[1]:
@@ -240,7 +268,7 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
         #draw_image(contours_img, "contours with thresh=" +str(threshold))
         contoursFiltered_img=cv2.cvtColor(foreground,cv2.COLOR_GRAY2RGB)
         cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
-        #draw_image(contoursFiltered_img, "contoursFiltered with thresh=" +str(threshold))
+        if plot: draw_image(contoursFiltered_img, "contoursFiltered with thresh=" +str(threshold))
         
         # If the number of detected objects is not close to the expected one adjust the thresholds and iterate
         print("thresh="+ str(round(threshold)) +"\t area_r="+ str(np.around(a_r)) +"\t compactness_r="+ str(np.around(c_r,2)) +"\t objects=" + str(len(contoursFiltered))+"\t exp objects=" + str(expected_obj_number))
@@ -277,7 +305,7 @@ def get_positions(contours):
     positions = []
     for contour in contours:
         (x,y,w,h) = cv2.boundingRect(contour)
-        positions.append([x+int(w/2),y+int(h/2)])
+        positions.append([x+(w/2),y+(h/2)])
     
     return positions
 
@@ -321,7 +349,8 @@ def valid_positions(positions : np.array):
     """
     validity0=(positions[:,0] >= 0) & (positions[:,0] <= 1920)
     validity1=(positions[:,1] >= 0) & (positions[:,1] <= 1080)
-    validity = validity0 * validity1
+    validity2= ~ np.isnan(positions[:,0])
+    validity = validity0 * validity1 * validity2
     
     assert len(validity) == positions.shape[0]
     return validity
@@ -332,7 +361,7 @@ def std_color_for_index(index : int):
     return color
 
 # CONSTANTS
-DEFAULT_COLOR = "green"
+DEFAULT_COLOR = "red"
 DEFAULT_BLUR = 9
 AUTO_SCALING = -1
 

@@ -19,8 +19,10 @@ import scipy
 import glob
 import re
 from typing import List
-import DOME_graphics as DOMEgraphics
+import os
 
+import DOME_graphics as DOMEgraphics
+import DOME_experiment_manager as DOMEexp
 
 def agentMatching(new_positions : np.array, positions : np.array, inactivity : List):
     """
@@ -51,7 +53,7 @@ def agentMatching(new_positions : np.array, positions : np.array, inactivity : L
     i=0
     for pos in new_positions:
         distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], positions))**2
-        inactivity_cost = (np.array(inactivity)**2) * 10
+        inactivity_cost = (np.array(inactivity)**3) * 100
         distances[i,:] += inactivity_cost
         cost_newid = np.min([DOMEgraphics.distance_from_edges(pos), 100])**2 + 50
         costs_newid[i,:] = np.ones([len(new_positions)]) * cost_newid
@@ -97,7 +99,7 @@ def estimate_velocities(positions : np.array):
     
     speeds = np.linalg.norm(velocities, axis=1)
     
-    print("avg speed = " + str(round(np.mean(speeds))) + "\tmax = " + str(round(max(speeds))) + "\tid =" + str(np.argmax(speeds)))
+    print("avg speed = " + str(round(np.mean(speeds),1)) + "\tmax = " + str(round(max(speeds),1)) + "\tid =" + str(np.argmax(speeds)))
     
     assert velocities.shape[1] == 2
     return velocities
@@ -131,6 +133,27 @@ def estimate_positions(old_pos : np.array, velocity : np.array):
     
     return estimated_pos
 
+def interpolate_positions(positions : np.array):
+    interpolated_pos=positions.copy()
+    
+    for obj in range(positions.shape[1]):
+        first_index = (~np.isnan(positions[:,obj,0])).argmax(0)
+        last_index = positions.shape[0] - (~np.isnan(positions[:,obj,0]))[::-1].argmax(0) -1
+        
+        nans=np.isnan(positions[first_index:last_index+1,obj,0])
+        missing_points = np.where(nans)[0] +first_index
+        valid_points = np.where(~nans)[0] +first_index
+        
+        if len(missing_points) >0 :
+            trajectory_x=positions[valid_points,obj,0]
+            trajectory_y=positions[valid_points,obj,1]
+            interpolated_pos[missing_points,obj,0] = np.interp(missing_points, valid_points, trajectory_x)
+            interpolated_pos[missing_points,obj,1] = np.interp(missing_points, valid_points, trajectory_y)
+    
+        #print(np.concatenate([positions[:last_index+2,obj], interpolated_pos[:last_index+2,obj]], axis=1))
+    return interpolated_pos
+
+
 def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
     
     print("Building the background model...")
@@ -144,7 +167,7 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
     n_detected_objects=0
 
     contours=[];
-    positions= - np.ones([frames_number, 0, 2], dtype=int );
+    positions= np.empty([frames_number, 0, 2], dtype=float)*np.nan;
     inactivity= - np.ones([frames_number, 0], dtype=int );
     
     print("Performing detection and tracking...")
@@ -157,7 +180,8 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
         print('t = ' + str(time))
         
         # collect contours and positions from new image
-        new_contours = DOMEgraphics.get_contours(img, area_r=area_r, compactness_r=compactness_r, background_model=background, expected_obj_number=n_detected_objects)
+        plot_detection_steps = counter == 0
+        new_contours = DOMEgraphics.get_contours(img, area_r, compactness_r, background, n_detected_objects, plot_detection_steps)
         new_positions = DOMEgraphics.get_positions(new_contours)
         n_detected_objects=len(new_positions)
         
@@ -185,13 +209,15 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
                 
             # for new objects allocate new data
             else:
-                empty_row= - np.ones([frames_number, 1, 2], dtype=int)
+                empty_row= - np.empty([frames_number, 1, 2], dtype=float)*np.nan
                 positions = np.concatenate([positions,  empty_row], axis=1)
                 positions[counter, number_of_objects] = new_positions[new_ids.index(new_id)]
-                contours.append(new_contours[new_ids.index(new_id)])
+                
                 empty_row= - np.ones([frames_number, 1], dtype=int)
                 inactivity = np.concatenate([inactivity,  empty_row], axis=1)
-                inactivity[counter, new_id] = 0
+                inactivity[counter, number_of_objects] = 0
+
+                contours.append(new_contours[new_ids.index(new_id)])
                 number_of_objects += 1
         
         # for lost objects estimate position and increase inactivity
@@ -206,22 +232,26 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
         
         # check data integrity
         assert all(DOMEgraphics.valid_positions(positions[counter]))
-                
-        # print image with ids and contours
-        for i in range(number_of_objects):
-            if inactivity[counter, i] <=5:
-                (Cx,Cy) = positions[counter][i]
-                cv2.putText(img, str(i), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
-                
-                if inactivity[counter, i] >0:
-                    cv2.putText(img, str(inactivity[counter, i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
-                    cv2.drawContours(img, contours, i, (255,0,0), 4)
-                    for t in range(inactivity[counter, i]):
-                        cv2.circle(img, positions[counter-t][i], 5, (255,0,0), 4)
-                else :
-                    cv2.drawContours(img, contours, i, (0,255,0), 4)
-        DOMEgraphics.draw_image(img, 'time='+str(time) )
         
+        DOMEgraphics.draw_trajectories(positions[:counter+1], inactivity[:counter+1], img, title='time='+str(time))
+
+        
+        # # print image with ids and contours
+        # for i in range(number_of_objects):
+        #     if inactivity[counter, i] <=3:
+        #         (Cx,Cy) = positions[counter][i].astype(int)
+        #         cv2.putText(img, str(i), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
+                
+        #         if inactivity[counter, i] >0:
+        #             cv2.putText(img, str(inactivity[counter, i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
+        #             cv2.drawContours(img, contours, i, (255,0,0), 4)
+        #             for t in range(inactivity[counter, i]):
+        #                 cv2.circle(img, positions[counter-t][i].astype(int), 5, (255,0,0), 4)
+        #         else :
+        #             cv2.drawContours(img, contours, i, (0,255,0), 4)
+        # DOMEgraphics.draw_image(img, 'time='+str(time) )
+        
+
         # print info
         print('total number of objects = '+ str( number_of_objects) )
         print('detected objects = '+ str( n_detected_objects) )
@@ -229,5 +259,36 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
         print('total lost ids = '+ str( len(lost_obj_ids)) + '\n')
         
     return positions, inactivity
+
+# MAIN
+if __name__ == '__main__':
+    AREA_RANGE = [100, 600]
+    COMPAC_RANGE = [0.5, 0.9]
+    
+    experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
+    experiment_name = "2023_02_01_EuglenaG_9"
+    
+    current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
+    
+    analised_data_path = os.path.join(experiments_directory, experiment_name, 'analysis_data.npz')
+    
+    # extract data
+    positions, inactivity = extract_data_from_images(os.path.join(experiments_directory, experiment_name), AREA_RANGE, COMPAC_RANGE)
+
+    # If the file analysis_data.npz is not found data are extracted using DOMEtracker.
+    # Otherwise the data from the existing file are loaded.
+    if not os.path.isfile(analised_data_path):
+        current_experiment.save_data(title="analysis_data", positions=positions, inactivity=inactivity)
+    else:
+        print(f'The file {analised_data_path} already exists. Data cannot be saved.')
+    
+    
+    
+    
+    
+    
+
+
+
 
 
