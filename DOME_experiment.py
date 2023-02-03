@@ -432,7 +432,7 @@ def start_experiment():
         t=count*deltaT
         tic=datetime.now()
         activation_times[count]=(tic - current_experiment.start_time).total_seconds()
-        images[count,:,:,:]=capture(f'fig_{round(t,1)}', prevent_print=True, prevent_log=False)
+        images[count,:,:,:]=capture('fig_' + '%04.1f' % t, prevent_print=True, prevent_log=False)
         
         # compute output
         output=outputs[count]

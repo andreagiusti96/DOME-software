@@ -52,7 +52,7 @@ class ExperimentManager:
                 file.write(f'Experiment \n\nDate={date} \nSpecies={species} \nCulture={culture} \nTrial={counter}\n\nCreated='+self.start_time.strftime('%H:%M:%S')+'\n')    
             
             with open(os.path.join(output_directory, 'experiments_list.txt'), 'a') as file:
-                file.write(f'\n{date},\t{species},\t{culture},\t{counter}')    
+                file.write(f'\n{date},'.ljust(11) + f'\t{species},'.ljust(12) + f'\t{culture},'.ljust(18) + f'\t{counter}')
     
     
     def __enter__(self):
