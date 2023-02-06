@@ -300,7 +300,8 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
         
         if expected_obj_number==0: expected_obj_number = len(contoursFiltered)
         
-        #draw_image(contours_img, "contours with thresh=" +str(threshold))
+        if plot: draw_image(contours_img, "contours with thresh=" +str(threshold))
+        
         contoursFiltered_img=cv2.cvtColor(foreground,cv2.COLOR_GRAY2RGB)
         cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0,255,0), 3)
         if plot: draw_image(contoursFiltered_img, "contoursFiltered with thresh=" +str(threshold))

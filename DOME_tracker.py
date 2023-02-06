@@ -20,9 +20,40 @@ import glob
 import re
 from typing import List
 import os
+import matplotlib.pyplot as plt
 
 import DOME_graphics as DOMEgraphics
 import DOME_experiment_manager as DOMEexp
+
+
+NEW_ID_COST_MIN = 500
+NEW_ID_COST_DIST_CAP = 100
+DISTANCE_COST_FACTORS = [0, 1]
+INACTIVITY_COST_FACTORS = [0, 1000]
+    
+def plotCosts():
+    fig = plt.figure(1,figsize=(19.20,10.80),dpi=100)
+    fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
+    plt.title('Matching cost')
+    
+    maxdist=200
+    distances=np.linspace(0, maxdist)
+    inactivity=np.array([0, 1, 2, 3, 4, 5])
+    
+    matching_cost=np.zeros([len(distances), len(inactivity)])
+    
+    for i in range(len(inactivity)):
+        matching_cost[:,i] = distances*DISTANCE_COST_FACTORS[0] + distances**2*DISTANCE_COST_FACTORS[1]
+        matching_cost[:,i] += inactivity[i] * INACTIVITY_COST_FACTORS[0] +inactivity[i]**2 * INACTIVITY_COST_FACTORS[1]
+    
+    
+    plt.plot(distances, matching_cost)
+    plt.plot([0, maxdist], NEW_ID_COST_MIN * np.array([1, 1]))
+    plt.plot([0, maxdist], (NEW_ID_COST_DIST_CAP**2) + NEW_ID_COST_MIN * np.array([1, 1]))
+    plt.legend( inactivity)
+    plt.gca().set_ylim([0, 50000])
+    plt.gca().set_xlim([0, maxdist])
+
 
 def agentMatching(new_positions : np.array, positions : np.array, inactivity : List):
     """
@@ -47,19 +78,21 @@ def agentMatching(new_positions : np.array, positions : np.array, inactivity : L
     """
     number_of_objects = sum(DOMEgraphics.valid_positions(positions))
     distances = np.ndarray([len(new_positions), number_of_objects])
+    costs_matching = np.ndarray([len(new_positions), number_of_objects])
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
     
     # build the matrix of costs
     i=0
     for pos in new_positions:
-        distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], positions))**2
-        inactivity_cost = (np.array(inactivity)**3) * 100
-        distances[i,:] += inactivity_cost
-        cost_newid = np.min([DOMEgraphics.distance_from_edges(pos), 100])**2 + 50
+        distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], positions))
+        costs_matching[i,:] = distances[i,:]*DISTANCE_COST_FACTORS[0] +distances[i,:]**2*DISTANCE_COST_FACTORS[1]
+        inactivity_cost = (np.array(inactivity)) * INACTIVITY_COST_FACTORS[0] + (np.array(inactivity)**2) * INACTIVITY_COST_FACTORS[1]
+        costs_matching[i,:] += inactivity_cost
+        cost_newid = np.min([DOMEgraphics.distance_from_edges(pos), NEW_ID_COST_DIST_CAP])**2 + NEW_ID_COST_MIN
         costs_newid[i,:] = np.ones([len(new_positions)]) * cost_newid
         i+=1
         
-    costs = np.concatenate((distances, costs_newid), axis=1)
+    costs = np.concatenate((costs_matching, costs_newid), axis=1)
     
     # Hungarian optimization algorithm
     row_ind, col_ind = scipy.optimize.linear_sum_assignment(costs)
@@ -252,12 +285,12 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List, 
 
 # MAIN
 if __name__ == '__main__':
-    AREA_RANGE = [100, 600]
+    AREA_RANGE = [120, 650]
     COMPAC_RANGE = [0.5, 0.9]
     
     experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
     experiment_name = "2023_02_01_EuglenaG_9"
-    output_folder ='tracking'
+    output_folder ='tracking2'
     
     current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
     
