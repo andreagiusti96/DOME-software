@@ -154,7 +154,12 @@ def interpolate_positions(positions : np.array):
     return interpolated_pos
 
 
-def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
+def extract_data_from_images(fileLocation, area_r : List, compactness_r : List, output_folder ='tracking'):
+    
+    try:
+        os.mkdir(os.path.join(fileLocation, output_folder))
+    except OSError:
+        pass
     
     print("Building the background model...")
     background = DOMEgraphics.build_background(fileLocation, 25)
@@ -171,8 +176,8 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
     inactivity= - np.ones([frames_number, 0], dtype=int );
     
     print("Performing detection and tracking...")
-    #for counter in range(len(files)):
-    for counter in range(20):
+    for counter in range(len(files)):
+    #for counter in range(10):
         # declare vars
         filename = files[counter]
         img = cv2.imread(filename)
@@ -233,31 +238,16 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List):
         # check data integrity
         assert all(DOMEgraphics.valid_positions(positions[counter]))
         
-        DOMEgraphics.draw_trajectories(positions[:counter+1], inactivity[:counter+1], img, title='time='+str(time))
-
+        # print image
+        fig = DOMEgraphics.draw_trajectories(positions[:counter+1], [], inactivity[:counter+1], img, title='time='+str(time), max_inactivity=3, time_window=5)
+        fig.savefig(os.path.join(fileLocation, output_folder,'trk_' + '%04.1f' % time + '.jpeg'), dpi=100)
         
-        # # print image with ids and contours
-        # for i in range(number_of_objects):
-        #     if inactivity[counter, i] <=3:
-        #         (Cx,Cy) = positions[counter][i].astype(int)
-        #         cv2.putText(img, str(i), (Cx+20,Cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255) ,5)
-                
-        #         if inactivity[counter, i] >0:
-        #             cv2.putText(img, str(inactivity[counter, i]), (Cx+20,Cy+40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0) ,5)
-        #             cv2.drawContours(img, contours, i, (255,0,0), 4)
-        #             for t in range(inactivity[counter, i]):
-        #                 cv2.circle(img, positions[counter-t][i].astype(int), 5, (255,0,0), 4)
-        #         else :
-        #             cv2.drawContours(img, contours, i, (0,255,0), 4)
-        # DOMEgraphics.draw_image(img, 'time='+str(time) )
-        
-
         # print info
         print('total number of objects = '+ str( number_of_objects) )
         print('detected objects = '+ str( n_detected_objects) )
         print('new ids = ' + str(newly_allocated_ids) + '\t tot = '+ str( len(newly_allocated_ids)) )
         print('total lost ids = '+ str( len(lost_obj_ids)) + '\n')
-        
+    
     return positions, inactivity
 
 # MAIN
@@ -267,16 +257,19 @@ if __name__ == '__main__':
     
     experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
     experiment_name = "2023_02_01_EuglenaG_9"
+    output_folder ='tracking'
     
     current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
     
-    analised_data_path = os.path.join(experiments_directory, experiment_name, 'analysis_data.npz')
-    
     # extract data
-    positions, inactivity = extract_data_from_images(os.path.join(experiments_directory, experiment_name), AREA_RANGE, COMPAC_RANGE)
-
+    positions, inactivity = extract_data_from_images(os.path.join(experiments_directory, experiment_name), AREA_RANGE, COMPAC_RANGE, output_folder)
+    
+    # make video from images
+    DOMEgraphics.make_video(os.path.join(experiments_directory, experiment_name, output_folder), title='tracking.mp4', fps=2)
+    
     # If the file analysis_data.npz is not found data are extracted using DOMEtracker.
     # Otherwise the data from the existing file are loaded.
+    analised_data_path = os.path.join(experiments_directory, experiment_name, 'analysis_data.npz')
     if not os.path.isfile(analised_data_path):
         current_experiment.save_data(title="analysis_data", positions=positions, inactivity=inactivity)
     else:

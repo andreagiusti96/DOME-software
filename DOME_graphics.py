@@ -18,22 +18,34 @@ import numpy as np
 import glob
 import matplotlib.pyplot as plt
 import re
+import os
 from typing import List
 
-def draw_trajectories(positions : np.array, inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = 3):
-    plt.figure(1,figsize=(20,20),dpi=72)
+def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = 3, time_window : int = 10):
+    fig = plt.figure(1,figsize=(19.20,10.80),dpi=100)
+    fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
     plt.title(title); 
     
+   # cv2.drawContours(img, contours, -1, (255,0,0), 4)
+
     if len(img.shape)==2:
         plt.imshow(img, cmap='gray', vmin=0, vmax=255)
     else:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         plt.imshow(img)
     
+    
     # discard longly inactive objects
-    obsolete_obgs = np.max(inactivity,axis=0) > max_inactivity
-    pos = positions.copy()
-    pos[:,obsolete_obgs,:]=np.nan
+    if max_inactivity > 0:
+        counter = inactivity.shape[0] - (inactivity[:,0] >= 0)[::-1].argmax(0) -1
+        obsolete_obgs = inactivity[counter,:] > max_inactivity
+        pos = positions.copy()
+        pos[:,obsolete_obgs,:]=np.nan
+    
+    # select recent data
+    if time_window > 0:
+        time_window_start = max([counter+1-time_window, 0])
+        pos[:time_window_start,:,:]=np.nan
     
     # Plot trajectories
     plt.plot(pos[:,:,0],pos[:,:,1],'o-', markersize=3)
@@ -48,7 +60,12 @@ def draw_trajectories(positions : np.array, inactivity : np.array = np.zeros(0),
         last_index = pos.shape[0] - (~np.isnan(pos[:,obj,0]))[::-1].argmax(0) -1
         if not np.isnan(pos[last_index,obj,0]):
             plt.text(pos[last_index,obj,0], pos[last_index,obj,1], str(obj), fontsize = 22, color = std_color_for_index(obj))
+            if len(contours)>0:
+                contour =np.array(contours[:][obj][:]).squeeze()
+                plt.plot(contour[:,0],contour[:,1], color = std_color_for_index(obj))
     plt.show()
+    
+    return fig
 
 def draw_image(img : np.array = np.zeros([1080, 1920]), title : str =""):
     plt.figure(1,figsize=(20,20),dpi=72)
@@ -65,6 +82,24 @@ def draw_image(img : np.array = np.zeros([1080, 1920]), title : str =""):
 def histogram(img : np.array):
     plt.title("Histogram");
     plt.hist(img.ravel(),256,[0,256]); plt.show()
+    
+def make_video(directory : str, title : str = "video.mp4", fps : float = 1):
+    paths = glob.glob(directory +  '/*.jpeg')
+    paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+    
+    dim=(1920,1080)
+    
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video = cv2.VideoWriter(os.path.join(directory,title), fourcc, fps, frameSize=dim)
+    
+    for path in paths:
+        frame=cv2.imread(path)
+        resized = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+        video.write(resized)
+    
+    cv2.destroyAllWindows()
+    video.release()
+    print(f'Video {title} saved in {directory}')
     
 def process_img(img : np.array, color : str = "", blur  : int = 0, gain  : float = 1., contrast : bool =False, equalize : bool =False, plot : bool =False):
     
@@ -129,7 +164,7 @@ def build_background(fileLocation : str, images_number : int):
         Gray scale image of the background.
 
     """
-    paths=glob.glob(fileLocation +  '/*.jpeg')
+    paths=glob.glob(fileLocation +  '/fig_*.jpeg')
     paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
 
     images = np.ndarray([images_number, 1080, 1920], dtype=np.uint8)
