@@ -132,7 +132,7 @@ def estimate_velocities(positions : np.array):
     
     speeds = np.linalg.norm(velocities, axis=1)
     
-    print("avg speed = " + str(round(np.mean(speeds),1)) + "\tmax = " + str(round(max(speeds),1)) + "\tid =" + str(np.argmax(speeds)))
+    #print("avg speed = " + str(round(np.mean(speeds),1)) + "\tmax = " + str(round(max(speeds),1)) + "\tid =" + str(np.argmax(speeds)))
     
     assert velocities.shape[1] == 2
     return velocities
@@ -302,9 +302,9 @@ if __name__ == '__main__':
     
     # If the file analysis_data.npz is not found data are extracted using DOMEtracker.
     # Otherwise the data from the existing file are loaded.
-    analised_data_path = os.path.join(experiments_directory, experiment_name, 'analysis_data.npz')
+    analised_data_path = os.path.join(experiments_directory, experiment_name, output_folder, 'analysis_data.npz')
     if not os.path.isfile(analised_data_path):
-        current_experiment.save_data(title="analysis_data", positions=positions, inactivity=inactivity)
+        current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), positions=positions, inactivity=inactivity)
     else:
         print(f'The file {analised_data_path} already exists. Data cannot be saved.')
     
