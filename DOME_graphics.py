@@ -21,6 +21,16 @@ import re
 import os
 from typing import List
 
+
+def highligth_inputs(inputs : np.array, alpha : float = 0.3):
+    on_value=max(inputs[:-2,0]-inputs[1:-1,0])
+    off_value=min(inputs[:-2,0]-inputs[1:-1,0])
+    
+    ons =np.where(inputs[:-2,0]-inputs[1:-1,0]==on_value)[0]
+    offs =np.where(inputs[:-2,0]-inputs[1:-1,0]==off_value)[0]
+    for i in range(len(ons)):
+        plt.axvspan(ons[i], offs[i], color='red', alpha=alpha, zorder=0)
+
 def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = 3, time_window : int = 10):
     fig = plt.figure(1,figsize=(19.20,10.80),dpi=100)
     fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
