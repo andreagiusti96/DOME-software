@@ -415,14 +415,17 @@ def start_experiment():
     current_experiment.add_detail(f'Sample: '+sample, include_in_exp_list=True)
     current_experiment.add_detail(f'Duration={totalT}s', include_in_exp_list=True)
     current_experiment.add_detail(f'Sampling time={deltaT}s\n')
+    current_experiment.add_detail(f'Sample temperature={temp}°C\n')
     current_experiment.add_detail('Camera settings:\n'+dome_camera.print_settings()+'\n')
     current_experiment.add_detail(f'camera_bright_reduction={camera_bright_reduction}\n')
     current_experiment.add_detail('Log:')
+    os.mkdir(os.path.join(current_experiment.path, 'patterns'))
+    os.mkdir(os.path.join(current_experiment.path, 'images'))
     
     count=0
     
     current_experiment.reset_starting_time()
-    rec()
+    rec('video')
     print('Experiment running...\n')
     
     # run the experiment
@@ -432,7 +435,8 @@ def start_experiment():
         t=count*deltaT
         tic=datetime.now()
         activation_times[count]=(tic - current_experiment.start_time).total_seconds()
-        images[count,:,:,:]=capture('fig_' + '%04.1f' % t, prevent_print=True, prevent_log=False)
+        out_img=os.path.join('images', 'fig_' + '%04.1f' % t)
+        images[count,:,:,:]=capture(out_img, prevent_print=True, prevent_log=False)
         
         # compute output
         output=outputs[count]
@@ -441,6 +445,8 @@ def start_experiment():
         
         # apply output
         patterns[count,:,:,:]=make_pattern()
+        out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
+        cv2.imwrite(out_patt, np.squeeze(patterns[count,:,:,:]))
         set_color(newcolor)
         
         # wait
@@ -452,6 +458,7 @@ def start_experiment():
         time.sleep(max(0, time_to_wait ))
     
     # terminate the experiment and recording
+    set_color(off_value, prevent_log=True)
     terminate_experiment()
 
 def terminate_experiment():
@@ -471,9 +478,10 @@ if __name__ == '__main__':
     
     # details of the experiment
     date='today'    # date of the experiment. Use format YYYY_MM_DD
-    species='EuglenaG'     # species used in the experiment
-    culture='20/12/22 B'     # culture used in the experiment
+    species='Euglena'     # species used in the experiment
+    culture='23/01/23 A'     # culture used in the experiment
     sample='Mag x90, 10uL, no frame'
+    temp='21.1' # temperature of the sample
     
     output_directory='/home/pi/Documents/experiments'
     
@@ -497,7 +505,7 @@ if __name__ == '__main__':
     red = np.array([0, 0, 1])
     green= np.array([0, 1, 0])
 
-    off_value = red*0.2
+    off_value = red*0.1
     on_value = blue + off_value
     
     camera_bright_base=40
@@ -505,7 +513,15 @@ if __name__ == '__main__':
     
     # experiment description
     time_instants=np.linspace(0,totalT, max_time_index)
+    
+    # always off
     outputs=[0]*max_time_index
+    
+#     # half off - half on
+#     outputs=[0]*max_time_index
+#     outputs[get_index_for_time(totalT/2):]=[1]*int(np.ceil(max_time_index/2))
+
+    # varying frequency
     outputs[get_index_for_time(10):get_index_for_time(15)]=sig.square(2*np.pi*(time_instants[get_index_for_time(10):get_index_for_time(15)]+deltaT/2))*0.5+0.5
     outputs[get_index_for_time(15):get_index_for_time(20)]=sig.square(0.5*2*np.pi*(time_instants[get_index_for_time(15):get_index_for_time(20)]+deltaT/2))*0.5+0.5
     outputs[get_index_for_time(20):get_index_for_time(40)]=sig.square(0.2*2*np.pi*(time_instants[get_index_for_time(20):get_index_for_time(40)]+deltaT/2))*0.5+0.5
@@ -532,7 +548,7 @@ if __name__ == '__main__':
     signal.signal(signal.SIGSEGV, terminate_experiment)
     
     # initialize projector
-    bright=100
+    bright=200
     color=off_value
     update_projector()
     
