@@ -23,11 +23,16 @@ from typing import List
 
 
 def highligth_inputs(inputs : np.array, alpha : float = 0.3):
-    on_value=max(inputs[:-2,0]-inputs[1:-1,0])
-    off_value=min(inputs[:-2,0]-inputs[1:-1,0])
+    input_differences = inputs[1:-1,0]-inputs[0:-2,0]
+    on_value=max(max(input_differences), 1)
+    off_value=min(min(input_differences), -1)
     
-    ons =np.where(inputs[:-2,0]-inputs[1:-1,0]==on_value)[0]
-    offs =np.where(inputs[:-2,0]-inputs[1:-1,0]==off_value)[0]
+    ons =np.where(input_differences ==on_value)[0]
+    offs =np.where(input_differences ==off_value)[0]
+    
+    if len(ons)>len(offs):
+        offs = np.append(offs,len(inputs)-1)
+    
     for i in range(len(ons)):
         plt.axvspan(ons[i], offs[i], color='red', alpha=alpha, zorder=0)
 
@@ -73,6 +78,9 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
             if len(contours)>0:
                 contour =np.array(contours[:][obj][:]).squeeze()
                 plt.plot(contour[:,0],contour[:,1], color = std_color_for_index(obj))
+    
+    plt.xlim([0, 1920])
+    plt.ylim([0, 1080])
     plt.show()
     
     return fig
@@ -195,9 +203,13 @@ def build_background(fileLocation : str, images_number : int):
     # compute background
     background = np.median(images, axis=0)
     #background = np.mean(images, axis=0)
+    
+
     background = background.round().astype(np.uint8)
     background = np.squeeze(background)
     
+    background = process_img(background, blur=DEFAULT_BLUR, gain=1.5)
+
     draw_image(background, "background from color "+DEFAULT_COLOR)
     
     return background
@@ -232,7 +244,7 @@ def get_time_from_title(filename: str):
     time = float(file_name)
     return time
 
-def get_contours(img : np.array, area_r : List, compactness_r : List, background_model=None, expected_obj_number : int =0, plot : bool = False): 
+def get_contours(img : np.array, bright_thresh : List, area_r : List, compactness_r : List, background_model=None, expected_obj_number : int =0, plot : bool = False): 
     """
     Thresholding based object detection.
 
@@ -258,26 +270,31 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
     if plot: draw_image(img, "img")
 
     elaborated_img = process_img(img, color=DEFAULT_COLOR, blur=DEFAULT_BLUR, gain=AUTO_SCALING)
+    if plot: draw_image(elaborated_img, "elaborated img from color " + DEFAULT_COLOR)
 
     # Subtract the background from the frame
     if type(background_model)==type(None): background_model= np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
-    foreground = cv2.min(cv2.absdiff(elaborated_img, background_model), elaborated_img)
+    #foreground = cv2.min(cv2.subtract(elaborated_img, background_model), elaborated_img)
+    foreground = cv2.subtract(elaborated_img, background_model)
     if plot: draw_image(foreground, "foreground")
     
     foreground = process_img(foreground, blur=DEFAULT_BLUR)
     if plot:  draw_image(foreground, "elaborated foreground")
     
-    threshold = 100
-    a_r=area_r.copy()
-    c_r=compactness_r.copy()
+    threshold = bright_thresh[0]
+    a_r=area_r #.copy()
+    c_r=compactness_r #.copy()
     
     first_time=True
     margin_factor = 0.25
-    adjustment_factor = 0.05
+    adjustment_factor = 0.02
+    
+    too_few_obgs = False
+    too_many_obgs = False
     
     # Perform brightness and shape thresholding.
     # Iterate as long as the number of detected objects is not close to the expected one.
-    while first_time or (len(contoursFiltered) < expected_obj_number * (1-margin_factor) and threshold > 55) or (len(contoursFiltered) > expected_obj_number * (1+margin_factor) and threshold<200):
+    while first_time or (too_few_obgs and threshold > 55) or (too_many_obgs and threshold<200):
         first_time=False
         
         # Apply thresholding to the foreground image to create a binary mask
@@ -318,14 +335,20 @@ def get_contours(img : np.array, area_r : List, compactness_r : List, background
         
         # If the number of detected objects is not close to the expected one adjust the thresholds and iterate
         print("thresh="+ str(round(threshold)) +"\t area_r="+ str(np.around(a_r)) +"\t compactness_r="+ str(np.around(c_r,2)) +"\t objects=" + str(len(contoursFiltered))+"\t exp objects=" + str(expected_obj_number))
-        if len(contoursFiltered) < expected_obj_number * (1-margin_factor) :
-            threshold=threshold * (1-adjustment_factor)
+        too_many_obgs = len(contoursFiltered)-expected_obj_number >  np.ceil(expected_obj_number*margin_factor*2.0)
+        too_few_obgs = len(contoursFiltered)-expected_obj_number < - np.ceil(expected_obj_number*margin_factor)
+        
+        if too_few_obgs :
+            bright_thresh[0]=bright_thresh[0] * (1-adjustment_factor)
+            threshold = bright_thresh[0]
             a_r[0]=a_r[0] * (1-adjustment_factor)
             a_r[1]=a_r[1] * (1+adjustment_factor)            
             c_r[0]=c_r[0] * (1-adjustment_factor)
             c_r[1]=c_r[1] * (1+adjustment_factor)
-        elif len(contoursFiltered) > expected_obj_number * (1+margin_factor) :
-            threshold=threshold * (1+adjustment_factor)
+        
+        elif too_many_obgs :
+            bright_thresh[0]=bright_thresh[0] * (1+adjustment_factor)
+            threshold = bright_thresh[0]
             a_r[0]=a_r[0] * (1+adjustment_factor)
             a_r[1]=a_r[1] * (1-adjustment_factor)            
             c_r[0]=c_r[0] * (1+adjustment_factor)

@@ -21,6 +21,7 @@ import re
 from typing import List
 import os
 import matplotlib.pyplot as plt
+import random
 
 import DOME_graphics as DOMEgraphics
 import DOME_experiment_manager as DOMEexp
@@ -187,12 +188,18 @@ def interpolate_positions(positions : np.array):
     return interpolated_pos
 
 
-def extract_data_from_images(fileLocation, area_r : List, compactness_r : List, output_folder ='tracking'):
+def test_detection_parameters(fileLocation, bright_thresh, area_r : List, compactness_r : List):
+    files = glob.glob(fileLocation +  '/*.jpeg')
+    files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
     
-    try:
-        os.mkdir(os.path.join(fileLocation, output_folder))
-    except OSError:
-        pass
+    filename = random.choice(files)
+    img = cv2.imread(filename)
+
+    background = DOMEgraphics.build_background(fileLocation, 25)
+
+    new_contours = DOMEgraphics.get_contours(img, bright_thresh, area_r, compactness_r, background, 0, True)
+
+def extract_data_from_images(fileLocation, bright_thresh : List, area_r : List, compactness_r : List, output_folder : str):
     
     print("Building the background model...")
     background = DOMEgraphics.build_background(fileLocation, 25)
@@ -219,7 +226,7 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List, 
         
         # collect contours and positions from new image
         plot_detection_steps = counter == 0
-        new_contours = DOMEgraphics.get_contours(img, area_r, compactness_r, background, n_detected_objects, plot_detection_steps)
+        new_contours = DOMEgraphics.get_contours(img, bright_thresh, area_r, compactness_r, background, n_detected_objects, plot_detection_steps)
         new_positions = DOMEgraphics.get_positions(new_contours)
         n_detected_objects=len(new_positions)
         
@@ -285,24 +292,37 @@ def extract_data_from_images(fileLocation, area_r : List, compactness_r : List, 
 
 # MAIN
 if __name__ == '__main__':
-    AREA_RANGE = [120, 650]
-    COMPAC_RANGE = [0.5, 0.9]
+    AREA_RANGE = [250, 3000] #[120, 650]
+    COMPAC_RANGE = [0.6, 0.9]
+    BRIGHT_THRESH = [85]
     
     experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-    experiment_name = "2023_02_01_EuglenaG_9"
-    output_folder ='tracking2'
+    experiment_name = "2023_02_20_Euglena_1"
+    output_folder ='tracking1'
     
     current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
     
+    if os.path.isdir(os.path.join(experiments_directory, experiment_name,'images')):
+        images_folder=os.path.join(experiments_directory, experiment_name,'images')
+    else:
+        images_folder=os.path.join(experiments_directory, experiment_name)
+    
+    test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
+    
+    output_dir = os.path.join(experiments_directory, experiment_name, output_folder)
+    try:
+        os.mkdir(output_dir)
+    except OSError:
+        pass
+    
     # extract data
-    positions, inactivity = extract_data_from_images(os.path.join(experiments_directory, experiment_name), AREA_RANGE, COMPAC_RANGE, output_folder)
+    positions, inactivity = extract_data_from_images(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE, output_dir)
     
     # make video from images
-    DOMEgraphics.make_video(os.path.join(experiments_directory, experiment_name, output_folder), title='tracking.mp4', fps=2)
+    DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2)
     
-    # If the file analysis_data.npz is not found data are extracted using DOMEtracker.
-    # Otherwise the data from the existing file are loaded.
-    analised_data_path = os.path.join(experiments_directory, experiment_name, output_folder, 'analysis_data.npz')
+    # If the file analysis_data.npz is not found data are saved
+    analised_data_path = os.path.join(output_dir, 'analysis_data.npz')
     if not os.path.isfile(analised_data_path):
         current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), positions=positions, inactivity=inactivity)
     else:
