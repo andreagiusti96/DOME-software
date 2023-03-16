@@ -436,7 +436,8 @@ def start_experiment():
         tic=datetime.now()
         activation_times[count]=(tic - current_experiment.start_time).total_seconds()
         out_img=os.path.join('images', 'fig_' + '%04.1f' % t)
-        images[count,:,:,:]=capture(out_img, prevent_print=True, prevent_log=False)
+        #images[count,:,:,:]=capture(out_img, prevent_print=True, prevent_log=False)
+        capture(out_img, prevent_print=True, prevent_log=False)
         
         # compute output
         output=outputs[count]
@@ -467,7 +468,8 @@ def terminate_experiment():
     print('Experiment stopped.\n')
     stop_rec()
     print('Saving data...\n')
-    current_experiment.save_data(title="data", activation_times=activation_times, images=images, patterns=patterns)
+    #current_experiment.save_data(title="data", activation_times=activation_times, images=images, patterns=patterns)
+    current_experiment.save_data(title="data", activation_times=activation_times, patterns=patterns)
     current_experiment=None
     
 def get_index_for_time(time : float):
@@ -496,7 +498,7 @@ if __name__ == '__main__':
     
     max_time_index = int(totalT/deltaT + 1)
     activation_times=np.ndarray([max_time_index])
-    images = np.ndarray([max_time_index, 1080, 1920, 3], dtype=np.uint8)
+    #images = np.ndarray([max_time_index, 1080, 1920, 3], dtype=np.uint8)
     patterns = np.ndarray([max_time_index, 480, 854, 3], dtype=np.uint8)
 
     white = np.array([1, 1, 1])
