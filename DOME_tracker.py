@@ -29,7 +29,7 @@ import DOME_experiment_manager as DOMEexp
 
 NEW_ID_COST_MIN = 500
 NEW_ID_COST_DIST_CAP = 100
-DISTANCE_COST_FACTORS = [0, 1]
+DISTANCE_COST_FACTORS = [0, 2]
 INACTIVITY_COST_FACTORS = [0, 1000]
     
 def plotCosts():
@@ -37,7 +37,7 @@ def plotCosts():
     fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
     plt.title('Matching cost')
     
-    maxdist=200
+    maxdist=100
     distances=np.linspace(0, maxdist)
     inactivity=np.array([0, 1, 2, 3, 4, 5])
     
@@ -47,12 +47,13 @@ def plotCosts():
         matching_cost[:,i] = distances*DISTANCE_COST_FACTORS[0] + distances**2*DISTANCE_COST_FACTORS[1]
         matching_cost[:,i] += inactivity[i] * INACTIVITY_COST_FACTORS[0] +inactivity[i]**2 * INACTIVITY_COST_FACTORS[1]
     
+    new_id_cost_max=(NEW_ID_COST_DIST_CAP**2) + NEW_ID_COST_MIN
     
     plt.plot(distances, matching_cost)
     plt.plot([0, maxdist], NEW_ID_COST_MIN * np.array([1, 1]))
-    plt.plot([0, maxdist], (NEW_ID_COST_DIST_CAP**2) + NEW_ID_COST_MIN * np.array([1, 1]))
+    plt.plot([0, maxdist],  new_id_cost_max* np.array([1, 1]))
     plt.legend( inactivity)
-    plt.gca().set_ylim([0, 50000])
+    plt.gca().set_ylim([0, new_id_cost_max*1.5])
     plt.gca().set_xlim([0, maxdist])
 
 
@@ -297,8 +298,8 @@ if __name__ == '__main__':
     BRIGHT_THRESH = [85]
     
     experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-    experiment_name = "2023_02_20_Euglena_1"
-    output_folder ='tracking1'
+    experiment_name = "2023_02_20_Euglena_4"
+    output_folder ='tracking2'
     
     current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
     
