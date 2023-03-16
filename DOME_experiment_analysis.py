@@ -14,6 +14,7 @@ import scipy
 import glob
 import matplotlib.pyplot as plt
 import os
+import re
 import random
 from typing import List
 import DOME_experiment_manager as DOMEexp
@@ -110,23 +111,33 @@ output_folder ='tracking1'
 
 current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
 
-analised_data_path = os.path.join(experiments_directory, experiment_name, output_folder, 'analysis_data.npz')
+analysed_data_path = os.path.join(experiments_directory, experiment_name, output_folder, 'analysis_data.npz')
 
 # load data
-if not os.path.isfile(analised_data_path):
-    print(f'File {analised_data_path} not found.\nFirst execute tracking with DOME_tracker.')
+if not os.path.isfile(analysed_data_path):
+    print(f'File {analysed_data_path} not found.\nFirst execute tracking with DOME_tracker.')
     exit()
 
 with current_experiment.get_data('data.npz') as data:
-    patterns = data['patterns']
+    #patterns = data['patterns']
     activation_times = data['activation_times']
     
 with current_experiment.get_data(os.path.join(output_folder,'analysis_data.npz')) as data:
     positions = data['positions']
     inactivity = data['inactivity']
+    
+if os.path.isdir(os.path.join(experiments_directory, experiment_name, 'patterns')):
+    files= glob.glob(os.path.join(experiments_directory, experiment_name, 'patterns') +  '/*.jpeg')
+    files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+    patterns=np.ndarray([len(files), 480, 854, 3], dtype=np.uint8)
+    for i in range(len(files)):
+        patterns[i]=cv2.imread(files[i])
+else:
+    with current_experiment.get_data('data.npz') as data:
+         patterns = data['patterns']   
 
 
-time_intants = positions.shape[0]
+time_intants = activation_times.shape[0]
 number_of_agents = positions.shape[1]
 
 # replace estimated positions with interpolated ones

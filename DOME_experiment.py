@@ -445,9 +445,11 @@ def start_experiment():
         dome_camera.camera.brightness=int(camera_bright_base-camera_bright_reduction*output)
         
         # apply output
-        patterns[count,:,:,:]=make_pattern()
         out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
-        cv2.imwrite(out_patt, np.squeeze(patterns[count,:,:,:]))
+        # patterns[count,:,:,:]=make_pattern()
+        # cv2.imwrite(out_patt, np.squeeze(patterns[count,:,:,:]))
+        pattern=make_pattern()
+        cv2.imwrite(out_patt, pattern)
         set_color(newcolor)
         
         # wait
@@ -469,7 +471,7 @@ def terminate_experiment():
     stop_rec()
     print('Saving data...\n')
     #current_experiment.save_data(title="data", activation_times=activation_times, images=images, patterns=patterns)
-    current_experiment.save_data(title="data", activation_times=activation_times, patterns=patterns)
+    current_experiment.save_data(title="data", activation_times=activation_times)
     current_experiment=None
     
 def get_index_for_time(time : float):
@@ -499,7 +501,7 @@ if __name__ == '__main__':
     max_time_index = int(totalT/deltaT + 1)
     activation_times=np.ndarray([max_time_index])
     #images = np.ndarray([max_time_index, 1080, 1920, 3], dtype=np.uint8)
-    patterns = np.ndarray([max_time_index, 480, 854, 3], dtype=np.uint8)
+    #patterns = np.ndarray([max_time_index, 480, 854, 3], dtype=np.uint8)
 
     white = np.array([1, 1, 1])
     black = np.array([0, 0, 0])
