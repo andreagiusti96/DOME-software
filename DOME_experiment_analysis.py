@@ -22,6 +22,13 @@ import DOME_graphics as DOMEgraphics
 import DOME_tracker as DOMEtracker
 
 
+def detect_outliers(data, m = 2.):
+    d = np.abs(data - np.ma.median(data))
+    mdev = np.ma.median(d)
+    #s = d/mdev if mdev else np.zeros(len(d))
+    s = d/mdev
+    return s>m
+
 
 def moving_average(x, window, weights=[], axis=0):
     #x=np.array(x).astype(float)
@@ -83,15 +90,20 @@ def angle_diff(unit1, unit2):
             
     return angles
 
-def my_histogram(data : np.array, bins, normalize=False):
+def my_histogram(data : np.array, bins=10, normalize=False):
     #data=np.array(data)
     
     number_of_series=len(data)
     
-    values=np.zeros([number_of_series, len(bins)-1])
+    if type(bins)==int:
+        n_bins=bins
+    else:
+        n_bins=len(bins)-1
+    
+    values=np.zeros([number_of_series, n_bins])
     
     for i in range(number_of_series):
-        val, b=np.histogram(data[i], bins)
+        val, bins = np.histogram(data[i], bins)
     
         if normalize:
             val = val/sum(val)
@@ -101,7 +113,7 @@ def my_histogram(data : np.array, bins, normalize=False):
         positions=bins[:-1] + (bins[1:]-bins[:-1])/(number_of_series+1)*(i+1)
         plt.bar(positions, val, width=0.8*np.diff(bins)/number_of_series)
     
-    plt.xticks(bins)
+    plt.xticks(bins, np.round(bins,1))
     plt.xlim([min(bins), max(bins)])
         
 # MAIN
@@ -175,6 +187,16 @@ speeds = np.ma.array(speeds, mask=np.isnan(speeds))
 speeds_smooth = moving_average(speeds, 3)
 speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
 
+# reject outliers
+outliers=detect_outliers(speeds_smooth, m=3.6)
+for i in range(number_of_agents):
+    if np.ma.max(outliers[:,i]):
+        print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i]))+ ' and has been removed !')
+
+speeds_smooth[:,np.max(outliers, axis=0)]=np.nan
+speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+displacements[:,np.max(outliers, axis=0)]=np.nan
+interp_positions[:,np.max(outliers, axis=0),:]= np.nan
 
 # accelearation
 #acc = speeds_smooth[1:,:] - speeds_smooth[:-1,:]
@@ -218,8 +240,8 @@ inputs = np.mean(np.mean(patterns, axis=1), axis=1)
 speeds_on = speeds_smooth[inputs[:,0]>100,:]
 speeds_off = speeds_smooth[inputs[:,0]<100,:]
 
-acc_on =  np.abs(acc_smooth[inputs[:,0]>100,:])
-acc_off = np.abs(acc_smooth[inputs[:,0]<100,:])
+acc_on =  acc_smooth[inputs[:,0]>100,:]
+acc_off = acc_smooth[inputs[:,0]<100,:]
 
 ang_vel_on  = np.abs(ang_vel_smooth[inputs[:-1,0]>100,:])
 ang_vel_off = np.abs(ang_vel_smooth[inputs[:-1,0]<100,:])
@@ -290,8 +312,8 @@ DOMEgraphics.highligth_inputs(inputs)
 
 plt.subplot(3, 1, 2)
 #plt.plot(np.linspace(0, time_intants-3, time_intants-2),np.ma.median(np.abs(acc),axis=1))
-plt.plot(np.linspace(0, time_intants-1, time_intants),np.ma.median(np.abs(acc_smooth),axis=1))
-plt.fill_between(np.linspace(0, time_intants-1, time_intants), np.min(np.abs(acc_smooth),axis=1), np.max(np.abs(acc_smooth),axis=1),alpha=0.5)
+plt.plot(np.linspace(0, time_intants-1, time_intants),np.ma.median(acc_smooth,axis=1))
+plt.fill_between(np.linspace(0, time_intants-1, time_intants), np.min(acc_smooth,axis=1), np.max(acc_smooth,axis=1),alpha=0.5)
 plt.gca().set_xlim([0, time_intants-1])
 plt.ylabel('Acc [px/frame^2]')
 plt.grid()
@@ -352,24 +374,24 @@ plt.show()
 plt.figure(figsize=(4,6))
 plt.subplot(3, 1, 1)
 plt.title('Histograms')
-bins=np.linspace(0, 40, round(40/5+1))
-my_histogram([np.mean(speeds_on, axis=0).compressed(), np.mean(speeds_off, axis=0).compressed()], bins, True)
+#bins=np.linspace(0, 40, round(40/5+1))
+my_histogram([np.mean(speeds_on, axis=0).compressed(), np.mean(speeds_off, axis=0).compressed()], normalize=True)
 plt.legend(labels=['Light ON', 'Light OFF'])
 plt.xlabel('Speed [px/frame]')
 #plt.gca().set_ylim([0, 0.25])
 plt.ylabel('Agents')
 plt.grid()
 plt.subplot(3, 1, 2)
-bins=np.linspace(0, 5, round(10+1))
-my_histogram([np.mean(acc_on, axis=0).compressed(), np.mean(acc_off, axis=0).compressed()], bins, True)
+#bins=np.linspace(0, 5, round(10+1))
+my_histogram([np.mean(acc_on, axis=0).compressed(), np.mean(acc_off, axis=0).compressed()], normalize=True)
 plt.legend(labels=['Light ON', 'Light OFF'])
 plt.xlabel('Acc [px/frame^2]')
 #plt.gca().set_ylim([0, 0.25])
 plt.ylabel('Agents')
 plt.grid()
 plt.subplot(3, 1, 3)
-bins=np.linspace(0, 1, round(10+1))
-my_histogram([np.mean(ang_vel_on, axis=0).compressed(), np.mean(ang_vel_off, axis=0).compressed()], bins, True)
+#bins=np.linspace(0, 1, round(10+1))
+my_histogram([np.mean(ang_vel_on, axis=0).compressed(), np.mean(ang_vel_off, axis=0).compressed()], normalize=True)
 plt.legend(labels=['Light ON', 'Light OFF'])
 plt.xlabel('Ang Vel [rad/frame]')
 #plt.gca().set_ylim([0, 0.25])
@@ -382,24 +404,24 @@ plt.show()
 plt.figure(figsize=(4,6))
 plt.subplot(3, 1, 1)
 plt.title('Histograms: just before and after the switch')
-bins=np.linspace(0, 40, round(40/5+1))
-my_histogram([np.mean(speeds_on[:5,:], axis=0).compressed(), np.mean(speeds_off[-5:,:], axis=0).compressed()] , bins, True)
+#bins=np.linspace(0, 40, round(40/5+1))
+my_histogram([np.mean(speeds_on[:5,:], axis=0).compressed(), np.mean(speeds_off[-5:,:], axis=0).compressed()] , normalize=True)
 plt.legend(labels=['Light ON', 'Light OFF'])
 plt.xlabel('Speed [px/frame]')
 #plt.gca().set_ylim([0, 0.25])
 plt.ylabel('Agents')
 plt.grid()
 plt.subplot(3, 1, 2)
-bins=np.linspace(0, 5, round(10+1))
-my_histogram([np.mean(acc_on[:5,:], axis=0).compressed(), np.mean(acc_off[-5:,:], axis=0).compressed()] , bins, True)
+#bins=np.linspace(0, 5, round(10+1))
+my_histogram([np.mean(acc_on[:5,:], axis=0).compressed(), np.mean(acc_off[-5:,:], axis=0).compressed()] , normalize=True)
 plt.legend(labels=['Light ON', 'Light OFF'])
 plt.xlabel('Acc [px/frame^2]')
 #plt.gca().set_ylim([0, 0.25])
 plt.ylabel('Agents')
 plt.grid()
 plt.subplot(3, 1, 3)
-bins=np.linspace(0, 1, round(10+1))
-my_histogram([np.mean(ang_vel_on[:5,:], axis=0).compressed(), np.mean(ang_vel_off[-5:,:], axis=0).compressed()] , bins, True)
+#bins=np.linspace(0, 1, round(10+1))
+my_histogram([np.mean(ang_vel_on[:5,:], axis=0).compressed(), np.mean(ang_vel_off[-5:,:], axis=0).compressed()] , normalize=True)
 plt.legend(labels=['Light ON', 'Light OFF'])
 plt.xlabel('Ang Vel [rad/frame]')
 #plt.gca().set_ylim([0, 0.25])
@@ -408,8 +430,9 @@ plt.grid()
 plt.show()
 
 # Select one agent
-agent=np.argmax(lengths)
-#agent=random.choice(np.arange(len(lengths))[lengths >= min_traj_length])
+#agent=np.argmax(lengths)
+agent=random.choice(np.arange(len(lengths))[lengths >= min_traj_length])
+#agent=38
 
 # Speed and Acceleration of one agent
 plt.figure(figsize=(9,6))
@@ -423,7 +446,7 @@ plt.grid()
 DOMEgraphics.highligth_inputs(inputs)
 
 plt.subplot(2, 1, 2)
-plt.plot(np.linspace(0, time_intants-1, time_intants),np.abs(acc_smooth[:,agent]))
+plt.plot(np.linspace(0, time_intants-1, time_intants),acc_smooth[:,agent])
 #plt.plot(np.linspace(0, time_intants-1, time_intants),np.abs(acc[:,agent]),'--')
 plt.gca().set_xlim([0, time_intants-1])
 plt.ylabel('Abs Acc [px/frame^2]')
