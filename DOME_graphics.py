@@ -56,22 +56,24 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
         obsolete_obgs = inactivity[counter,:] > max_inactivity
         pos = positions.copy()
         pos[:,obsolete_obgs,:]=np.nan
-    
+
     # select recent data
     if time_window > 0:
         time_window_start = max([counter+1-time_window, 0])
-        pos[:time_window_start,:,:]=np.nan
+        #pos[:time_window_start,:,:]=np.nan
+        pos=pos[time_window_start:,:,:]
     
     # Plot trajectories
     plt.plot(pos[:,:,0],pos[:,:,1],'o-', markersize=3)
     
     # mark estimated or interpolated positions
-    est_positions = pos.copy().astype(float)
-    est_positions[inactivity==0] = np.nan
+    #est_positions = pos.copy().astype(float)
+    #est_positions[inactivity==0] = np.nan
     plt.gca().set_prop_cycle(None)
-    plt.plot(est_positions[:,:,0], est_positions[:,:,1], 'x', markersize=10)
+    #plt.plot(pos[inactivity>0,0], pos[inactivity>0,1], 'x', markersize=10)
     
     for obj in range(pos.shape[1]):
+        plt.plot(pos[inactivity[:,obj]>0,obj,0], pos[inactivity[:,obj]>0,obj,1], 'x', markersize=10)
         last_index = pos.shape[0] - (~np.isnan(pos[:,obj,0]))[::-1].argmax(0) -1
         if not np.isnan(pos[last_index,obj,0]):
             plt.text(pos[last_index,obj,0], pos[last_index,obj,1], str(obj), fontsize = 22, color = std_color_for_index(obj))

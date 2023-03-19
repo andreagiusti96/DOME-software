@@ -30,6 +30,52 @@ def detect_outliers(data, m = 2.):
     return s>m
 
 
+def autocorrelation(x, axis=0):
+    x=np.ma.filled(x, fill_value=np.nan)
+    acorrs=[]
+    
+    if len(x.shape)>1:
+        series = x.shape[axis-1]
+    else:
+        series=1
+    
+    for i in range(series):
+        if len(x.shape)>1:
+            data = np.take(x, i, axis-1)
+        else:
+            data=x
+        
+        if any(~np.isnan(data)):
+            valid_data=data[~np.isnan(data)]
+            mean = np.mean(valid_data)
+            var = np.var(valid_data)
+            ndata = valid_data - mean
+            values=np.correlate(ndata, ndata, 'full')[len(ndata)-1:] 
+
+            acorr = values[~np.isnan(values)]
+            
+            acorr = acorr / var / len(ndata)
+
+            acorrs.append(acorr)
+        else:
+            acorrs.append(np.array([]))
+    
+    return acorrs
+
+def vector_autocorrelation(data):
+    data=np.ma.filled(data, fill_value=np.nan)
+    valid_data=data[~np.isnan(data[:,0])]   
+    
+    if len(valid_data)==0:
+        return np.array([])
+        
+    n_row = valid_data.shape[0]
+    dot_mat = valid_data.dot(valid_data.T)
+    corr = [np.trace(dot_mat,offset=x) for x in range(n_row)]
+    corr/=(n_row-np.arange(n_row))
+    corr/=corr[0]
+    return corr
+    
 def moving_average(x, window, weights=[], axis=0):
     #x=np.array(x).astype(float)
     x=np.ma.filled(x, fill_value=np.nan)
@@ -45,17 +91,13 @@ def moving_average(x, window, weights=[], axis=0):
     for i in range(x.shape[axis-1]):
         #y[:,i]= np.convolve(x[:,i], kernel, 'same')
         data = np.take(x, i, axis-1)
-        out_data = data.copy(); out_data
+        out_data = data.copy();
         
         if sum(~np.isnan(data)) >= window:
-            values=np.convolve(data, kernel, 'valid'); values
+            values=np.convolve(data, kernel, 'valid');
             edge=round(np.floor(window/2))
 
-            (out_data[edge:-edge])[~np.isnan(values)]
-
             (out_data[edge:-edge])[~np.isnan(values)] = values[~np.isnan(values)]
-            
-            out_data
             
         if axis==0:
             y[:,i]=out_data
@@ -119,7 +161,7 @@ def my_histogram(data : np.array, bins=10, normalize=False):
 # MAIN
 experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
 experiment_name = "2023_02_20_Euglena_4"
-output_folder ='tracking1'
+output_folder ='tracking2'
 
 current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
 
@@ -232,6 +274,12 @@ ang_vel_smooth = np.gradient(directions_reg_smooth, axis=0)
 ang_vel_smooth = moving_average(ang_vel_smooth, 3)
 ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
 
+
+# autocorrelation of displacements
+#displacements_autocorr = autocorr(displacements)
+disp_acorr=[]
+for agent in range(number_of_agents):
+    disp_acorr.append(vector_autocorrelation(displacements[:,agent,:]))
 
 # inputs
 inputs = np.mean(np.mean(patterns, axis=1), axis=1)
@@ -429,6 +477,15 @@ plt.ylabel('Agents')
 plt.grid()
 plt.show()
 
+
+# # displacements autocorrelation
+# plt.figure()
+# plt.plot(np.array(disp_acorr), marker='o')
+# plt.title('displacements autocorrelation '+ str(agent))
+# plt.grid()
+# plt.show()
+
+
 # Select one agent
 #agent=np.argmax(lengths)
 agent=random.choice(np.arange(len(lengths))[lengths >= min_traj_length])
@@ -503,6 +560,13 @@ plt.subplot(3, 1, 3)
 data_to_plot = list(map(lambda X: [x for x in X if x], [ang_vel_on[:,agent], ang_vel_off[:,agent]]))
 plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
 plt.ylabel('Ang Vel [rad/frame]')
+plt.show()
+
+# displacements autocorrelation
+plt.figure()
+plt.plot(disp_acorr[agent], marker='o')
+plt.title('displacements autocorrelation '+ str(agent))
+plt.grid()
 plt.show()
 
 # plot trajectory of one agent

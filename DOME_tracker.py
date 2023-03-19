@@ -27,11 +27,16 @@ import DOME_graphics as DOMEgraphics
 import DOME_experiment_manager as DOMEexp
 
 
-NEW_ID_COST_MIN = 500
+NEW_ID_COST_MIN = 1000
 NEW_ID_COST_DIST_CAP = 100
 DISTANCE_COST_FACTORS = [0, 2]
 INACTIVITY_COST_FACTORS = [0, 1000]
-    
+
+def matchingCost(distance, inactivity):
+    cost = (distance*DISTANCE_COST_FACTORS[0] + distance**2*DISTANCE_COST_FACTORS[1])/(inactivity**2*0.25+1)
+    cost += inactivity * INACTIVITY_COST_FACTORS[0] +inactivity**2 * INACTIVITY_COST_FACTORS[1]
+    return cost
+
 def plotCosts():
     fig = plt.figure(1,figsize=(19.20,10.80),dpi=100)
     fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
@@ -44,9 +49,8 @@ def plotCosts():
     matching_cost=np.zeros([len(distances), len(inactivity)])
     
     for i in range(len(inactivity)):
-        matching_cost[:,i] = distances*DISTANCE_COST_FACTORS[0] + distances**2*DISTANCE_COST_FACTORS[1]
-        matching_cost[:,i] += inactivity[i] * INACTIVITY_COST_FACTORS[0] +inactivity[i]**2 * INACTIVITY_COST_FACTORS[1]
-    
+        matching_cost[:,i] = matchingCost(distances, inactivity[i])
+        
     new_id_cost_max=(NEW_ID_COST_DIST_CAP**2) + NEW_ID_COST_MIN
     
     plt.plot(distances, matching_cost)
@@ -65,7 +69,7 @@ def agentMatching(new_positions : np.array, positions : np.array, inactivity : L
     
     Parameters
     ----------
-    new_positions : np.array (Shape=N)
+    new_positions : np.array (Shape=Nx2)
         Positions of detected objects.
     positions : np.array
         Positions of previously detected objects. (Shape=Mx2)
@@ -78,21 +82,24 @@ def agentMatching(new_positions : np.array, positions : np.array, inactivity : L
         IDs assigned to the detected positions. (Shape=N)
 
     """
+    new_positions=np.array(new_positions)
     number_of_objects = sum(DOMEgraphics.valid_positions(positions))
-    distances = np.ndarray([len(new_positions), number_of_objects])
     costs_matching = np.ndarray([len(new_positions), number_of_objects])
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
     
+    distances = np.squeeze(scipy.spatial.distance.cdist(new_positions, positions))
+    
     # build the matrix of costs
-    i=0
-    for pos in new_positions:
-        distances[i,:] = np.squeeze(scipy.spatial.distance.cdist([pos], positions))
-        costs_matching[i,:] = distances[i,:]*DISTANCE_COST_FACTORS[0] +distances[i,:]**2*DISTANCE_COST_FACTORS[1]
-        inactivity_cost = (np.array(inactivity)) * INACTIVITY_COST_FACTORS[0] + (np.array(inactivity)**2) * INACTIVITY_COST_FACTORS[1]
-        costs_matching[i,:] += inactivity_cost
-        cost_newid = np.min([DOMEgraphics.distance_from_edges(pos), NEW_ID_COST_DIST_CAP])**2 + NEW_ID_COST_MIN
+    for i in range(positions.shape[0]):
+        # distances = np.squeeze(scipy.spatial.distance.cdist(new_positions, positions[i,:]))
+        # costs_matching[i,:] = distances[i,:]*DISTANCE_COST_FACTORS[0] +distances[i,:]**2*DISTANCE_COST_FACTORS[1]
+        # inactivity_cost = (np.array(inactivity)) * INACTIVITY_COST_FACTORS[0] + (np.array(inactivity)**2) * INACTIVITY_COST_FACTORS[1]
+        # costs_matching[i,:] += inactivity_cost
+        costs_matching[:,i] = matchingCost(distances[:,i], inactivity[i])
+        
+    for i in range(new_positions.shape[0]):
+        cost_newid = np.min([DOMEgraphics.distance_from_edges(new_positions[i]), NEW_ID_COST_DIST_CAP])**2 + NEW_ID_COST_MIN
         costs_newid[i,:] = np.ones([len(new_positions)]) * cost_newid
-        i+=1
         
     costs = np.concatenate((costs_matching, costs_newid), axis=1)
     
@@ -161,7 +168,7 @@ def estimate_positions(old_pos : np.array, velocity : np.array):
     assert len(velocity.shape) == 2
     assert old_pos.shape[1] == 2
     
-    estimated_pos = old_pos + velocity
+    estimated_pos = old_pos + velocity*0.66
     
     non_valid_pos_idx = ~ DOMEgraphics.valid_positions(estimated_pos)
     estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx]  - velocity[non_valid_pos_idx] 
@@ -308,7 +315,7 @@ if __name__ == '__main__':
     else:
         images_folder=os.path.join(experiments_directory, experiment_name)
     
-    test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
+    #test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
     
     output_dir = os.path.join(experiments_directory, experiment_name, output_folder)
     try:
@@ -322,7 +329,7 @@ if __name__ == '__main__':
     # make video from images
     DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2)
     
-    # If the file analysis_data.npz is not found data are saved
+    # If the file analysis_data.npz is not already existing data are saved
     analised_data_path = os.path.join(output_dir, 'analysis_data.npz')
     if not os.path.isfile(analised_data_path):
         current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), positions=positions, inactivity=inactivity)
