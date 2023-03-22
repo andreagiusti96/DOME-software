@@ -22,21 +22,40 @@ import os
 from typing import List
 
 
-def highligth_inputs(inputs : np.array, alpha : float = 0.3):
-    input_differences = inputs[1:-1,0]-inputs[0:-2,0]
+def highligth_inputs(inputs : np.array, color='red', alpha : float = 0.3):
+    inputs=np.ma.filled(inputs, fill_value=np.nan)
+    input_differences = inputs[1:]-inputs[0:-1]
+    input_differences[np.isnan(input_differences)]=0
+
     on_value=max(max(input_differences), 1)
     off_value=min(min(input_differences), -1)
     
-    ons =np.where(input_differences ==on_value)[0]
+    
+    ons  =np.where(input_differences ==on_value)[0]
     offs =np.where(input_differences ==off_value)[0]
     
-    if len(ons)>len(offs):
-        offs = np.append(offs,len(inputs)-1)
+    if len(ons) * len(offs) >0:
+        if max(ons)>max(offs):
+            offs = np.append(offs, np.where(~np.isnan(inputs))[0][-1])
+        if min(offs)<min(ons):
+            ons = np.append(ons, np.where(~np.isnan(inputs))[0][0])
+            ons=sorted(ons)
     
+    elif len(ons)==0 and len(offs) >0:
+        ons = np.append(ons, np.where(~np.isnan(inputs))[0][0])
+        ons=sorted(ons)
+    
+    elif len(offs)==0 and len(ons) >0:
+        offs = np.append(offs, np.where(~np.isnan(inputs))[0][-1])
+        offs=sorted(offs)
+        
+    else: 
+        return
+        
     for i in range(len(ons)):
-        plt.axvspan(ons[i], offs[i], color='red', alpha=alpha, zorder=0)
+        plt.axvspan(ons[i], offs[i], color=color, alpha=alpha, zorder=0)
 
-def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = 3, time_window : int = 10):
+def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = 3, time_window : int = 10, show:bool = True):
     fig = plt.figure(1,figsize=(19.20,10.80),dpi=100)
     fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
     plt.title(title); 
@@ -83,7 +102,9 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
     
     plt.xlim([0, 1920])
     plt.ylim([0, 1080])
-    plt.show()
+    
+    if show: 
+        plt.show()
     
     return fig
 
