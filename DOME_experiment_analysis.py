@@ -14,6 +14,7 @@ import pandas as pd
 import scipy
 import glob
 import matplotlib.pyplot as plt
+import plotly.express as px
 import os
 import re
 import random
@@ -295,8 +296,42 @@ def my_histogram(data : np.array, bins=10, normalize=False):
     
     plt.xticks(bins, np.round(bins,1))
     plt.xlim([min(bins), max(bins)])
+
+
+def scatter_hist(x, y, n_bins=10):
+    fig = plt.gcf()
+    
+    ax = fig.add_gridspec(top=0.75, right=0.75).subplots()
+
+    ax_histx = ax.inset_axes([0, 1.05, 1, 0.25], sharex=ax)
+    ax_histy = ax.inset_axes([1.05, 0, 0.25, 1], sharey=ax)
+    
+    # no labels
+    ax_histx.tick_params(axis="x", labelbottom=False)
+    ax_histx.tick_params(axis="y", labelleft=False)
+    ax_histy.tick_params(axis="x", labelbottom=False)
+    ax_histy.tick_params(axis="y", labelleft=False)
+
+    number_of_series=len(x)
+    
+    for i in range(number_of_series):
+        # the scatter plot
+        ax.scatter(x[i], y[i])
         
-# MAIN
+        # the histograms     
+        x_val, x_bins = np.histogram(x[i][~np.isnan(x[i])], n_bins)
+        y_val, y_bins = np.histogram(y[i][~np.isnan(y[i])], n_bins)
+        
+        x_val = x_val/sum(x_val)/(x_bins[1]-x_bins[0])
+        y_val = y_val/sum(y_val)/(y_bins[1]-y_bins[0])
+       
+        ax_histx.bar(x_bins[:-1], x_val, width=1.0*np.diff(x_bins), align='edge', alpha=0.5)
+        ax_histy.barh(y_bins[:-1], y_val, height=1.0*np.diff(y_bins), align='edge', alpha=0.5)
+
+    return ax
+    
+    
+# MAIN -------------------------------------------------------------------------------------
 experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
 experiment_name = "2023_02_20_Euglena_4"
 output_folder ='tracking2'
@@ -427,7 +462,7 @@ for agent in range(number_of_agents):
     # disp_acorr.append(vector_autocorrelation(displacements[:,agent,:]))
     # disp_corr.append(vector_correlation(displacements[:,agent,:], displacements[:,agent,:]))
     lag1_similarity[:,agent]= lag_auto_similarity(displacements[:,agent,:])
-
+lag1_similarity = np.ma.array(lag1_similarity, mask=np.isnan(lag1_similarity))
 
 
 # detect tumbling
@@ -460,7 +495,8 @@ ang_vel_off = np.abs(ang_vel_smooth[inputs[:-1,0]<100,:])
 tumbling_on = tumbling2[inputs[:,0]>=100,:]
 tumbling_off = tumbling2[inputs[:,0]<100,:]
 
-# Plots
+
+# PLOTS -------------------------------------------------------------------------------------
 
 # number of agents
 plt.figure(figsize=(9,3))
@@ -671,11 +707,54 @@ plt.show()
 # plt.xlim([0, 20])
 # plt.show()
 
+# scatter plot speed and ang velocity
+plt.figure(figsize=(9,6))
+x=[np.ma.divide(speeds_smooth[:-1],np.ma.median(speeds_smooth, axis=0))[tumbling2[:-1]<0.5], np.ma.divide(speeds_smooth[:-1],np.ma.median(speeds_smooth, axis=0))[tumbling2[:-1]>0.5]]
+y=[np.ma.abs(ang_vel_smooth[tumbling2[:-1]<0.5]), np.ma.abs(ang_vel_smooth[tumbling2[:-1]>0.5])]
+scatter_hist(x, y, n_bins=20)
+plt.xlabel('Speed / Agents median speed')
+plt.ylabel('Ang Vel [rad/frame]')
+plt.gca().set_xlim([0, 3])
+plt.legend(['running', 'tumbling'])
+plt.grid()
+plt.show()
 
-# Select one agent
+# scatter plot speed and ang velocity
+plt.figure(figsize=(9,6))
+scatter_hist([speeds_smooth[:-1]/np.ma.median(speeds_smooth, axis=0)], [np.ma.abs(ang_vel_smooth)], n_bins=20)
+plt.xlabel('Speed / Agents median speed')
+plt.ylabel('Ang Vel [rad/frame]')
+plt.gca().set_xlim([0, 3])
+plt.grid()
+plt.show()
+
+# scatter plot speed and lag1 similarity
+plt.figure(figsize=(9,6))
+x=[np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0))[tumbling2<0.5], np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0))[tumbling2>0.5]]
+y=[lag1_similarity[tumbling2<0.5], lag1_similarity[tumbling2>0.5]]
+scatter_hist(x, y, n_bins=20)
+plt.xlabel('Speed / Agents median speed')
+plt.ylabel('Lag 1 similarity')
+plt.gca().set_xlim([0, 3])
+plt.grid()
+plt.show()
+
+# scatter plot speed and lag1 similarity
+plt.figure(figsize=(9,6))
+x=[np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0))]
+y=[lag1_similarity]
+scatter_hist(x, y, n_bins=20)
+plt.xlabel('Speed / Agents median speed')
+plt.ylabel('Lag 1 similarity')
+plt.gca().set_xlim([0, 3])
+plt.grid()
+plt.show()
+
+
+# Select one agent ---------------------------------------------------------------------------------
 agent=np.argmax(lengths)
 agent=random.choice(np.arange(len(lengths))[lengths >= min_traj_length])
-agent= 127 #145 #127 #40 #109
+agent= 102 #145 #127 #40 #109
 
 # Speed and Acceleration of one agent
 plt.figure(figsize=(9,6))
@@ -813,6 +892,55 @@ plt.show()
 # plt.grid()
 # plt.show()
 
+
+# scatter plot speed and ang velocity of one agent
+plt.figure(figsize=(9,6))
+x=[speeds_smooth[:-1, agent][tumbling2[:-1,agent]<0.5], speeds_smooth[:-1,agent][tumbling2[:-1,agent]>0.5]]
+y=[np.ma.abs(ang_vel_smooth[:,agent][tumbling2[:-1,agent]<0.5]), np.ma.abs(ang_vel_smooth[:,agent][tumbling2[:-1,agent]>0.5])]
+scatter_hist(x, y)
+plt.xlabel('Speed [px/frame]')
+plt.ylabel('Ang Vel [rad/frame]')
+#plt.gca().set_ylim([0, 0.25])
+plt.legend(['running', 'tumbling'])
+plt.title('Agent '+ str(agent))
+plt.grid()
+plt.show()
+
+# scatter plot speed and ang velocity of one agent
+plt.figure(figsize=(9,6))
+x=[speeds_smooth[:-1, agent]]
+y=[np.ma.abs(ang_vel_smooth[:,agent])]
+scatter_hist(x, y)
+plt.xlabel('Speed [px/frame]')
+plt.ylabel('Ang Vel [rad/frame]')
+#plt.gca().set_ylim([0, 0.25])
+plt.title('Agent '+ str(agent))
+plt.grid()
+plt.show()
+
+# scatter plot speed and lag1 similarity
+plt.figure(figsize=(9,6))
+x=[speeds_smooth[:, agent][tumbling2[:,agent]<0.5], speeds_smooth[:,agent][tumbling2[:,agent]>0.5]]
+y=[lag1_similarity[:,agent][tumbling2[:,agent]<0.5], lag1_similarity[:,agent][tumbling2[:,agent]>0.5]]
+scatter_hist(x, y, n_bins=20)
+plt.xlabel('Speed [px/frame]')
+plt.ylabel('Lag 1 similarity')
+plt.title('Agent '+ str(agent))
+plt.grid()
+plt.show()
+
+
+# scatter plot speed and lag1 similarity
+plt.figure(figsize=(9,6))
+x=[speeds_smooth[:, agent]]
+y=[lag1_similarity[:,agent]]
+scatter_hist(x, y, n_bins=20)
+plt.xlabel('Speed [px/frame]')
+plt.ylabel('Lag 1 similarity')
+plt.title('Agent '+ str(agent))
+plt.grid()
+plt.show()
+
 # plot trajectory of one agent
 #tumbling_pos=interp_positions[:-1,agent,:]
 tumbling_pos = interp_positions[:-1,agent,:][tumbling[:,agent]>0]
@@ -822,9 +950,3 @@ DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivi
 #plt.scatter(tumbling_pos[:,0], tumbling_pos[:,1], color='green' )
 plt.scatter(tumbling_pos2[:,0], tumbling_pos2[:,1], color='yellow' )
 plt.show()
-
-
-
-
-
-
