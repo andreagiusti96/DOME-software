@@ -14,7 +14,8 @@ import pandas as pd
 import scipy
 import glob
 import matplotlib.pyplot as plt
-import plotly.express as px
+#import plotly.express as px
+import seaborn as sns
 import os
 import re
 import random
@@ -23,6 +24,13 @@ import DOME_experiment_manager as DOMEexp
 import DOME_graphics as DOMEgraphics
 import DOME_tracker as DOMEtracker
 
+
+def split(data : np.array, condition : np.array):
+    out_data=[]
+    out_data.append(data[condition])
+    out_data.append(data[~condition])
+    
+    return out_data
 
 def detect_outliers(data, m = 2., side='both'):
     assert side in ['both', 'top', 'bottom']
@@ -482,18 +490,13 @@ tumbling2 = np.ma.array(tumbling2, mask=np.isnan(speeds_smooth))
 # inputs
 inputs = np.mean(np.mean(patterns, axis=1), axis=1)
 
-# average (over time) values for different inputs
-speeds_on = speeds_smooth[inputs[:,0]>=100,:]
-speeds_off = speeds_smooth[inputs[:,0]<100,:]
+# values for different inputs
+[speeds_on, speeds_off] = split(speeds_smooth, condition=inputs[:,0]>=100)
+[acc_on, acc_off] = split(acc_smooth, condition=inputs[:,0]>=100)
+[ang_vel_on, ang_vel_off] = split(np.abs(ang_vel_smooth), condition=inputs[:-1,0]>=100)
+[tumbling_on, tumbling_off] = split(tumbling2, condition=inputs[:,0]>=100)
+[lag1_similarity_on, lag1_similarity_off] = split(lag1_similarity, condition=inputs[:,0]>=100)
 
-acc_on =  acc_smooth[inputs[:,0]>=100,:]
-acc_off = acc_smooth[inputs[:,0]<100,:]
-
-ang_vel_on  = np.abs(ang_vel_smooth[inputs[:-1,0]>=100,:])
-ang_vel_off = np.abs(ang_vel_smooth[inputs[:-1,0]<100,:])
-
-tumbling_on = tumbling2[inputs[:,0]>=100,:]
-tumbling_off = tumbling2[inputs[:,0]<100,:]
 
 
 # PLOTS -------------------------------------------------------------------------------------
@@ -707,35 +710,37 @@ plt.show()
 # plt.xlim([0, 20])
 # plt.show()
 
-# scatter plot speed and ang velocity
-plt.figure(figsize=(9,6))
-x=[np.ma.divide(speeds_smooth[:-1],np.ma.median(speeds_smooth, axis=0))[tumbling2[:-1]<0.5], np.ma.divide(speeds_smooth[:-1],np.ma.median(speeds_smooth, axis=0))[tumbling2[:-1]>0.5]]
-y=[np.ma.abs(ang_vel_smooth[tumbling2[:-1]<0.5]), np.ma.abs(ang_vel_smooth[tumbling2[:-1]>0.5])]
-scatter_hist(x, y, n_bins=20)
-plt.xlabel('Speed / Agents median speed')
-plt.ylabel('Ang Vel [rad/frame]')
-plt.gca().set_xlim([0, 3])
-plt.legend(['running', 'tumbling'])
-plt.grid()
-plt.show()
 
 # scatter plot speed and ang velocity
 plt.figure(figsize=(9,6))
 scatter_hist([speeds_smooth[:-1]/np.ma.median(speeds_smooth, axis=0)], [np.ma.abs(ang_vel_smooth)], n_bins=20)
 plt.xlabel('Speed / Agents median speed')
 plt.ylabel('Ang Vel [rad/frame]')
-plt.gca().set_xlim([0, 3])
+plt.gca().set_xlim([0, 2.5])
 plt.grid()
 plt.show()
 
-# scatter plot speed and lag1 similarity
+# scatter plot speed and ang velocity - cluster wrt tumbling
 plt.figure(figsize=(9,6))
-x=[np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0))[tumbling2<0.5], np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0))[tumbling2>0.5]]
-y=[lag1_similarity[tumbling2<0.5], lag1_similarity[tumbling2>0.5]]
+x=split(np.ma.divide(speeds_smooth[:-1],np.ma.median(speeds_smooth, axis=0)), condition=tumbling2[:-1]<0.5)
+y=split(np.ma.abs(ang_vel_smooth), condition=tumbling2[:-1]<0.5)
 scatter_hist(x, y, n_bins=20)
 plt.xlabel('Speed / Agents median speed')
-plt.ylabel('Lag 1 similarity')
-plt.gca().set_xlim([0, 3])
+plt.ylabel('Ang Vel [rad/frame]')
+plt.gca().set_xlim([0, 2.5])
+plt.legend(['running', 'tumbling'])
+plt.grid()
+plt.show()
+
+# scatter plot speed and ang velocity - cluster wrt light input
+plt.figure(figsize=(9,6))
+x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off[:-1],np.ma.median(speeds_smooth, axis=0))]
+y=[ang_vel_on, ang_vel_off]
+scatter_hist(x, y, n_bins=20)
+plt.xlabel('Speed / Agents median speed')
+plt.ylabel('Ang Vel [rad/frame]')
+plt.gca().set_xlim([0, 2.5])
+plt.legend(['Light ON', 'Light OFF'])
 plt.grid()
 plt.show()
 
@@ -746,9 +751,43 @@ y=[lag1_similarity]
 scatter_hist(x, y, n_bins=20)
 plt.xlabel('Speed / Agents median speed')
 plt.ylabel('Lag 1 similarity')
-plt.gca().set_xlim([0, 3])
+plt.gca().set_xlim([0, 2.5])
 plt.grid()
 plt.show()
+
+# scatter plot speed and lag1 similarity - cluster wrt tumbling
+plt.figure(figsize=(9,6))
+x=split(np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0)), condition=tumbling2<0.5)
+y=split(lag1_similarity, condition=tumbling2<0.5)
+scatter_hist(x, y, n_bins=20)
+plt.xlabel('Speed / Agents median speed')
+plt.ylabel('Lag 1 similarity')
+plt.gca().set_xlim([0, 2.5])
+plt.legend(['running', 'tumbling'])
+plt.grid()
+plt.show()
+
+# scatter plot speed and lag1 similarity - cluster wrt light input
+plt.figure(figsize=(9,6))
+x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off,np.ma.median(speeds_smooth, axis=0))]
+y=[lag1_similarity_on, lag1_similarity_off]
+scatter_hist(x, y, n_bins=20)
+plt.xlabel('Speed / Agents median speed')
+plt.ylabel('Lag 1 similarity')
+plt.gca().set_xlim([0, 2.5])
+plt.legend(['Light ON', 'Light OFF'])
+plt.grid()
+plt.show()
+
+# heatmap input - tumbling
+plt.figure(figsize=(4,4))
+x=np.array([[np.ma.sum(tumbling_on),
+    np.ma.sum(tumbling_off)], 
+   [np.ma.sum(-tumbling_on+1), 
+    np.ma.sum(-tumbling_off+1)]])
+x=(x.T/np.ma.sum(x, axis=1)).T
+sns.heatmap(x, xticklabels=['Light ON','Light OFF'], yticklabels=['Tumbling','Running'], 
+            annot=True, cbar=False, vmin=0.25, vmax=0.75, cmap="gray", linewidths=0.2)
 
 
 # Select one agent ---------------------------------------------------------------------------------
@@ -895,8 +934,8 @@ plt.show()
 
 # scatter plot speed and ang velocity of one agent
 plt.figure(figsize=(9,6))
-x=[speeds_smooth[:-1, agent][tumbling2[:-1,agent]<0.5], speeds_smooth[:-1,agent][tumbling2[:-1,agent]>0.5]]
-y=[np.ma.abs(ang_vel_smooth[:,agent][tumbling2[:-1,agent]<0.5]), np.ma.abs(ang_vel_smooth[:,agent][tumbling2[:-1,agent]>0.5])]
+x=split(speeds_smooth[:-1, agent], condition=tumbling2[:-1, agent]<0.5)
+y=split(np.ma.abs(ang_vel_smooth[:,agent]), condition=tumbling2[:-1, agent]<0.5)
 scatter_hist(x, y)
 plt.xlabel('Speed [px/frame]')
 plt.ylabel('Ang Vel [rad/frame]')
@@ -920,8 +959,8 @@ plt.show()
 
 # scatter plot speed and lag1 similarity
 plt.figure(figsize=(9,6))
-x=[speeds_smooth[:, agent][tumbling2[:,agent]<0.5], speeds_smooth[:,agent][tumbling2[:,agent]>0.5]]
-y=[lag1_similarity[:,agent][tumbling2[:,agent]<0.5], lag1_similarity[:,agent][tumbling2[:,agent]>0.5]]
+x=split(speeds_smooth[:, agent], condition=tumbling2[:, agent]<0.5)
+y=split(lag1_similarity[:,agent], condition=tumbling2[:, agent]<0.5)
 scatter_hist(x, y, n_bins=20)
 plt.xlabel('Speed [px/frame]')
 plt.ylabel('Lag 1 similarity')
@@ -950,3 +989,11 @@ DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivi
 #plt.scatter(tumbling_pos[:,0], tumbling_pos[:,1], color='green' )
 plt.scatter(tumbling_pos2[:,0], tumbling_pos2[:,1], color='yellow' )
 plt.show()
+
+
+
+
+
+
+
+
