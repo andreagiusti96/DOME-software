@@ -437,12 +437,12 @@ def start_experiment():
         activation_times[count]=(tic - current_experiment.start_time).total_seconds()
         out_img=os.path.join('images', 'fig_' + '%04.1f' % t)
         #images[count,:,:,:]=capture(out_img, prevent_print=True, prevent_log=False)
-        capture(out_img, prevent_print=True, prevent_log=False)
+        capture(out_img, prevent_print=True, prevent_log=True)
         
         # compute output
         output=outputs[count]
         newcolor=off_value*(1-output)+on_value*output
-        dome_camera.camera.brightness=int(camera_bright_base-camera_bright_reduction*output)
+        #dome_camera.camera.brightness=int(camera_bright_base-camera_bright_reduction*output)
         
         # apply output
         out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
@@ -450,15 +450,16 @@ def start_experiment():
         # cv2.imwrite(out_patt, np.squeeze(patterns[count,:,:,:]))
         pattern=make_pattern()
         cv2.imwrite(out_patt, pattern)
-        set_color(newcolor)
+        set_color(newcolor, prevent_log=True)
         
         # wait
         toc=datetime.now()
-        ellapsed_time=toc-tic
-        time_to_wait=deltaT-ellapsed_time.total_seconds()
-        if time_to_wait<0:
-            print('Negative time_to_wait!\n')
-        time.sleep(max(0, time_to_wait ))
+        ellapsed_time=toc - current_experiment.start_time
+        time_to_wait=t+deltaT-ellapsed_time.total_seconds()
+        if time_to_wait<-0.01:
+            print(f'{-time_to_wait:.2}s delay!\n')
+        else:
+            time.sleep(max(0, time_to_wait ))
     
     # terminate the experiment and recording
     set_color(off_value, prevent_log=True)
@@ -482,10 +483,10 @@ if __name__ == '__main__':
     
     # details of the experiment
     date='today'    # date of the experiment. Use format YYYY_MM_DD
-    species='Euglena'     # species used in the experiment
-    culture='23/01/23 A'     # culture used in the experiment
-    sample='Mag x90, 10uL, no frame'
-    temp='21.1' # temperature of the sample
+    species='Prova'     # species used in the experiment
+    culture='XXXX'     # culture used in the experiment
+    sample='XX'      # details about the sample (volume, frame, etc)
+    temp='XX' # temperature of the sample
     
     output_directory='/home/pi/Documents/experiments'
     
@@ -521,15 +522,15 @@ if __name__ == '__main__':
     # always off
     outputs=[0]*max_time_index
     
-#     # half off - half on
-#     outputs=[0]*max_time_index
-#     outputs[get_index_for_time(totalT/2):]=[1]*int(np.ceil(max_time_index/2))
+    # half off - half on
+    outputs=[0]*max_time_index
+    outputs[get_index_for_time(totalT/2):]=[1]*int(np.ceil(max_time_index/2))
 
     # varying frequency
-    outputs[get_index_for_time(10):get_index_for_time(15)]=sig.square(2*np.pi*(time_instants[get_index_for_time(10):get_index_for_time(15)]+deltaT/2))*0.5+0.5
-    outputs[get_index_for_time(15):get_index_for_time(20)]=sig.square(0.5*2*np.pi*(time_instants[get_index_for_time(15):get_index_for_time(20)]+deltaT/2))*0.5+0.5
-    outputs[get_index_for_time(20):get_index_for_time(40)]=sig.square(0.2*2*np.pi*(time_instants[get_index_for_time(20):get_index_for_time(40)]+deltaT/2))*0.5+0.5
-    outputs[get_index_for_time(40):get_index_for_time(60)]=sig.square(0.1*2*np.pi*(time_instants[get_index_for_time(40):get_index_for_time(60)]+deltaT/2))*0.5+0.5
+#     outputs[get_index_for_time(10):get_index_for_time(15)]=sig.square(2*np.pi*(time_instants[get_index_for_time(10):get_index_for_time(15)]+deltaT/2))*0.5+0.5
+#     outputs[get_index_for_time(15):get_index_for_time(20)]=sig.square(0.5*2*np.pi*(time_instants[get_index_for_time(15):get_index_for_time(20)]+deltaT/2))*0.5+0.5
+#     outputs[get_index_for_time(20):get_index_for_time(40)]=sig.square(0.2*2*np.pi*(time_instants[get_index_for_time(20):get_index_for_time(40)]+deltaT/2))*0.5+0.5
+#     outputs[get_index_for_time(40):get_index_for_time(60)]=sig.square(0.1*2*np.pi*(time_instants[get_index_for_time(40):get_index_for_time(60)]+deltaT/2))*0.5+0.5
     
         
     [dome_pi4node, dome_camera, dome_gpio]=init()
