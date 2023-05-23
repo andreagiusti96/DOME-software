@@ -98,7 +98,7 @@ def init(camera_settings=None, gpio_light=None):
         if not gpio_light is None:
             dome_gpio.add_pin_label('light source', gpio_light)
             dome_gpio.toggle('light source', 'on')
-        print('On the projector Pi run "DOME_calibration_projector.py" and wait for a black ' \
+        print('On the projector Pi run "DOME_projection_interface.py" and wait for a black ' \
               'screen to appear (this may take several seconds). Once a black screen is ' \
               'shown, click anywhere on the black screen, then press any key (such as ALT).')
 
@@ -162,10 +162,7 @@ def set_brightness(newbright : int, prevent_log=False):
     if newbright>=0 and newbright<=255:
         global bright
         bright = newbright
-        response = update_projector(prevent_log=prevent_log)
-        
-        if response != 'Done':
-            raise(Exception('Error communicating with the projector.\n'))
+        update_projector(prevent_log=prevent_log)
         
         print(f'Brightness set to {bright}.\n')
         
@@ -216,6 +213,8 @@ def update_projector(pattern=None, prevent_log=False):
             current_experiment.add_log_entry(f'pattern updated')
 
     response = dome_pi4node.receive()
+    if response != 'Done' and response != 'Done.':
+        raise(Exception('Error communicating with the projector.\n'))
     
     return response
 
@@ -451,8 +450,8 @@ def start_experiment():
         # cv2.imwrite(out_patt, np.squeeze(patterns[count,:,:,:]))
         pattern=make_pattern()
         cv2.imwrite(out_patt, pattern)
-        #set_color(newcolor, prevent_log=True)
-        update_projector(pattern, prevent_log=False)
+        set_color(newcolor, prevent_log=True)
+        #update_projector(pattern, prevent_log=False)
         
         # wait
         toc=datetime.now()
@@ -561,5 +560,10 @@ if __name__ == '__main__':
     
     # start experiment and recording
     print('Now adjust focus and camera parameters, then use start_experiment() to run the experiment.\n')
+    
+    # Command example for the projector running projection_interface
+    #cmd = {"add": {"label": 'prova', "shape type": 'square', "pose": [[20, 0, 300], [0, 100, 500],[0, 0, 1]], "colour": [0, 255, 0]}}
+    #dome_pi4node.transmit(cmd)
+    
     
     

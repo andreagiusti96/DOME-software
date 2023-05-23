@@ -107,6 +107,7 @@ def main(dimensions, refresh_delay):
                             screen_manager.set_image_to_screen(
                                     message[c])
                         elif command_type == 'add':
+                            print(message[c])
                             label = message[c]['label']
                             shape_type = message[c]['shape type']
                             pose = np.array(message[c]['pose'])
@@ -136,6 +137,7 @@ def main(dimensions, refresh_delay):
                             screen_manager.shapes_shown_to_screen(
                                     message[c])
                 pattern = screen_manager.get_pattern_for_screen()
+                
             elif isinstance(message, str):
                 if message == 'exit':
                     cv2.destroyAllWindows()
