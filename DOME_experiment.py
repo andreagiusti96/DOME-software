@@ -211,11 +211,12 @@ def update_projector(pattern=None, prevent_log=False):
         if current_experiment and not prevent_log:
             current_experiment.add_log_entry(f'light={light}')
     else:
-        dome_pi4node.transmit(pattern)
+        dome_pi4node.transmit(pattern.astype(np.uint8))
         if current_experiment and not prevent_log:
             current_experiment.add_log_entry(f'pattern updated')
 
     response = dome_pi4node.receive()
+    
     return response
 
 def capture(file_name = '', autosave=True, show=False, prevent_print=False, prevent_log=False):
@@ -450,14 +451,15 @@ def start_experiment():
         # cv2.imwrite(out_patt, np.squeeze(patterns[count,:,:,:]))
         pattern=make_pattern()
         cv2.imwrite(out_patt, pattern)
-        set_color(newcolor, prevent_log=True)
+        #set_color(newcolor, prevent_log=True)
+        update_projector(pattern, prevent_log=False)
         
         # wait
         toc=datetime.now()
         ellapsed_time=toc - current_experiment.start_time
         time_to_wait=t+deltaT-ellapsed_time.total_seconds()
         if time_to_wait<-0.01:
-            print(f'{-time_to_wait:.2}s delay!\n')
+            print(f'{-time_to_wait:3.2}s delay!\n')
         else:
             time.sleep(max(0, time_to_wait ))
     
