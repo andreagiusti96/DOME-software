@@ -112,7 +112,7 @@ class PoseManager:
         ---
         Optional Inputs
             labels : list[str,]
-                List of dictionary keys ientifying which shapes to draw. By default, all stored
+                List of dictionary keys identifying which shapes to draw. By default, all stored
                 shapes are drawn.
         ---
         Outputs
@@ -331,7 +331,7 @@ def linear_transform(scale=None, shear=None, shift=None):
         shear : tuple(float, float)
             Amounts of shearing to apply in the x and y axes.
         shift : tuple(float, float)
-            Amounts of translation to aply in the x and y axes.
+            Amounts of translation to apply in the x and y axes.
     ---
     Outputs
         affine_matrix : np.ndarray

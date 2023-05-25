@@ -4,6 +4,7 @@ import DOME_transformation as DOMEtran
 import numpy as np
 import time
 import cv2
+from datetime import datetime
 
 class ScreenManager():
     
@@ -66,6 +67,111 @@ class ScreenManager():
                                            labels)
         return display
 
+    def make_pattern_from_cmd(self, message, old_pattern):
+        out_msg = 'Done'
+        pattern = old_pattern
+        
+        # if the message is an array use it as the pattern
+        if isinstance(message, np.ndarray):
+            pattern = message.copy().astype(np.uint8)
+            self.store_image(pattern)
+            
+        # if the message is a dictionary extract the commands from it
+        #   message = {'screen': 'default',
+        #              'image': image_index,
+        #              'add': {'label': 'spotlight', 'shape': 'circle',
+        #                      'pose': [[1,0,0],[0,1,0],[0,0,1]], 'colour':[255]},
+        #              'add2': {'label': 'spotlight', 'shape': 'circle',
+        #                       'pose': [[1,0,0],[0,1,0],[0,0,1]], 'colour':[255]},
+        #              'transform': {'matrix': [[1,0,0],[0,1,0],[0,0,1]], 'labels': ['a']},
+        #              'transform2': {'matrix': [[1,0,0],[0,1,0],[0,0,1]], 'labels': ['b']},
+        #              'colour': {'colour': [255], 'label': 'splotlight', 'indices': [0]},
+        #              'shown': ['name1', 'name2']}
+        elif isinstance(message, dict):
+            all_command_types = ['screen', 'image', 'add', 'transform', 'colour', 'shown']
+            for command_type in all_command_types:
+                commands = [c for c in message.keys()
+                            if command_type in c]
+                for c in commands:
+                    
+                    # message = {"screen": screen_name}                        
+                    if command_type == 'screen':
+                        self.switch_to_screen(
+                                message[c])
+                    
+                    # message = {'image': image_index}
+                    elif command_type == 'image':
+                        self.set_image_to_screen(
+                                message[c])
+                    
+                    # message = {"add": {"label": 'a', "shape type": 'square',
+                    #                   "pose": [[20, 0, 300], [0, 100, 500],[0, 0, 1]],
+                    #                   "colour": [0, 255, 0]}}
+                    elif command_type == 'add':
+                        label = message[c]['label']
+                        shape_type = message[c]['shape type']
+                        pose = np.array(message[c]['pose'])
+                        colour = None
+                        if 'colour' in message[c].keys():
+                            colour = message[c]['colour']
+                        self.add_shape_to_screen(
+                                label, shape_type, pose, colour)
+                    
+                    # message = {'transform': {'matrix': [[1,0,0],[0,1,0],[0,0,1]], 'labels': ['a']}}
+                    elif command_type == 'transform':
+                        matrix = np.array(message[c]['matrix'])
+                        labels = None
+                        if 'labels' in message[c].keys():
+                            labels = message[c]['labels']
+                        self.transform_shapes_on_screen(
+                                matrix, labels)
+                    
+                    # message = {'colour': {'colour': [255], 'label': 'splotlight',
+                    #                       'indices': [0]}}
+                    elif command_type == 'colour':
+                        colour = message[c]['colour']
+                        label = message[c]['label']
+                        indices = None
+                        if 'indices' in message[c].keys():
+                            indices = message[c]['indices']
+                        self.set_colour_on_screen(
+                                colour, label, indices)
+                    
+                    #  message = {"shown": list_of_labels_to_show}
+                    elif command_type == 'shown':
+                        self.shapes_shown_to_screen(
+                                message[c])
+            
+            # make pattern from the saved screen data
+            pattern = self.get_pattern_for_screen()
+
+        # if the message is a string extract the command from it
+        elif isinstance(message, str):
+            if message == 'exit':
+                cv2.destroyAllWindows()
+                out_msg='exit'
+                time.sleep(1)
+                projecting = False
+            segments = message.split(' ')
+            if segments[0] == 'dimensions':
+                out_msg = self.dimensions
+            elif segments[0] == 'all':
+                for c in range(0, 3):
+                    pattern[:, :, c] = int(segments[c + 1])
+            elif segments[0] == 'row':
+                pattern[int(segments[1]):int(segments[2]),
+                        :, :] = 255
+            elif segments[0] == 'column':
+                pattern[:, int(segments[1]):int(segments[2]),
+                        :] = 255
+            else:
+                out_msg=f'Unrecognised string:' + f'{message}'
+        
+        # if the message is of a different type throw an error
+        else:
+            out_msg='Unexpected data type.'
+        
+        return pattern, out_msg
 
 def main(dimensions, refresh_delay):
     screen_manager = ScreenManager(dimensions)
@@ -73,103 +179,32 @@ def main(dimensions, refresh_delay):
     cv2.namedWindow('Pattern', cv2.WND_PROP_FULLSCREEN)
     cv2.setWindowProperty('Pattern', cv2.WND_PROP_FULLSCREEN,
                           cv2.WINDOW_FULLSCREEN)
+    
     with DOMEcomm.NetworkNode() as dome_pi0node:
         cv2.imshow('Pattern', pattern)
         cv2.waitKey(0)
         dome_pi0node.establish_connection()
-        all_command_types = ['screen', 'image', 'add',
-                             'transform', 'colour', 'shown']
-#         x = {'screen': 'default',
-#              'image': image_index,
-#              'add': {'label': 'spotlight', 'shape': 'circle',
-#                      'pose': [[1,0,0],[0,1,0],[0,0,1]], 'colour':[255]},
-#              'add2': {'label': 'spotlight', 'shape': 'circle',
-#                       'pose': [[1,0,0],[0,1,0],[0,0,1]], 'colour':[255]},
-#              'transform': {'matrix': [[1,0,0],[0,1,0],[0,0,1]], 'labels': ['a']},
-#              'transform2': {'matrix': [[1,0,0],[0,1,0],[0,0,1]], 'labels': ['b']},
-#              'colour': {'colour': [255], 'label': 'splotlight', 'indices': [0]},
-#              'shown': ['name1', 'name2']}
+
         projecting = True
         while projecting:
             message = dome_pi0node.receive()
-            if isinstance(message, np.ndarray):
-                pattern = message.copy().astype(np.uint8)
-                screen_manager.store_image(pattern)
-            elif isinstance(message, dict):
-                for command_type in all_command_types:
-                    commands = [c for c in message.keys()
-                                if command_type in c]
-                    for c in commands:
-                        if command_type == 'screen':
-                            screen_manager.switch_to_screen(
-                                    message[c])
-                        elif command_type == 'image':
-                            screen_manager.set_image_to_screen(
-                                    message[c])
-                        elif command_type == 'add':
-                            print(message[c])
-                            label = message[c]['label']
-                            shape_type = message[c]['shape type']
-                            pose = np.array(message[c]['pose'])
-#                             blah = [[1, 0, 0], [0, 1, 0],[0, 0, 1]]
-#                             [list(x) for x in np.array(blah)]
-                            colour = None
-                            if 'colour' in message[c].keys():
-                                colour = message[c]['colour']
-                            screen_manager.add_shape_to_screen(
-                                    label, shape_type, pose, colour)
-                        elif command_type == 'transform':
-                            matrix = np.array(message[c]['matrix'])
-                            labels = None
-                            if 'labels' in message[c].keys():
-                                labels = message[c]['labels']
-                            screen_manager.transform_shapes_on_screen(
-                                    matrix, labels)
-                        elif command_type == 'colour':
-                            colour = message[c]['colour']
-                            label = message[c]['label']
-                            indices = None
-                            if 'indices' in message[c].keys():
-                                indices = message[c]['indices']
-                            screen_manager.set_colour_on_screen(
-                                    colour, label, indices)
-                        elif command_type == 'shown':
-                            screen_manager.shapes_shown_to_screen(
-                                    message[c])
-                pattern = screen_manager.get_pattern_for_screen()
-                
-            elif isinstance(message, str):
-                if message == 'exit':
-                    cv2.destroyAllWindows()
-                    dome_pi0node.transmit('exit')
-                    time.sleep(1)
-                    projecting = False
-                segments = message.split(' ')
-                if segments[0] == 'dimensions':
-                    dome_pi0node.transmit(dimensions)
-                    continue
-                elif segments[0] == 'all':
-                    for c in range(0, 3):
-                        pattern[:, :, c] = int(segments[c + 1])
-                elif segments[0] == 'row':
-                    pattern[int(segments[1]):int(segments[2]),
-                            :, :] = 255
-                elif segments[0] == 'column':
-                    pattern[:, int(segments[1]):int(segments[2]),
-                            :] = 255
-                else:
-                    dome_pi0node.transmit(f'Unrecognised string:' + \
-                                          f'{message}')
-                    continue
-            else:
-                dome_pi0node.transmit('Unexpected data type.')
-                continue
-            cv2.imshow('Pattern', pattern)
-            cv2.waitKey(refresh_delay)
-            dome_pi0node.transmit('Done.')
+            tic=datetime.now()
+            
+            pattern, out_msg = screen_manager.make_pattern_from_cmd(message, pattern)
+            
+            if out_msg is 'Done':                
+                # update projected pattern
+                cv2.imshow('Pattern', pattern)
+                cv2.waitKey(refresh_delay)
+            
+            toc=datetime.now()
+            ellapsed_time = (toc - tic).total_seconds()
+            print(f'Update time = {ellapsed_time:4.3}s\n')
+            dome_pi0node.transmit(out_msg)
 
 if __name__ == '__main__':
     dims = (480, 854, 3)
-    refresh_delay = 33
+    refresh_delay = 33    # refresh delay in milliseconds
+    
     main(dims, refresh_delay)
         

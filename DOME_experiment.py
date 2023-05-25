@@ -11,6 +11,8 @@
 import DOME_communication as DOMEcomm
 import DOME_imaging_utilities as DOMEutil
 import DOME_experiment_manager as DOMEexp
+import DOME_transformation as DOMEtran
+import DOME_projection_interface as DOMEproj
 
 import numpy as np
 import cv2
@@ -172,7 +174,7 @@ def set_brightness(newbright : int, prevent_log=False):
     else:
         print('Input a value between 0 and 255.\n')
     
-def make_pattern():
+def make_pattern(dimensions):
     '''
     Generate pattern for the projector.
     ---
@@ -182,7 +184,7 @@ def make_pattern():
     '''
     
     light = np.rint( bright * color )
-    pattern = np.ndarray([480, 854, 3], dtype=np.uint8)
+    pattern = np.ndarray(dimensions, dtype=np.uint8)
     pattern[:, :, 0] = int(light[0])
     pattern[:, :, 1] = int(light[1])
     pattern[:, :, 2] = int(light[2])
@@ -208,13 +210,13 @@ def update_projector(pattern=None, prevent_log=False):
         if current_experiment and not prevent_log:
             current_experiment.add_log_entry(f'light={light}')
     else:
-        dome_pi4node.transmit(pattern.astype(np.uint8))
+        dome_pi4node.transmit(pattern)
         if current_experiment and not prevent_log:
             current_experiment.add_log_entry(f'pattern updated')
 
     response = dome_pi4node.receive()
-    if response != 'Done' and response != 'Done.':
-        raise(Exception('Error communicating with the projector.\n'))
+    #if response != 'Done' and response != 'Done.':
+    #    raise(Exception('Error communicating with the projector.\n'))
     
     return response
 
@@ -377,16 +379,6 @@ def set_camera_value(setting_name : str, value, mode_name='', autoload=True):
     
     if current_experiment and autoload:
         current_experiment.add_log_entry(f'camera {setting_name}={value}')
-            
-def disconnect():
-    '''
-    Disconnect projector module.
-    '''
-    dome_pi4node.transmit('all' + 3 * ' 0')
-    response = dome_pi4node.receive()
-    dome_pi4node.transmit('exit')
-    response = dome_pi4node.receive()
-    print('Projector disconnected.\n')
 
 def new_experiment(date : str, species : str, culture ='', output_directory='/home/pi/Documents/experiments'):
     global current_experiment
@@ -410,7 +402,11 @@ def start_experiment():
     # start the experiment
     global color
     global current_experiment
+    global proj_dim
     
+    screen_manager = DOMEproj.ScreenManager(proj_dim)
+    pattern = screen_manager.get_pattern_for_screen()
+
     current_experiment=new_experiment(date, species, culture, output_directory)
     current_experiment.add_detail(f'Sample: '+sample, include_in_exp_list=True)
     current_experiment.add_detail(f'Duration={totalT}s', include_in_exp_list=True)
@@ -423,6 +419,7 @@ def start_experiment():
     os.mkdir(os.path.join(current_experiment.path, 'images'))
     
     count=0
+    cmd_count=0
     
     current_experiment.reset_starting_time()
     rec('video')
@@ -437,34 +434,41 @@ def start_experiment():
         activation_times[count]=(tic - current_experiment.start_time).total_seconds()
         out_img=os.path.join('images', 'fig_' + '%04.1f' % t)
         #images[count,:,:,:]=capture(out_img, prevent_print=True, prevent_log=False)
-        capture(out_img, prevent_print=True, prevent_log=True)
+        capture(out_img, prevent_print=True, prevent_log=False)
         
-        # compute output
-        output=outputs[count]
-        newcolor=off_value*(1-output)+on_value*output
-        #dome_camera.camera.brightness=int(camera_bright_base-camera_bright_reduction*output)
+#         # compute output
+#         output=outputs[count]
+#         newcolor=off_value*(1-output)+on_value*output
+#         #dome_camera.camera.brightness=int(camera_bright_base-camera_bright_reduction*output)
         
         # apply output
+        if cmd_count < len(commands):
+            if t >= commands[cmd_count]["t"]:
+                message = commands[cmd_count]["cmd"]
+                update_projector(message, prevent_log=False)
+                pattern, msg_out = screen_manager.make_pattern_from_cmd(message, pattern)
+                cmd_count=cmd_count+1
+        
+        # save output pattern
         out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
-        # patterns[count,:,:,:]=make_pattern()
-        # cv2.imwrite(out_patt, np.squeeze(patterns[count,:,:,:]))
-        pattern=make_pattern()
         cv2.imwrite(out_patt, pattern)
-        set_color(newcolor, prevent_log=True)
-        #update_projector(pattern, prevent_log=False)
         
         # wait
         toc=datetime.now()
         ellapsed_time=toc - current_experiment.start_time
         time_to_wait=t+deltaT-ellapsed_time.total_seconds()
         if time_to_wait<-0.01:
-            print(f'{-time_to_wait:3.2}s delay!\n')
+            print(f't={t}: {-time_to_wait:3.2}s delay!\n')
         else:
             time.sleep(max(0, time_to_wait ))
     
     # terminate the experiment and recording
     set_color(off_value, prevent_log=True)
     terminate_experiment()
+
+def get_index_for_time(time : float):
+    index=int(time/deltaT)
+    return index
 
 def terminate_experiment():
     global current_experiment
@@ -475,10 +479,23 @@ def terminate_experiment():
     #current_experiment.save_data(title="data", activation_times=activation_times, images=images, patterns=patterns)
     current_experiment.save_data(title="data", activation_times=activation_times)
     current_experiment=None
+
+def disconnect():
+    '''
+    Disconnect projector module.
+    '''
+    dome_pi4node.transmit('all' + 3 * ' 0')
+    response = dome_pi4node.receive()
+    dome_pi4node.transmit('exit')
+    response = dome_pi4node.receive()
+    print('Projector disconnected.\n')
+
+def terminate_session():
+    if current_experiment:
+        terminate_experiment()
     
-def get_index_for_time(time : float):
-    index=int(time/deltaT)
-    return index
+    disconnect()
+    print('Session tereminated.\n')
 
 if __name__ == '__main__':
     
@@ -492,7 +509,7 @@ if __name__ == '__main__':
     output_directory='/home/pi/Documents/experiments'
     
     deltaT= 0.5 # sampling time [s]
-    totalT= 60  # experiment duration [s]
+    totalT= 10  # experiment duration [s]
     
     
     # allocate vars
@@ -514,6 +531,9 @@ if __name__ == '__main__':
     off_value = red*0.1
     on_value = blue + off_value
     
+    bright=200
+    proj_dim = (480, 854, 3)
+
     camera_bright_base=40
     camera_bright_reduction=0
     
@@ -533,6 +553,26 @@ if __name__ == '__main__':
 #     outputs[get_index_for_time(20):get_index_for_time(40)]=sig.square(0.2*2*np.pi*(time_instants[get_index_for_time(20):get_index_for_time(40)]+deltaT/2))*0.5+0.5
 #     outputs[get_index_for_time(40):get_index_for_time(60)]=sig.square(0.1*2*np.pi*(time_instants[get_index_for_time(40):get_index_for_time(60)]+deltaT/2))*0.5+0.5
     
+    # commands at specific times
+    pose = DOMEtran.linear_transform(scale=(25,25), shift=(200,100)).tolist()
+    off_light = np.rint( bright * off_value )
+    on_light = np.rint( bright * on_value )
+    commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
+                {"t":4, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
+                {"t":8, "cmd": {"screen": '0',
+                                "add": {"label": 'prova', "shape type": 'square',
+                                "pose": pose, "colour": [0, 255, 0]}}}
+                ]
+    
+#     # commands at specific times
+#     pose = DOMEtran.linear_transform(scale=(25,25), shift=(200,100)).tolist()
+#     commands = [{"t":0, "cmd": {"screen": '0',
+#                                "add": {"label": 'prova', "shape type": 'square',
+#                                "pose": pose, "colour": [0, 255, 0]}}},
+#                 {"t":5, "cmd": {"screen": '1',
+#                                "add": {"label": 'prova', "shape type": 'square',
+#                                "pose": pose, "colour": [255, 0, 0]}}}
+#                 ]
         
     [dome_pi4node, dome_camera, dome_gpio]=init()
     
@@ -546,15 +586,14 @@ if __name__ == '__main__':
     
     
     # handle program termination
-    atexit.register(terminate_experiment)
-    signal.signal(signal.SIGTERM, terminate_experiment)
-    signal.signal(signal.SIGINT, terminate_experiment)
-    signal.signal(signal.SIGABRT, terminate_experiment)
-    signal.signal(signal.SIGILL, terminate_experiment)
-    signal.signal(signal.SIGSEGV, terminate_experiment)
+    atexit.register(terminate_session)
+    signal.signal(signal.SIGTERM, terminate_session)
+    signal.signal(signal.SIGINT, terminate_session)
+    signal.signal(signal.SIGABRT, terminate_session)
+    signal.signal(signal.SIGILL, terminate_session)
+    signal.signal(signal.SIGSEGV, terminate_session)
     
     # initialize projector
-    bright=200
     color=off_value
     update_projector()
     
