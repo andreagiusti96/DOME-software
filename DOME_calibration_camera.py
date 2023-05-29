@@ -298,6 +298,7 @@ def get_bright_lines(intensities : list):
 
 def main(margin : float, pixelation : list, camera_grid_spacing : int,
          camera_grid_thickness : int, camera_settings=None, gpio_light=None):
+    
     projector_dims = (480, 854, 3)
     settings = {'brightness': None,
                 'threshold': None,
@@ -340,6 +341,8 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
 #                 if step == 0:
 #                     break
                 duration = 5
+                
+                # STEP 1: adjust the focus
                 while step == 1:
                     message = f'--- STEP 1 ---\nTo begin, we will focus the camera by adjusting ' \
                               f'the height of the sample stage on the DOME. Input the number of ' \
@@ -368,11 +371,14 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                     response = dome_pi4node.receive()
                 if step != 0:
                     loaded_file = None
+                
+                # STEP 2: choose existing calibration settings or input new ones
                 while step == 2:
                     message = f'--- STEP 2 ---\nTo proceed with manually defining settings for ' \
                               f'calibration, type "next".\nTo load previously saved calibration ' \
                               f'settings, type "load", followed by the file name (separated by ' \
-                              f'a space character).\nCurrent file loaded = {loaded_file}\n'
+                              f'a space character). Calibration setting are saved in ".json" files.'\
+                              f'\nCurrent file loaded = {loaded_file}\n'
                     user_args, step = custom_input(message, step)
                     if not user_args[0] == 'load' or len(user_args) != 2:
                         continue
@@ -385,6 +391,8 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                     else:
                         loaded_file = user_args[1]
 #                         step = 5
+                
+                # STEP 3: input the brightness and the threshold fo a correct detection of lit area
                 while step == 3:
                     message = f'--- STEP 3 ---\nFirst, we will identify the illuminatible area ' \
                               f'of the camera frame. Input a value for the BRIGHTNESS of the ' \
@@ -435,6 +443,8 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                     cv2.imshow('Scan regions', scan_region_picture)
                     cv2.imshow('reduced', reduced_map)
                     cv2.waitKey(0)
+                
+                # STEP 4: input the spacing and the thickness of the lines to project
                 while step == 4:
                     # Check that the brightness and threshold values have been set.
                     if settings['brightness'] is None or settings['threshold'] is None:
@@ -483,6 +493,8 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                         cv2.waitKey(0)
                 length_cam = None
                 length_proj = None
+                
+                # STEP 5: input the length unit for the camera and the projector
                 while step == 5:
                     # Check that the brightness and threshold values have been set.
                     if settings['spacing proj'] is None or settings['thickness proj'] is None:
@@ -512,6 +524,8 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                         length_per_pixel_cam = length_cam / settings['spacing cam']
                         length_per_pixel_proj = length_proj / settings['spacing proj']
                         settings['magnification'] = length_per_pixel_cam / length_per_pixel_proj
+                
+                # STEP 6: input the increment (width) of the scan lines
                 while step == 6:
                     if settings['magnification'] is None:
                         print('Values for SQUARE LENGTHs of camera grid and projector grid have ' \
@@ -543,6 +557,8 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                             print('Please specify an integer value.')
                 if step != 0:
                     saved_file = None
+                    
+                # STEP 7: save calibration parameters in a .json file
                 while step == 7:
                     if settings['corners'] is None or settings['increment'] is None:
                         print('Value for INCREMENT has not been specified.')
@@ -560,6 +576,8 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                         saved_file = user_args[0] + '.json'
                         with open(saved_file, 'w') as calibration_parameters_file:
                             json.dump(settings, calibration_parameters_file)
+                
+                # STEP 8: perform calibration and save the transformation matrix in 'camera2projector.npy'
                 if step == 8:
 #                     dome_pi4node.transmit('dimensions')
 #                     projector_dims = dome_pi4node.receive()
@@ -617,3 +635,6 @@ if __name__ == '__main__':
     default_spacing_cam = 100
     default_thickness_cam = 5
     main(default_margin, default_pixelation, default_spacing_cam, default_thickness_cam)
+    
+    
+    

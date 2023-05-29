@@ -371,8 +371,8 @@ def rotational_transform(angle=0, centre=None):
                                 [0, 0, 1]])
     if centre is None:
         return rotation_matrix
-    affine_matrix = transform_linear(shift=centre) @ rotation_matrix @ \
-                    transform_linear(shift=-centre)
+    affine_matrix = linear_transform(shift=centre) @ rotation_matrix @ \
+                    linear_transform(shift=-centre)
     return affine_matrix
 
 

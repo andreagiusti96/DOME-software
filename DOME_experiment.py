@@ -25,51 +25,51 @@ from datetime import datetime
 from datetime import date
 from scipy import signal as sig
 
-class SettingsFileFormatError(Exception):
-    '''
-    Exception class for handling errors raised when calibration settings cannot be read from a
-    file. The file should specify values for "brightness", "threshold", "region size" and
-    "scan increment".
-    '''
+# class SettingsFileFormatError(Exception):
+#     '''
+#     Exception class for handling errors raised when calibration settings cannot be read from a
+#     file. The file should specify values for "brightness", "threshold", "region size" and
+#     "scan increment".
+#     '''
     
-    def __init__(self, key : str):
-        '''
-        Sets up the parent class for exceptions and provides an error message.
-        ---
-        Parameters
-            key : str
-                The settings dictionary key that is missing from the json file.
-        '''
-        self.error_message = f'Format of calibration settings file is not recognised.\n Setting ' \
-                             f'key "{key}" not specified.'
-        super().__init__(self.error_message)
+#     def __init__(self, key : str):
+#         '''
+#         Sets up the parent class for exceptions and provides an error message.
+#         ---
+#         Parameters
+#             key : str
+#                 The settings dictionary key that is missing from the json file.
+#         '''
+#         self.error_message = f'Format of calibration settings file is not recognised.\n Setting ' \
+#                              f'key "{key}" not specified.'
+#         super().__init__(self.error_message)
     
-    def print_error_message(self):
-        '''
-        Prints the error message without interupting execution.
-        '''
-        print(self.error_message)
+#     def print_error_message(self):
+#         '''
+#         Prints the error message without interupting execution.
+#         '''
+#         print(self.error_message)
 
 
-def load_calibration_settings(file_name : str, keys : list):
-    '''
-    Reads calibration setting values from a json file.
-    ---
-    Parameters
-        file_name : str
-            Name of json file to read settings from.
-    ---
-    Outputs
-        stored_settings : dict
-            Dictionary of calibration settings.
-    '''
-    with open(file_name, 'r') as file:
-        stored_settings = json.load(file)
-    for setting in keys:
-        # Check that the file contains all of the expected parameters.
-        if not setting in stored_settings.keys():
-            raise SettingsFileFormatError(setting)
-    return stored_settings
+# def load_calibration_settings(file_name : str, keys : list):
+#     '''
+#     Reads calibration setting values from a json file.
+#     ---
+#     Parameters
+#         file_name : str
+#             Name of json file to read settings from.
+#     ---
+#     Outputs
+#         stored_settings : dict
+#             Dictionary of calibration settings.
+#     '''
+#     with open(file_name, 'r') as file:
+#         stored_settings = json.load(file)
+#     for setting in keys:
+#         # Check that the file contains all of the expected parameters.
+#         if not setting in stored_settings.keys():
+#             raise SettingsFileFormatError(setting)
+#     return stored_settings
 
 
 def init(camera_settings=None, gpio_light=None):
