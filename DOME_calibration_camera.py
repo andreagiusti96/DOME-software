@@ -11,6 +11,7 @@
 
 import DOME_communication as DOMEcomm
 import DOME_imaging_utilities as DOMEutil
+import DOME_transformation as DOMEtran
 
 import numpy as np
 import cv2
@@ -337,7 +338,7 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
             loaded_file = None
             saved_file = None
             step = 1
-            while 1 <= step <= 8:
+            while 1 <= step <= 9:
 #                 if step == 0:
 #                     break
                 duration = 5
@@ -624,7 +625,21 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                     dome_pi4node.transmit('all' + 3 * ' 0')
                     response = dome_pi4node.receive()
                     step += 1
+                    
+                # STEP 9: validation
+                if step == 9:
+                    print('The camera frame should now be exactly filled by a green rectangle.')
+                    camera2projector = np.load('camera2projector.npy')
+                    img = DOMEtran.linear_transform(scale=(480-20,854-20), shift=(480/2,854/2))
+                    pose_proj = np.dot(camera2projector, img)
+                    cmd = {"screen": '0', "add": {"label": 'a', "shape type": 'square',"pose": pose_proj.tolist(), "colour": [100, 100, 100]}}
+                    picture = dome_camera.capture_image(camera_mode)
+                    cv2.imshow('Camera picture.', picture)
+                    cv2.waitKey(0)
+                    step += 1
+                    
         finally:
+            dome_pi4node.transmit('all' + 3 * ' 0')
             dome_pi4node.transmit('exit')
             response = dome_pi4node.receive()
 

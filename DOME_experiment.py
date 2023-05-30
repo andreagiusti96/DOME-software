@@ -513,6 +513,7 @@ if __name__ == '__main__':
     
     
     # allocate vars
+    cam2proj_trans = np.load('camera2projector.npy')
     current_experiment=None
     fig_counter = 1
     video_counter = 1
@@ -554,16 +555,18 @@ if __name__ == '__main__':
 #     outputs[get_index_for_time(40):get_index_for_time(60)]=sig.square(0.1*2*np.pi*(time_instants[get_index_for_time(40):get_index_for_time(60)]+deltaT/2))*0.5+0.5
     
     # commands at specific times
-    pose = DOMEtran.linear_transform(scale=(25,25), shift=(200,100)).tolist()
+    pose_cam = DOMEtran.linear_transform(scale=(480-20,854-20), shift=(480/2,854/2))
+    pose_proj = np.dot(cam2proj_trans, pose_cam)
     off_light = np.rint( bright * off_value )
     on_light = np.rint( bright * on_value )
-    commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
-                {"t":4, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
-                {"t":8, "cmd": {"screen": '0',
-                                "add": {"label": 'prova', "shape type": 'square',
-                                "pose": pose, "colour": [0, 255, 0]}}}
-                ]
-    
+    cmd = {"screen": '0', "add": {"label": 'prova', "shape type": 'square',"pose": pose_proj.tolist(), "colour": [0, 255, 0]}}
+#     commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
+#                 {"t":4, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
+#                 {"t":8, "cmd": {"screen": '0',
+#                                 "add": {"label": 'prova', "shape type": 'square',
+#                                 "pose": pose_proj.tolist(), "colour": [0, 255, 0]}}}
+#                 ]
+     
 #     # commands at specific times
 #     pose = DOMEtran.linear_transform(scale=(25,25), shift=(200,100)).tolist()
 #     commands = [{"t":0, "cmd": {"screen": '0',
