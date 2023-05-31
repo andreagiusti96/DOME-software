@@ -15,6 +15,7 @@ class ScreenManager():
         self.screens = {}
         self.store_image(np.zeros(self.dimensions))
         self.switch_to_screen('default')
+        self.default_transformation = np.eye(3)
     
     def store_image(self, image):
         if image.shape == self.dimensions:
@@ -71,9 +72,12 @@ class ScreenManager():
         out_msg = 'Done'
         pattern = old_pattern
         
-        # if the message is an array use it as the pattern
+        # if the message is an array scale it to the right size
+        # and use it as the pattern
         if isinstance(message, np.ndarray):
             pattern = message.copy().astype(np.uint8)
+            if pattern.shape[0:2] != self.dimensions[0:2]:
+                pattern = cv2.resize(pattern, (self.dimensions[1],self.dimensions[0]) )
             self.store_image(pattern)
             
         # if the message is a dictionary extract the commands from it
@@ -88,14 +92,36 @@ class ScreenManager():
         #              'colour': {'colour': [255], 'label': 'splotlight', 'indices': [0]},
         #              'shown': ['name1', 'name2']}
         elif isinstance(message, dict):
-            all_command_types = ['screen', 'image', 'add', 'transform', 'colour', 'shown']
+            all_command_types = ['get', 'set', 'screen', 'image', 'add', 'transform', 'colour', 'shown']
             for command_type in all_command_types:
                 commands = [c for c in message.keys()
                             if command_type in c]
                 for c in commands:
+                    # message = {"get": {'param': name_of_the_attribute}}                        
+                    if command_type == 'get':
+                        if hasattr(self, message[c]['param']):
+                            out_msg = getattr(self, message[c]['param'])
+                            print(f'{message[c]["param"]} = {out_msg}')
+                        else:
+                            out_msg = f'{message[c]["param"]} is not valid!'
+                            print(f'{message[c]["param"]} is not valid!')
+                    
+                    # message = {"set": {'param': name_of_the_attribute , 'value': new_value}}                        
+                    elif command_type == 'set':
+                        if hasattr(self, message[c]['param']):
+                            old_val = getattr(self, message[c]['param'])
+                            if isinstance(old_val, np.ndarray):
+                                new_val = np.array(message[c]['value'])
+                            else:
+                                new_val = message[c]['value']
+                            setattr(self, message[c]['param'], new_val)
+                            print(f'{message[c]["param"]} = {getattr(self, message[c]["param"])}')
+                        else:
+                            out_msg = f'{message[c]["param"]} is not valid!'
+                            print(f'{message[c]["param"]} is not valid!')
                     
                     # message = {"screen": screen_name}                        
-                    if command_type == 'screen':
+                    elif command_type == 'screen':
                         self.switch_to_screen(
                                 message[c])
                     
@@ -173,8 +199,10 @@ class ScreenManager():
         
         return pattern, out_msg
 
-def main(dimensions, refresh_delay):
-    screen_manager = ScreenManager(dimensions)
+def main(output_dims, refresh_delay, internal_dims=None):
+    if internal_dims==None:
+        internal_dims = output_dims
+    screen_manager = ScreenManager(internal_dims)
     pattern = screen_manager.get_pattern_for_screen()
     cv2.namedWindow('Pattern', cv2.WND_PROP_FULLSCREEN)
     cv2.setWindowProperty('Pattern', cv2.WND_PROP_FULLSCREEN,
@@ -194,7 +222,8 @@ def main(dimensions, refresh_delay):
             
             if out_msg is 'Done':                
                 # update projected pattern
-                cv2.imshow('Pattern', pattern)
+                out_pattern = DOMEtran.transform_image(pattern, screen_manager.default_transformation, output_dims)
+                cv2.imshow('Pattern', out_pattern)
                 cv2.waitKey(refresh_delay)
             
             toc=datetime.now()
@@ -203,8 +232,9 @@ def main(dimensions, refresh_delay):
             dome_pi0node.transmit(out_msg)
 
 if __name__ == '__main__':
-    dims = (480, 854, 3)
+    internal_dims = (1080, 1920, 3)
+    output_dims = (480, 854, 3)
     refresh_delay = 33    # refresh delay in milliseconds
     
-    main(dims, refresh_delay)
+    main(output_dims, refresh_delay, internal_dims)
         

@@ -210,6 +210,9 @@ def update_projector(pattern=None, prevent_log=False):
         if current_experiment and not prevent_log:
             current_experiment.add_log_entry(f'light={light}')
     else:
+        if isinstance(pattern, np.ndarray):
+            pattern.astype(np.uint8)
+        
         dome_pi4node.transmit(pattern)
         if current_experiment and not prevent_log:
             current_experiment.add_log_entry(f'pattern updated')
@@ -321,12 +324,12 @@ def close_camera():
     dome_camera.camera.stop_preview()
     print('Live view stopped. Use open_camera() to restart.\n')
     
-def open_camera( window=(1000, 40, 1000, 400) ):
+def open_camera( window=(1000, 40, 854, 480) ):
     '''
     Start live video from the camera.
     ---
     Parameters
-        window = (1000, 40, 1000, 400)
+        window = (1000, 40, 854, 480)
             Position and dimensions of the preview window.
     '''
     dome_camera.camera.start_preview()
@@ -404,7 +407,7 @@ def start_experiment():
     global current_experiment
     global proj_dim
     
-    screen_manager = DOMEproj.ScreenManager(proj_dim)
+    screen_manager = DOMEproj.ScreenManager(camera_dim)
     pattern = screen_manager.get_pattern_for_screen()
 
     current_experiment=new_experiment(date, species, culture, output_directory)
@@ -445,9 +448,13 @@ def start_experiment():
         if cmd_count < len(commands):
             if t >= commands[cmd_count]["t"]:
                 message = commands[cmd_count]["cmd"]
-                update_projector(message, prevent_log=False)
+                message2proj = message
+                if type(message) is dict:
+                    message2proj = message.copy()
+                    #message2proj['transform'] = {"matrix": cam2proj_trans.tolist()}
+                update_projector(message2proj, prevent_log=False)
                 pattern, msg_out = screen_manager.make_pattern_from_cmd(message, pattern)
-                cmd_count=cmd_count+1
+                cmd_count+=1
         
         # save output pattern
         out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
@@ -496,6 +503,7 @@ def terminate_session():
     
     disconnect()
     print('Session tereminated.\n')
+    exit()
 
 if __name__ == '__main__':
     
@@ -533,8 +541,12 @@ if __name__ == '__main__':
     on_value = blue + off_value
     
     bright=200
-    proj_dim = (480, 854, 3)
-
+    off_light = np.rint( bright * off_value )
+    on_light = np.rint( bright * on_value )
+    
+    proj_dim   = ( 480,  854, 3)
+    camera_dim = (1080, 1920, 3)
+    
     camera_bright_base=40
     camera_bright_reduction=0
     
@@ -555,27 +567,20 @@ if __name__ == '__main__':
 #     outputs[get_index_for_time(40):get_index_for_time(60)]=sig.square(0.1*2*np.pi*(time_instants[get_index_for_time(40):get_index_for_time(60)]+deltaT/2))*0.5+0.5
     
     # commands at specific times
-    pose_cam = DOMEtran.linear_transform(scale=(480-20,854-20), shift=(480/2,854/2))
-    pose_proj = np.dot(cam2proj_trans, pose_cam)
-    off_light = np.rint( bright * off_value )
-    on_light = np.rint( bright * on_value )
-    cmd = {"screen": '0', "add": {"label": 'prova', "shape type": 'square',"pose": pose_proj.tolist(), "colour": [0, 255, 0]}}
-#     commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
-#                 {"t":4, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
-#                 {"t":8, "cmd": {"screen": '0',
-#                                 "add": {"label": 'prova', "shape type": 'square',
-#                                 "pose": pose_proj.tolist(), "colour": [0, 255, 0]}}}
-#                 ]
+    green_cam = DOMEtran.linear_transform(scale=(1080-20,1920-20), shift=(1080/2,1920/2))
+    black_cam = DOMEtran.linear_transform(scale=(1080-40,1920-40), shift=(1080/2,1920/2))
+#     cmd = {"screen": '0', "add": {"label": 'prova', "shape type": 'square',"pose": green_cam.tolist(), "colour": [0, 100, 0]}}
+#     cmd2 = {"transform": {"matrix": cam2proj_trans.tolist()}}
+    commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
+                {"t":2, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
+                {"t":6, "cmd": {"screen": '0',
+                                "add": {"label": 'prova', "shape type": 'square',
+                                "pose": green_cam.tolist(), "colour": [0, 255, 0]}}},
+                {"t":8, "cmd": {"screen": '0',
+                                "add": {"label": 'prova', "shape type": 'square',
+                                "pose": black_cam.tolist(), "colour": [0, 0, 0]}}}
+                ]
      
-#     # commands at specific times
-#     pose = DOMEtran.linear_transform(scale=(25,25), shift=(200,100)).tolist()
-#     commands = [{"t":0, "cmd": {"screen": '0',
-#                                "add": {"label": 'prova', "shape type": 'square',
-#                                "pose": pose, "colour": [0, 255, 0]}}},
-#                 {"t":5, "cmd": {"screen": '1',
-#                                "add": {"label": 'prova', "shape type": 'square',
-#                                "pose": pose, "colour": [255, 0, 0]}}}
-#                 ]
         
     [dome_pi4node, dome_camera, dome_gpio]=init()
     
@@ -597,15 +602,13 @@ if __name__ == '__main__':
     signal.signal(signal.SIGSEGV, terminate_session)
     
     # initialize projector
+    cmd = {"set": {'param':'default_transformation', "value": cam2proj_trans.tolist()}}
+    update_projector(cmd)
     color=off_value
     update_projector()
     
     # start experiment and recording
     print('Now adjust focus and camera parameters, then use start_experiment() to run the experiment.\n')
-    
-    # Command example for the projector running projection_interface
-    #cmd = {"add": {"label": 'prova', "shape type": 'square', "pose": [[20, 0, 300], [0, 100, 500],[0, 0, 1]], "colour": [0, 255, 0]}}
-    #dome_pi4node.transmit(cmd)
     
     
     

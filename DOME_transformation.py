@@ -75,8 +75,12 @@ class PoseManager:
         for l in labels:
             shape_group = self.shape_groups[l]
             for s, shape in enumerate(shape_group):
-                self.shape_groups[l][s] = matrix @ shape['pose']
-        
+                #pose = self.shape_groups[l][s]['pose']
+                #print(f'old pose = \n{pose}')
+                self.shape_groups[l][s]['pose'] = np.dot(matrix, shape['pose'])
+                #pose = self.shape_groups[l][s]['pose']
+                #print(f'new pose = \n{pose}')
+                
     def set_colour(self, colour : list, label : str, indices=None):
         '''
         Set the colours of stored shapes.

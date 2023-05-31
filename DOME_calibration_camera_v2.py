@@ -334,15 +334,32 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                   f'to begin scanning. Alternatively, enter "next" to proceed to the next step, ' \
                   f'"back" to return to the previous step, "restart" to begin the calibration ' \
                   'from the start, or "exit" to end the program.')
+            
+            # start live video from the camera
+            dome_camera.camera.start_preview()
+            dome_camera.camera.preview.fullscreen=False
+            dome_camera.camera.preview.window=(1000, 40, 854, 480)
+            
+            # project three squares
+            delta = 50
+            pos =[]
+            pos.append( DOMEtran.linear_transform(scale=(20,20), shift=(480/2-delta,854/2-delta)) )
+            pos.append( DOMEtran.linear_transform(scale=(20,20), shift=(480/2-delta,854/2+delta)) )
+            pos.append( DOMEtran.linear_transform(scale=(20,20), shift=(480/2+delta,854/2-delta)) )
+            cmd = {"screen": '0',
+                    "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
+                    "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
+                    "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
+            dome_pi4node.transmit(cmd)
+            response = dome_pi4node.receive()       
+                    
             threshold_picture = None
             loaded_file = None
             saved_file = None
             step = 1
+            count = 1
             while 1 <= step <= 9:
-#                 if step == 0:
-#                     break
-                duration = 5
-                
+
                 # STEP 1: adjust the focus
                 while step == 1:
                     message = f'--- STEP 1 ---\nTo begin, we will focus the camera by adjusting ' \
@@ -353,8 +370,7 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                               f'this is done, input "next" to continue. Henceforth, it is ' \
                               f'crucial that the camera, projector, sample stage and any lenses ' \
                               f'maintain their relative positions. Any change to the physical ' \
-                              f'setup of the DOME may invalidate the calibration.\n--- Duration ' \
-                              f'= {duration} ; integer (positive, non-zero)\n'
+                              f'setup of the DOME may invalidate the calibration.\n'
                     user_args, step = custom_input(message, step)
                     if len(user_args) == 1 and len(user_args[0]) != 0:
                         try:
@@ -364,259 +380,175 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                             continue
                     elif step != 1:
                         continue
-                    dome_pi4node.transmit('all' + 3 * ' 128')
-                    response = dome_pi4node.receive()
                     time.sleep(1)
-                    dome_camera.show_live_feed(duration)
-                    dome_pi4node.transmit('all' + 3 * ' 0')
-                    response = dome_pi4node.receive()
                 if step != 0:
                     loaded_file = None
-                
-                # STEP 2: choose existing calibration settings or input new ones
-                while step == 2:
-                    message = f'--- STEP 2 ---\nTo proceed with manually defining settings for ' \
-                              f'calibration, type "next".\nTo load previously saved calibration ' \
-                              f'settings, type "load", followed by the file name (separated by ' \
-                              f'a space character). Calibration setting are saved in ".json" files.'\
-                              f'\nCurrent file loaded = {loaded_file}\n'
-                    user_args, step = custom_input(message, step)
-                    if not user_args[0] == 'load' or len(user_args) != 2:
-                        continue
-                    try:
-                        settings = load_settings(user_args[1], list(settings.keys()))
-                    except FileNotFoundError:
-                        print(f'No such file: {user_args[1]}')
-                    except SettingsFileFormatError as error:
-                        error.print_error_message()
-                    else:
-                        loaded_file = user_args[1]
-#                         step = 5
-                
-                # STEP 3: input the brightness and the threshold fo a correct detection of lit area
-                while step == 3:
-                    message = f'--- STEP 3 ---\nFirst, we will identify the illuminatible area ' \
-                              f'of the camera frame. Input a value for the BRIGHTNESS of the ' \
-                              f'projector to illuminate the sample area (start with a ' \
-                              f'low value, then increase until the illuminatible region is ' \
-                              f'clearly visible). Also, input a value for the intensity ' \
-                              f'THRESHOLD to use when detecting the illuminatible space (start ' \
-                              f'with a high value then decrease until only the illuminatible ' \
-                              f'region is detected). Separate these two values with a space ' \
-                              f'character. Close the two windows that appear displaying the raw ' \
-                              f'and processed images to try a different set of values. Once an ' \
-                              f'appropriate set of values have been found, close the windows ' \
-                              f'and enter "next" to continue.\n--- BRIGHTNESS = ' \
-                              f'{settings["brightness"]} ; integer (0 - 255)\n--- THRESHOLD = ' \
-                              f'{settings["threshold"]} ; integer (0 - 255)\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) != 2:
-                        continue
-                    try:
-                        [bright, thresh] = [min(max(0, int(arg)), 255) for arg in user_args]
-                    except ValueError:
-                        print('Please specify integer values in the range 0 - 255, separated ' \
-                              'with a space character.')
-                    else:
-                        dome_pi4node.transmit(f'all' + 3 * f' {bright}')
-                        response = dome_pi4node.receive()
-                        time.sleep(1)
-                        picture = dome_camera.capture_image(camera_mode)
-                        gray_picture = cv2.cvtColor(picture, cv2.COLOR_BGR2GRAY)
-                        blur_value = 10
-                        smoothed_gray_picture = cv2.blur(gray_picture, (blur_value, blur_value))
-                        ret, threshold_picture = cv2.threshold(smoothed_gray_picture,
-                                                               thresh, 255, 0)
-                        cv2.imshow(f'Camera frame, brightness used: {bright}', picture)
-                        cv2.imshow(f'Threshold applied: {thresh}', threshold_picture)
-                        cv2.waitKey(0)
-                        settings['brightness'] = bright
-                        settings['threshold'] = thresh
-                if not threshold_picture is None and step != 0:
-                    corners_list, reduced_map = find_grid_corners(threshold_picture, settings['margin'],
-                                                                  settings['pixelation'])
-                    settings['corners'] = corners_list
-                    scan_region_picture = threshold_picture.copy()
-                    for corner in corners_list:
-                        scan_region_picture[corner[0] - 5:corner[0] + 5,
-                                            corner[1] - 5:corner[1] + 5] = 128
-                        
-                    cv2.imshow('Scan regions', scan_region_picture)
-                    cv2.imshow('reduced', reduced_map)
-                    cv2.waitKey(0)
-                
-                # STEP 4: input the spacing and the thickness of the lines to project
-                while step == 4:
-                    # Check that the brightness and threshold values have been set.
-                    if settings['brightness'] is None or settings['threshold'] is None:
-                        print('Values for BRIGHTNESS and/or THRESHOLD have not been specified.')
-                        step -= 1
-                        break
-                    message = f'--- STEP 4 ---\nNext we will approximate the level of ' \
-                              f'magnification between the camera frame and the projector frame. ' \
-                              f'To do this, a grid pattern will be displayed by the projector, ' \
-                              f'whilst the camera frame is overlayed with a reference grid. ' \
-                              f'Input the SPACING and THICKNESS of the grid lines that the ' \
-                              f'projector should display, in terms of number of pixels, ' \
-                              f'separated by a space character. Ideally, the SPACING should be ' \
-                              f'small enough to allow several grid squares to be seen by the ' \
-                              f'camera. The THICKNESS of the grid lines should be as small as ' \
-                              f'possible whilst still being clearly visible by the camera. ' \
-                              f'When both grids can be seen clearly, record the SQUARE LENGTHS ' \
-                              f'of each grid, using any unit of measure. To continue, close the ' \
-                              f'window displaying the grids, then enter "next".\n--- SPACING = ' \
-                              f'{settings["spacing proj"]} ; integer (positive, non-zero)\n--- ' \
-                              f'THICKNESS = {settings["thickness proj"]} ; integer (positive, ' \
-                              f'non-zero, << SPACING)\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) != 2:
-                        continue
-                    try:
-                        [spacing, thickness] = [min(max(0, int(arg)), 255) for arg in user_args]
-                        settings['spacing proj'] = spacing
-                        settings['thickness proj'] = thickness
-                    except ValueError:
-                        print('Please specify integer values.')
-                    else:
-#                         dome_pi4node.transmit('dimensions')
-#                         projector_dims = dome_pi4node.receive()
-                        grid_proj = overlay_grid(np.zeros(projector_dims, dtype=np.uint8),
-                                                 settings['spacing proj'],
-                                                 settings['thickness proj'],
-                                                 (255, 255, 255))
-                        dome_pi4node.transmit(grid_proj.astype(np.uint8))
-                        response = dome_pi4node.receive()
-                        picture = dome_camera.capture_image(camera_mode)
-                        picture_with_grid = overlay_grid(picture, settings['spacing cam'],
-                                                         settings['thickness cam'],
-                                                         (128, 128, 128))
-                        cv2.imshow('Camera frame with grid.', picture_with_grid)
-                        cv2.waitKey(0)
-                length_cam = None
-                length_proj = None
-                
-                # STEP 5: input the length unit for the camera and the projector
-                while step == 5:
-                    # Check that the brightness and threshold values have been set.
-                    if settings['spacing proj'] is None or settings['thickness proj'] is None:
-                        print('Values for projector grid SPACING and/or THICKNESS have not been ' \
-                              'specified.')
-                        step -= 1
-                        break
-                    message = f'--- STEP 5 ---\nNow, enter the visual grid sizes that you ' \
-                              f'recorded during the previous step as two numbers separated by a ' \
-                              f'space character. Enter the SQUARE LENGTH for the projector grid ' \
-                              f'first, followed by the SQUARE LENGTH for the camera grid. The ' \
-                              f'lengths can be entered according to any unit of measurement, ' \
-                              f'such as number of screen pixels - for example, the camera grid ' \
-                              f'square length was {settings["spacing cam"]} screen pixels. When ' \
-                              f'the values have been entered, type next to continue.\n--- ' \
-                              f'Projector grid square length = {length_proj} ; float (positive, ' \
-                              f'non-zero number)\n---Camera grid square length = {length_cam} ; ' \
-                              f'float (positive, non-zero number)\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) != 2:
-                        continue
-                    try:
-                        [length_proj, length_cam] = [float(arg) for arg in user_args]
-                    except ValueError:
-                        print('Please specify numerical values.')
-                    else:
-                        length_per_pixel_cam = length_cam / settings['spacing cam']
-                        length_per_pixel_proj = length_proj / settings['spacing proj']
-                        settings['magnification'] = length_per_pixel_cam / length_per_pixel_proj
-                
-                # STEP 6: input the increment (width) of the scan lines
-                while step == 6:
-                    if settings['magnification'] is None:
-                        print('Values for SQUARE LENGTHs of camera grid and projector grid have ' \
-                              'not been specified.')
-                        step -= 1
-                        break
-                    corner_distance = ((np.array(settings['corners'])[0, :] -
-                                        np.array(settings['corners'])[1, :]) ** 2).sum() ** 0.5
-                    max_region_size = int(min(corner_distance, settings['margin'] * 255))
-                    max_increment = int(max_region_size / (2 * settings['magnification']))
-                    min_increment = max(1, int(1 / (settings['magnification'])))
-                    message = f'--- STEP 6 ---\nFinally, specify the INCREMENT (/width) of scan ' \
-                              f'lines that should be illuminated per iteration during the ' \
-                              f'calibration. Based on the parameters that have been set in the ' \
-                              f'previous step, it would be advisable for the INCREMENT to be no ' \
-                              f'smaller than {min_increment} and no greater {max_increment}. ' \
-                              f'Generally, using a larger INCREMENT will reduce the time taken ' \
-                              f'to complete the calibration procedure, at the cost of ' \
-                              f'potentially reducing the accuracy of the calculated ' \
-                              f'transformation. Once a value for the INCREMENT has been ' \
-                              f'entered, input "next" to continue.\n--- INCREMENT = ' \
-                              f'{settings["increment"]} ; integer ({min_increment} - ' \
-                              f'{max_increment})\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args[0]) != 0:
-                        try:
-                            settings['increment'] = int(user_args[0])
-                        except ValueError:
-                            print('Please specify an integer value.')
-                if step != 0:
-                    saved_file = None
                     
-                # STEP 7: save calibration parameters in a .json file
-                while step == 7:
-                    if settings['corners'] is None or settings['increment'] is None:
-                        print('Value for INCREMENT has not been specified.')
-                        step -= 1
-                        break
-                    message = f'--- STEP 7 ---\nIf you would like to save the currently stored ' \
-                              f'calibration parameters, enter a file name without an extension ' \
-                              f'(a ".json" file extension will be applied automatically). The ' \
-                              f'saved file can be reloaded to hasten the process of future ' \
-                              f'calibrations. When ready to run the scanning procedure, input ' \
-                              f'"next" to proceed.\n--- Calibration parameters saved to file: ' \
-                              f'{saved_file}\n'
+                # STEP 2: first square y pos    
+                while step == 2:
+                    s = 0
+                    cmd = {"screen": f'{count}',
+                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 200, 100]},
+                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
+                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
+                    dome_pi4node.transmit(cmd)
+                    response = dome_pi4node.receive()
+                    count+=1
+                    
+                    message = f'--- STEP 2 ---\nMove the first square to the top of the camera view.'\
+                              f' To move the square input positive or negative values.\n'
                     user_args, step = custom_input(message, step)
-                    if len(user_args[0]) != 0:
-                        saved_file = user_args[0] + '.json'
-                        with open(saved_file, 'w') as calibration_parameters_file:
-                            json.dump(settings, calibration_parameters_file)
+                    if len(user_args) == 1 and len(user_args[0]) != 0:
+                        try:
+                            increment = int(user_args[0])
+                        except ValueError:
+                            print('Please input an integer.')
+                            continue
+                    elif step != 1:
+                        continue
+                    #move = DOMEtran.linear_transform(shift=(step,0))
+                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+                    pos[s][0,2]+=increment
+
+                # STEP 3: first square x pos     
+                while step == 3:
+                    s = 0
+                    cmd = {"screen": f'{count}',
+                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 200, 100]},
+                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
+                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
+                    dome_pi4node.transmit(cmd)
+                    response = dome_pi4node.receive()
+                    count+=1
+                    
+                    message = f'--- STEP 3 ---\nMove the first square to the left side of the camera view.'\
+                              f' To move the square input positive or negative values.\n'
+                    user_args, step = custom_input(message, step)
+                    if len(user_args) == 1 and len(user_args[0]) != 0:
+                        try:
+                            increment = int(user_args[0])
+                        except ValueError:
+                            print('Please input an integer.')
+                            continue
+                    elif step != 1:
+                        continue
+                    #move = DOMEtran.linear_transform(shift=(step,0))
+                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+                    pos[s][1,2]+=increment
                 
+                # STEP 4: second square y pos    
+                while step == 4:
+                    s = 1
+                    cmd = {"screen": f'{count}',
+                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
+                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 200, 100]},
+                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
+                    dome_pi4node.transmit(cmd)
+                    response = dome_pi4node.receive()
+                    count+=1
+                    
+                    message = f'--- STEP 4 ---\nMove the second square to the top of the camera view.'\
+                              f' To move the square input positive or negative values.\n'
+                    user_args, step = custom_input(message, step)
+                    if len(user_args) == 1 and len(user_args[0]) != 0:
+                        try:
+                            increment = int(user_args[0])
+                        except ValueError:
+                            print('Please input an integer.')
+                            continue
+                    elif step != 1:
+                        continue
+                    #move = DOMEtran.linear_transform(shift=(step,0))
+                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+                    pos[s][0,2]+=increment
+
+                # STEP 5: second square x pos     
+                while step == 5:
+                    s = 1
+                    cmd = {"screen": f'{count}',
+                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
+                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 200, 100]},
+                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
+                    dome_pi4node.transmit(cmd)
+                    response = dome_pi4node.receive()
+                    count+=1
+                    
+                    message = f'--- STEP 5 ---\nMove the second square to the right side of the camera view.'\
+                              f' To move the square input positive or negative values.\n'
+                    user_args, step = custom_input(message, step)
+                    if len(user_args) == 1 and len(user_args[0]) != 0:
+                        try:
+                            increment = int(user_args[0])
+                        except ValueError:
+                            print('Please input an integer.')
+                            continue
+                    elif step != 1:
+                        continue
+                    #move = DOMEtran.linear_transform(shift=(step,0))
+                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+                    pos[s][1,2]+=increment
+               
+                # STEP 6: third square y pos    
+                while step == 6:
+                    s = 2
+                    cmd = {"screen": f'{count}',
+                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
+                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
+                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 200, 100]}}
+                    dome_pi4node.transmit(cmd)
+                    response = dome_pi4node.receive()
+                    count+=1
+                    
+                    message = f'--- STEP 6 ---\nMove the third square to the bottom of the camera view.'\
+                              f' To move the square input positive or negative values.\n'
+                    user_args, step = custom_input(message, step)
+                    if len(user_args) == 1 and len(user_args[0]) != 0:
+                        try:
+                            increment = int(user_args[0])
+                        except ValueError:
+                            print('Please input an integer.')
+                            continue
+                    elif step != 1:
+                        continue
+                    #move = DOMEtran.linear_transform(shift=(step,0))
+                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+                    pos[s][0,2]+=increment
+
+                # STEP 7: third square x pos     
+                while step == 7:
+                    s = 2
+                    cmd = {"screen": f'{count}',
+                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
+                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
+                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 200, 100]}}
+                    dome_pi4node.transmit(cmd)
+                    response = dome_pi4node.receive()
+                    count+=1
+                    
+                    message = f'--- STEP 7 ---\nMove the third square to the left side of the camera view.'\
+                              f' To move the square input positive or negative values.\n'
+                    user_args, step = custom_input(message, step)
+                    if len(user_args) == 1 and len(user_args[0]) != 0:
+                        try:
+                            increment = int(user_args[0])
+                        except ValueError:
+                            print('Please input an integer.')
+                            continue
+                    elif step != 1:
+                        continue
+                    #move = DOMEtran.linear_transform(shift=(step,0))
+                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+                    pos[s][1,2]+=increment
+              
                 # STEP 8: perform calibration and save the transformation matrix in 'camera2projector.npy'
                 if step == 8:
-#                     dome_pi4node.transmit('dimensions')
-#                     projector_dims = dome_pi4node.receive()
-                    num_scan_lines = np.ceil(np.array(projector_dims) /
-                                             settings['increment']).astype(int)
-                    corners = np.array(settings['corners'])
-                    intensities = [np.zeros((corners.shape[0], num_scan_lines[d]))
-                                   for d in range(0, 2)]
-                    # Iterate over rows first, then columns.
-                    for rc, row_column in enumerate(['row', 'column']):
-                        for l in range(0, num_scan_lines[rc]):
-                            # Reset the projected pattern.
-                            dome_pi4node.transmit('all' + 3 * ' 0')
-                            response = dome_pi4node.receive()
-                            # Illuminate the current row / columm
-                            line_start = l * settings['increment']
-                            line_end = min(projector_dims[rc], (l + 1) * settings['increment'])
-                            dome_pi4node.transmit(row_column + f' {line_start} {line_end}')
-                            response = dome_pi4node.receive()
-                            print(f'Scanning {row_column}s: Progress = {l} / ' \
-                                  f'{num_scan_lines[rc]}')
-                            # Take a picture of the illuminated scan lines and record...
-                            #...intensities in scanning regions.
-                            line_picture = dome_camera.capture_image(camera_mode)
-                            gray_line_picture = cv2.cvtColor(line_picture, cv2.COLOR_BGR2GRAY)
-                            half_region_size = int(np.ceil(settings['magnification'] *
-                                                      settings['increment']))
-                            intensities[rc][:, l] = measure_intensities(gray_line_picture,
-                                                                        corners, half_region_size)
-                    bright_lines = get_bright_lines(intensities)
-                    projector_points = (bright_lines * settings['increment']).astype(np.float32)
-                    camera_points = corners.astype(np.float32)
-                    print('Camera points')
-                    print(camera_points)
-                    print('Projector points')
-                    print(projector_points)
-                    camera2projector = cv2.getAffineTransform(camera_points[0:3, :],
-                                                              projector_points[0:3, :])
+                    camera_points = np.float32([[0,0], [0,1920], [1080,0]])
+                    projector_points = np.float32([[0,0]]*3)
+                    projector_points[0] = pos[0][0:2,2]
+                    projector_points[1] = pos[1][0:2,2]
+                    projector_points[2] = pos[2][0:2,2]
+                    camera2projector = cv2.getAffineTransform(camera_points,
+                                                              projector_points)
                     camera2projector = np.concatenate((camera2projector, np.array([[0, 0, 1]])), 0)
                     print(camera2projector)
                     mapping_filename = 'camera2projector.npy'
@@ -628,16 +560,18 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                     
                 # STEP 9: validation
                 if step == 9:
-                    print('The camera frame should now be exactly filled by a green rectangle.')
+                    print('The camera frame should now be exactly filled by a green frame.')
+                    user_args, step = custom_input('Input \'next\' to finish.', step)
                     camera2projector = np.load('camera2projector.npy')
-                    img = DOMEtran.linear_transform(scale=(1080-20,1920-20), shift=(1080/2,1920/2))
-                    pose_proj = np.dot(camera2projector, img)
-                    cmd = {"screen": '0', "add": {"label": 'a', "shape type": 'square',"pose": pose_proj.tolist(), "colour": [100, 100, 100]}}
-                    wait(1)
-                    picture = dome_camera.capture_image(camera_mode)
-                    cv2.imshow('Camera picture.', picture)
-                    cv2.waitKey(0)
-                    step += 1
+                    green_cam = DOMEtran.linear_transform(scale=(1080-20,1920-20), shift=(1080/2,1920/2))
+                    black_cam = DOMEtran.linear_transform(scale=(1080-40,1920-40), shift=(1080/2,1920/2))
+                    green_proj = np.dot(camera2projector, green_cam)
+                    black_proj = np.dot(camera2projector, black_cam)
+                    cmd = {"screen": 'new',
+                           "add1": {"label": 'a', "shape type": 'square',"pose": green_proj.tolist(), "colour": [50, 50, 50]},
+                           "add2": {"label": 'a', "shape type": 'square',"pose": black_proj.tolist(), "colour": [0, 0, 0]}}
+                    dome_pi4node.transmit(cmd)
+                    response = dome_pi4node.receive()
                     
         finally:
             dome_pi4node.transmit('all' + 3 * ' 0')
