@@ -34,12 +34,15 @@ class ScreenManager():
                   f'number of stored images ({len(self.images)})')
     
     def switch_to_screen(self, new_screen):
-        self.current = new_screen
+        if new_screen is 'new':
+            new_screen='screen' + str(len(self.screens.keys()))
+        
         if not new_screen in self.screens.keys():
             poses = DOMEtran.PoseManager()
             self.screens[new_screen] = {'image': 0,
                                         'poses': poses,
                                         'shown': []}
+        self.current = new_screen
     
     def shapes_shown_to_screen(self, shown_list):
         self.screens[self.current]['shown'] = shown_list
@@ -239,7 +242,7 @@ def main(output_dims, refresh_delay, pattern_dims=None):
             dome_pi0node.transmit(out_msg)
 
 if __name__ == '__main__':
-    pattern_dims = (1080, 1920, 3)
+    pattern_dims = (480//2, 854//2, 3)
     output_dims = (480, 854, 3)
     refresh_delay = 33    # refresh delay in milliseconds
     

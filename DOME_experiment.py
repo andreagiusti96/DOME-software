@@ -405,9 +405,9 @@ def start_experiment():
     # start the experiment
     global color
     global current_experiment
-    global proj_dim
+    global pattern_dim
     
-    screen_manager = DOMEproj.ScreenManager(camera_dim)
+    screen_manager = DOMEproj.ScreenManager(pattern_dim)
     pattern = screen_manager.get_pattern_for_screen()
 
     current_experiment=new_experiment(date, species, culture, output_directory)
@@ -419,6 +419,7 @@ def start_experiment():
     current_experiment.add_detail(f'camera_bright_reduction={camera_bright_reduction}\n')
     current_experiment.add_detail('Log:')
     os.mkdir(os.path.join(current_experiment.path, 'patterns'))
+    os.mkdir(os.path.join(current_experiment.path, 'patterns_cam'))
     os.mkdir(os.path.join(current_experiment.path, 'images'))
     
     count=0
@@ -448,17 +449,16 @@ def start_experiment():
         if cmd_count < len(commands):
             if t >= commands[cmd_count]["t"]:
                 message = commands[cmd_count]["cmd"]
-                message2proj = message
-                if type(message) is dict:
-                    message2proj = message.copy()
-                    #message2proj['transform'] = {"matrix": cam2proj_trans.tolist()}
-                update_projector(message2proj, prevent_log=False)
+                update_projector(message, prevent_log=False)
                 pattern, msg_out = screen_manager.make_pattern_from_cmd(message, pattern)
+                pattern_cam = DOMEtran.transform_image(pattern, pattern2camera, camera_dim)
                 cmd_count+=1
         
         # save output pattern
         out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
         cv2.imwrite(out_patt, pattern)
+        out_patt=os.path.join(current_experiment.path, 'patterns_cam', 'pattern_' + '%04.1f' % t + '.jpeg')
+        cv2.imwrite(out_patt, pattern_cam)
         
         # wait
         toc=datetime.now()
@@ -521,7 +521,6 @@ if __name__ == '__main__':
     
     
     # allocate vars
-    cam2proj_trans = np.load('camera2projector.npy')
     current_experiment=None
     fig_counter = 1
     video_counter = 1
@@ -544,8 +543,20 @@ if __name__ == '__main__':
     off_light = np.rint( bright * off_value )
     on_light = np.rint( bright * on_value )
     
+    scale = 2
     proj_dim   = ( 480,  854, 3)
     camera_dim = (1080, 1920, 3)
+    pattern_dim = (480//scale, 854//scale, 3)
+    
+    camera2projector = np.load('camera2projector.npy')
+    projector2pattern = DOMEtran.linear_transform(scale=(1/scale,1/scale))
+    camera2pattern = projector2pattern @ camera2projector
+    pattern2camera = np.linalg.inv(camera2pattern)
+
+    camera_frame = np.array(DOMEtran.map_coordinates(np.array([0,camera_dim[0]]), np.array([0,camera_dim[1]]),
+                    camera2pattern)) 
+    camera_center = np.mean(camera_frame, 1)
+    camera_scale = np.diff(camera_frame)
     
     camera_bright_base=40
     camera_bright_reduction=0
@@ -567,18 +578,23 @@ if __name__ == '__main__':
 #     outputs[get_index_for_time(40):get_index_for_time(60)]=sig.square(0.1*2*np.pi*(time_instants[get_index_for_time(40):get_index_for_time(60)]+deltaT/2))*0.5+0.5
     
     # commands at specific times
-    green_cam = DOMEtran.linear_transform(scale=(1080-20,1920-20), shift=(1080/2,1920/2))
-    black_cam = DOMEtran.linear_transform(scale=(1080-40,1920-40), shift=(1080/2,1920/2))
+    camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
+    circ_pose = DOMEtran.linear_transform(scale=[1,1]*min(camera_scale)/4, shift=camera_center)
+    green_cam = camera_pose @ DOMEtran.linear_transform(scale=(0.9,0.9))
+    black_cam = camera_pose @ DOMEtran.linear_transform(scale=(0.8,0.8))
+    green_prog = np.dot(camera2projector, green_cam)
 #     cmd = {"screen": '0', "add": {"label": 'prova', "shape type": 'square',"pose": green_cam.tolist(), "colour": [0, 100, 0]}}
-#     cmd2 = {"transform": {"matrix": cam2proj_trans.tolist()}}
+#     cmd2 = {"transform": {"matrix": camera2projector.tolist()}}
     commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
                 {"t":2, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
-                {"t":6, "cmd": {"screen": '0',
+                {"t":4, "cmd": {"screen": 'new',
                                 "add": {"label": 'prova', "shape type": 'square',
-                                "pose": green_cam.tolist(), "colour": [0, 255, 0]}}},
-                {"t":8, "cmd": {"screen": '0',
-                                "add": {"label": 'prova', "shape type": 'square',
-                                "pose": black_cam.tolist(), "colour": [0, 0, 0]}}}
+                                "pose": green_cam.tolist(), "colour": [0, 50, 0]}}},
+                {"t":6, "cmd": {"add": {"label": 'prova', "shape type": 'square',
+                                "pose": black_cam.tolist(), "colour": [0, 0, 0]}}},
+                {"t":8, "cmd": {"screen": 'new',
+                                "add": {"label": 'prova', "shape type": 'circle',
+                                "pose": circ_pose.tolist(), "colour": [0, 50, 0]}}}
                 ]
      
         
@@ -596,14 +612,14 @@ if __name__ == '__main__':
     # handle program termination
     atexit.register(terminate_session)
     signal.signal(signal.SIGTERM, terminate_session)
-    signal.signal(signal.SIGINT, terminate_session)
+    signal.signal(signal.SIGINT,  terminate_session)
     signal.signal(signal.SIGABRT, terminate_session)
-    signal.signal(signal.SIGILL, terminate_session)
+    signal.signal(signal.SIGILL,  terminate_session)
     signal.signal(signal.SIGSEGV, terminate_session)
     
     # initialize projector
-    cmd = {"set": {'param':'default_transformation', "value": cam2proj_trans.tolist()}}
-    update_projector(cmd)
+#     cmd = {"set": {'param':'default_transformation', "value": camera2projector.tolist()}}
+#     update_projector(cmd)
     color=off_value
     update_projector()
     
@@ -611,4 +627,11 @@ if __name__ == '__main__':
     print('Now adjust focus and camera parameters, then use start_experiment() to run the experiment.\n')
     
     
+    # pattern description with camera pov and arbitrary resolution
+    # scaling to camera resolution using transform
+    # transform to projector reference frame
+    # send to projector
+    
+    # pattern description wrt progector
+    # send to projector
     
