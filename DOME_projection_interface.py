@@ -100,7 +100,11 @@ class ScreenManager():
                     # message = {"get": {'param': name_of_the_attribute}}                        
                     if command_type == 'get':
                         if hasattr(self, message[c]['param']):
-                            out_msg = getattr(self, message[c]['param'])
+                            val = getattr(self, message[c]['param'])
+                            if isinstance(val, np.ndarray):
+                                out_msg = val.tolist()
+                            else:
+                                out_msg = val
                             print(f'{message[c]["param"]} = {out_msg}')
                         else:
                             out_msg = f'{message[c]["param"]} is not valid!'
@@ -199,10 +203,10 @@ class ScreenManager():
         
         return pattern, out_msg
 
-def main(output_dims, refresh_delay, internal_dims=None):
-    if internal_dims==None:
-        internal_dims = output_dims
-    screen_manager = ScreenManager(internal_dims)
+def main(output_dims, refresh_delay, pattern_dims=None):
+    if pattern_dims==None:
+        pattern_dims = output_dims
+    screen_manager = ScreenManager(pattern_dims)
     pattern = screen_manager.get_pattern_for_screen()
     cv2.namedWindow('Pattern', cv2.WND_PROP_FULLSCREEN)
     cv2.setWindowProperty('Pattern', cv2.WND_PROP_FULLSCREEN,
@@ -222,7 +226,10 @@ def main(output_dims, refresh_delay, internal_dims=None):
             
             if out_msg is 'Done':                
                 # update projected pattern
-                out_pattern = DOMEtran.transform_image(pattern, screen_manager.default_transformation, output_dims)
+                ratio = (output_dims[0]/pattern.shape[0], output_dims[1]/pattern.shape[1])
+                pattern2output = DOMEtran.linear_transform(scale=ratio)
+                pattern2camera = np.dot(pattern2output,screen_manager.default_transformation)
+                out_pattern = DOMEtran.transform_image(pattern, pattern2camera, output_dims)
                 cv2.imshow('Pattern', out_pattern)
                 cv2.waitKey(refresh_delay)
             
@@ -232,9 +239,9 @@ def main(output_dims, refresh_delay, internal_dims=None):
             dome_pi0node.transmit(out_msg)
 
 if __name__ == '__main__':
-    internal_dims = (1080, 1920, 3)
+    pattern_dims = (1080, 1920, 3)
     output_dims = (480, 854, 3)
     refresh_delay = 33    # refresh delay in milliseconds
     
-    main(output_dims, refresh_delay, internal_dims)
+    main(output_dims, refresh_delay, pattern_dims)
         
