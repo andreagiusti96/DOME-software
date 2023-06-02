@@ -191,35 +191,33 @@ def make_pattern(dimensions):
     
     return pattern
 
-def update_projector(pattern=None, prevent_log=False):
+def update_projector(command=None, prevent_log=False):
     '''
     Send command to the projector module.
     ---
     Parameters
-        pattern=None
-            Pattern to send to the projector.
+        command=None
+            Command to send to the projector.
             If None a unifor pattern is generated with bright and color.
     ---
     Outputs
-        response : int
+        response : str
             Response from the projector module.
     '''
-    if pattern is None: 
+    if command is None: 
         light = np.rint( bright * color )
         dome_pi4node.transmit(f'all' + f' {int(light[0])} {int(light[1])} {int(light[2])}')
         if current_experiment and not prevent_log:
             current_experiment.add_log_entry(f'light={light}')
     else:
-        if isinstance(pattern, np.ndarray):
-            pattern.astype(np.uint8)
+        if isinstance(command, np.ndarray):
+            command.astype(np.uint8)
         
-        dome_pi4node.transmit(pattern)
+        dome_pi4node.transmit(command)
         if current_experiment and not prevent_log:
-            current_experiment.add_log_entry(f'pattern updated')
+            current_experiment.add_log_entry(f'projector updated')
 
     response = dome_pi4node.receive()
-    #if response != 'Done' and response != 'Done.':
-    #    raise(Exception('Error communicating with the projector.\n'))
     
     return response
 
@@ -425,6 +423,8 @@ def start_experiment():
     count=0
     cmd_count=0
     
+    update_projector({"screen": 'new'}, prevent_log=True)
+    
     current_experiment.reset_starting_time()
     rec('video')
     print('Experiment running...\n')
@@ -519,6 +519,21 @@ if __name__ == '__main__':
     deltaT= 0.5 # sampling time [s]
     totalT= 10  # experiment duration [s]
     
+    white = np.array([1, 1, 1])
+    black = np.array([0, 0, 0])
+    blue  = np.array([1, 0, 0])
+    red   = np.array([0, 0, 1])
+    green = np.array([0, 1, 0])
+
+    off_value = red*0.1
+    on_value = blue + off_value
+    
+    bright=200
+    off_light = np.rint( bright * off_value ).astype(np.uint8)
+    on_light = np.rint( bright * on_value ).astype(np.uint8)
+    
+    camera_bright_base=40
+    camera_bright_reduction=0
     
     # allocate vars
     current_experiment=None
@@ -529,19 +544,6 @@ if __name__ == '__main__':
     activation_times=np.ndarray([max_time_index])
     #images = np.ndarray([max_time_index, 1080, 1920, 3], dtype=np.uint8)
     #patterns = np.ndarray([max_time_index, 480, 854, 3], dtype=np.uint8)
-
-    white = np.array([1, 1, 1])
-    black = np.array([0, 0, 0])
-    blue = np.array([1, 0, 0])
-    red = np.array([0, 0, 1])
-    green= np.array([0, 1, 0])
-
-    off_value = red*0.1
-    on_value = blue + off_value
-    
-    bright=200
-    off_light = np.rint( bright * off_value )
-    on_light = np.rint( bright * on_value )
     
     scale = 2
     proj_dim   = ( 480,  854, 3)
@@ -557,9 +559,6 @@ if __name__ == '__main__':
                     camera2pattern)) 
     camera_center = np.mean(camera_frame, 1)
     camera_scale = np.diff(camera_frame)
-    
-    camera_bright_base=40
-    camera_bright_reduction=0
     
     # experiment description
     time_instants=np.linspace(0,totalT, max_time_index)
@@ -586,7 +585,10 @@ if __name__ == '__main__':
 #     cmd = {"screen": '0', "add": {"label": 'prova', "shape type": 'square',"pose": green_cam.tolist(), "colour": [0, 100, 0]}}
 #     cmd2 = {"transform": {"matrix": camera2projector.tolist()}}
     commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
-                {"t":2, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
+                #{"t":2, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
+                {"t":2, "cmd": on_light},
+                {"t":3, "cmd": {"add": {"label": 'prova', "shape type": 'circle',
+                                "pose": circ_pose.tolist(), "colour": [0, 50, 0]}}},
                 {"t":4, "cmd": {"screen": 'new',
                                 "add": {"label": 'prova', "shape type": 'square',
                                 "pose": green_cam.tolist(), "colour": [0, 50, 0]}}},
@@ -597,7 +599,6 @@ if __name__ == '__main__':
                                 "pose": circ_pose.tolist(), "colour": [0, 50, 0]}}}
                 ]
      
-        
     [dome_pi4node, dome_camera, dome_gpio]=init()
     
     # start video preview
@@ -608,6 +609,11 @@ if __name__ == '__main__':
     open_camera()
     #dome_camera.show_info()
     
+    # initialize projector
+    #  cmd = {"set": {'param':'default_transformation', "value": camera2projector.tolist()}}
+    #  update_projector(cmd)
+    color=off_value
+    update_projector()
     
     # handle program termination
     atexit.register(terminate_session)
@@ -617,13 +623,7 @@ if __name__ == '__main__':
     signal.signal(signal.SIGILL,  terminate_session)
     signal.signal(signal.SIGSEGV, terminate_session)
     
-    # initialize projector
-#     cmd = {"set": {'param':'default_transformation', "value": camera2projector.tolist()}}
-#     update_projector(cmd)
-    color=off_value
-    update_projector()
-    
-    # start experiment and recording
+    # start session
     print('Now adjust focus and camera parameters, then use start_experiment() to run the experiment.\n')
     
     

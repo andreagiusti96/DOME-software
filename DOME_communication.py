@@ -231,7 +231,8 @@ def encode_array(array : np.ndarray, encryption : str):
     flat_array = array.flatten()
     array_values = [str(flat_array[i]) for i in range(0, len(flat_array))]
     array_bytes = b''.join([bytes(val + ',', encryption) for val in array_values])
-    shape_bytes = bytes(str(array.shape), encryption)
+    shape_values = str(array.shape).replace(',)',')')
+    shape_bytes = bytes(shape_values, encryption)
     shape_array_bytes = shape_bytes + array_bytes
     return shape_array_bytes
     

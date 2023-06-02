@@ -13,9 +13,9 @@ class ScreenManager():
         self.current = ''
         self.images = []
         self.screens = {}
+        self.default_transformation = np.eye(3)
         self.store_image(np.zeros(self.dimensions))
         self.switch_to_screen('default')
-        self.default_transformation = np.eye(3)
     
     def store_image(self, image):
         if image.shape == self.dimensions:
@@ -26,15 +26,15 @@ class ScreenManager():
                   f'--- screen = {self.dimensions}')
     
     def set_image_to_screen(self, image_index):
-        if image_index >= len(self.images):
+        if image_index < len(self.images):
             self.screens[self.current]['image'] = image_index
         else:
-            images_list = [i for i in self.images.keys()]
+            #images_list = [i for i in self.images.keys()]
             print(f'WARNING: image index {image_index} exceeds ' + \
                   f'number of stored images ({len(self.images)})')
     
     def switch_to_screen(self, new_screen):
-        if new_screen is 'new':
+        if new_screen == 'new':
             new_screen='screen' + str(len(self.screens.keys()))
         
         if not new_screen in self.screens.keys():
@@ -78,10 +78,16 @@ class ScreenManager():
         # if the message is an array scale it to the right size
         # and use it as the pattern
         if isinstance(message, np.ndarray):
-            pattern = message.copy().astype(np.uint8)
-            if pattern.shape[0:2] != self.dimensions[0:2]:
-                pattern = cv2.resize(pattern, (self.dimensions[1],self.dimensions[0]) )
-            self.store_image(pattern)
+            image = message.copy().astype(np.uint8)
+            if len(image.shape) == 1:
+                image = (np.ones(self.dimensions)*image).astype(np.uint8)
+            if image.shape[0:2] != self.dimensions[0:2]:
+                image = cv2.resize(image, (self.dimensions[1],self.dimensions[0]) )
+            # save and set the bacground for the current screen
+            self.store_image(image)
+            self.set_image_to_screen(len(self.images)-1)
+            # make pattern from the saved screen data
+            pattern = self.get_pattern_for_screen()
             
         # if the message is a dictionary extract the commands from it
         #   message = {'screen': 'default',
@@ -92,7 +98,7 @@ class ScreenManager():
         #                       'pose': [[1,0,0],[0,1,0],[0,0,1]], 'colour':[255]},
         #              'transform': {'matrix': [[1,0,0],[0,1,0],[0,0,1]], 'labels': ['a']},
         #              'transform2': {'matrix': [[1,0,0],[0,1,0],[0,0,1]], 'labels': ['b']},
-        #              'colour': {'colour': [255], 'label': 'splotlight', 'indices': [0]},
+        #              'colour': {'colour': [255], 'label': 'spotlight', 'indices': [0]},
         #              'shown': ['name1', 'name2']}
         elif isinstance(message, dict):
             all_command_types = ['get', 'set', 'screen', 'image', 'add', 'transform', 'colour', 'shown']
@@ -227,7 +233,7 @@ def main(output_dims, refresh_delay, pattern_dims=None):
             
             pattern, out_msg = screen_manager.make_pattern_from_cmd(message, pattern)
             
-            if out_msg is 'Done':                
+            if out_msg == 'Done':                
                 # update projected pattern
                 ratio = (output_dims[0]/pattern.shape[0], output_dims[1]/pattern.shape[1])
                 pattern2output = DOMEtran.linear_transform(scale=ratio)
