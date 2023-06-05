@@ -144,23 +144,29 @@ def set_brightness(newbright : int, prevent_log=False):
         
     else:
         print('Input a value between 0 and 255.\n')
-    
-def make_pattern(dimensions):
-    '''
-    Generate pattern for the projector.
-    ---
-    Outputs
-        pattern : np.ndarray([480, 854, 3], dtype=np.uint8)
-            Generated patter.
-    '''
-    
-    light = np.rint( bright * color )
-    pattern = np.ndarray(dimensions, dtype=np.uint8)
-    pattern[:, :, 0] = int(light[0])
-    pattern[:, :, 1] = int(light[1])
-    pattern[:, :, 2] = int(light[2])
-    
-    return pattern
+     
+# def make_pattern(dimensions):
+#     '''
+#     Generate pattern for the projector.
+#     ---
+#     Outputs
+#         pattern : np.ndarray([480, 854, 3], dtype=np.uint8)
+#             Generated patter.
+#     '''
+#     
+#     light = np.rint( bright * color )
+#     pattern = np.ndarray(dimensions, dtype=np.uint8)
+#     pattern[:, :, 0] = int(light[0])
+#     pattern[:, :, 1] = int(light[1])
+#     pattern[:, :, 2] = int(light[2])
+#     
+#     return pattern
+
+def update_pattern(command, prevent_log=False):
+    global screen_manager
+    update_projector(command, prevent_log)
+    pattern, msg_out = screen_manager.make_pattern_from_cmd(command)
+    return pattern, msg_out
 
 def update_projector(command=None, prevent_log=False):
     '''
@@ -372,12 +378,8 @@ def load_experiment(name : str, output_directory='/home/pi/Documents/experiments
 
 def start_experiment():
     # start the experiment
-    global color
     global current_experiment
-    global pattern_dim
-    
-    screen_manager = DOMEproj.ScreenManager(pattern_dim)
-    pattern = screen_manager.get_pattern_for_screen()
+    global screen_manager
 
     current_experiment=new_experiment(date, species, culture, output_directory)
     current_experiment.add_detail(f'Sample: '+sample, include_in_exp_list=True)
@@ -394,7 +396,8 @@ def start_experiment():
     count=0
     cmd_count=0
     
-    update_projector({"screen": 'new'}, prevent_log=True)
+    update_pattern({"screen": 'new'}, prevent_log=True)
+    pattern, msg_out = update_pattern(off_light, prevent_log=True)
     
     current_experiment.reset_starting_time()
     rec('video')
@@ -420,9 +423,10 @@ def start_experiment():
         if cmd_count < len(commands):
             if t >= commands[cmd_count]["t"]:
                 message = commands[cmd_count]["cmd"]
-                update_projector(message, prevent_log=False)
-                pattern, msg_out = screen_manager.make_pattern_from_cmd(message, pattern)
-                pattern_cam = DOMEtran.transform_image(pattern, pattern2camera, camera_dim)
+                #update_projector(message, prevent_log=False)
+                #pattern, msg_out = screen_manager.make_pattern_from_cmd(message)
+                pattern, msg_out = update_pattern(message)
+                pattern_cam = DOMEtran.transform_image(pattern, projector2camera, camera_dim)
                 cmd_count+=1
         
         # save output pattern
@@ -441,7 +445,8 @@ def start_experiment():
             time.sleep(max(0, time_to_wait ))
     
     # terminate the experiment and recording
-    set_color(off_value, prevent_log=True)
+    update_pattern({"screen": 'new'}, prevent_log=True)
+    pattern, msg_out = update_pattern(off_light, prevent_log=True)
     terminate_experiment()
 
 def get_index_for_time(time : float):
@@ -486,11 +491,11 @@ if __name__ == '__main__':
     temp='XX' # temperature of the sample
     
     output_directory      = '/home/pi/Documents/experiments'
-    commands_file         = '/home/pi/Documents/config/prova.json'
+    commands_file         = '/home/pi/Documents/config/cmd_prova.json'
     camera2projector_file = '/home/pi/Documents/config/camera2projector.npy'
     
     deltaT= 0.5 # sampling time [s]
-    totalT= 20  # experiment duration [s]
+    totalT= 15  # experiment duration [s]
     
     white = np.array([1, 1, 1])
     black = np.array([0, 0, 0])
@@ -518,46 +523,46 @@ if __name__ == '__main__':
     #images = np.ndarray([max_time_index, 1080, 1920, 3], dtype=np.uint8)
     #patterns = np.ndarray([max_time_index, 480, 854, 3], dtype=np.uint8)
     
-    scale = 2
+    scale = 10
     camera_dim = (1080, 1920, 3)
     proj_dim   = ( 480,  854, 3)
-    pattern_dim = (480//scale, 854//scale, 3)
+    #pattern_dim = (480//scale, 854//scale, 3)
     
     camera2projector = np.load(camera2projector_file)
-    projector2pattern = DOMEtran.linear_transform(scale=(1/scale,1/scale))
-    camera2pattern = projector2pattern @ camera2projector
-    pattern2camera = np.linalg.inv(camera2pattern)
+    projector2camera = np.linalg.inv(camera2projector)
+    #projector2pattern = DOMEtran.linear_transform(scale=1/scale)
+    #camera2pattern = projector2pattern @ camera2projector
+    #pattern2camera = np.linalg.inv(camera2pattern)
 
-    camera_frame = np.array(DOMEtran.map_coordinates(np.array([0,camera_dim[0]]), np.array([0,camera_dim[1]]),
-                    camera2pattern)) 
+    camera_frame = np.array(DOMEtran.map_coordinates(
+                    np.array([0,camera_dim[0]]), np.array([0,camera_dim[1]]),
+                    camera2projector)) 
     camera_center = np.mean(camera_frame, 1)
     camera_scale = np.diff(camera_frame)
     
     # experiment description
     # load saved commands from a json file or define new ones
-    commands = load_json(commands_file)    
+    # commands = load_json(commands_file)    
 
-#     # commands at specific times
-#     camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
-#     circ_pose = DOMEtran.linear_transform(scale=[1,1]*min(camera_scale)/4, shift=camera_center)
-#     green_cam = camera_pose @ DOMEtran.linear_transform(scale=(0.9,0.9))
-#     black_cam = camera_pose @ DOMEtran.linear_transform(scale=(0.8,0.8))
-#     green_prog = np.dot(camera2projector, green_cam)
-#     commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
-#                 #{"t":2, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
-#                 {"t":2, "cmd": on_light},
-#                 {"t":3, "cmd": {"add": {"label": 'prova', "shape type": 'circle',
-#                                 "pose": circ_pose, "colour": [0, 50, 0]}}},
-#                 {"t":4, "cmd": {"screen": 'new',
-#                                 "add": {"label": 'prova', "shape type": 'square',
-#                                 "pose": green_cam, "colour": [0, 50, 0]}}},
-#                 {"t":6, "cmd": {"add": {"label": 'prova', "shape type": 'square',
-#                                 "pose": black_cam, "colour": [0, 0, 0]}}},
-#                 {"t":8, "cmd": {"screen": 'new',
-#                                 "add": {"label": 'prova', "shape type": 'circle',
-#                                 "pose": circ_pose, "colour": [0, 50, 0]}}},
-#                 {"t":10, "cmd": {"gradient": {'points': camera_frame[1,:], 'values': [off_light, off_light*5]}}}
-#                 ]
+    # commands at specific times
+    camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
+    circ_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
+    green_cam = camera_pose @ DOMEtran.linear_transform(scale=0.9)
+    black_cam = camera_pose @ DOMEtran.linear_transform(scale=0.8)
+    commands = [{"t":0, "cmd": on_light},
+                {"t":2, "cmd": off_light},
+                {"t":3, "cmd": {"add": {"label": 'prova', "shape type": 'circle',
+                                "pose": circ_pose, "colour": [0, 50, 0]}}},
+                {"t":4, "cmd": {"screen": 'new',
+                                "add": {"label": 'prova', "shape type": 'square',
+                                "pose": green_cam, "colour": [0, 50, 0]}}},
+                {"t":6, "cmd": {"add": {"label": 'prova', "shape type": 'square',
+                                "pose": black_cam, "colour": [0, 0, 0]}}},
+                {"t":8, "cmd": {"screen": 'new',
+                                "add": {"label": 'prova', "shape type": 'circle',
+                                "pose": circ_pose, "colour": [0, 50, 0]}}},
+                {"t":10, "cmd": {"gradient": {'points': camera_frame[1,:], 'values': [off_light, off_light*10]}}}
+                ]
     
 #     # varying frequency
 #     outputs[get_index_for_time(10):get_index_for_time(15)]=sig.square(2*np.pi*(time_instants[get_index_for_time(10):get_index_for_time(15)]+deltaT/2))*0.5+0.5
@@ -577,10 +582,9 @@ if __name__ == '__main__':
     #dome_camera.show_info()
     
     # initialize projector
-    #  cmd = {"set": {'param':'default_transformation', "value": camera2projector.tolist()}}
-    #  update_projector(cmd)
-    color=off_value
-    update_projector(off_light)
+    screen_manager = DOMEproj.ScreenManager(proj_dim)
+    update_pattern({"scale": scale}, prevent_log=True)
+    update_pattern(off_light, prevent_log=True)
     
     # handle program termination
     atexit.register(terminate_session)

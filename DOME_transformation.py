@@ -330,7 +330,7 @@ def linear_transform(scale=None, shear=None, shift=None):
     Create affine transformation matrix for stretches, shears and translations.
     ---
     Optional Inputs
-        scale : tuple(float, float)
+        scale : tuple(float, float) or float
             Amounts of stretching to apply in the x and y axes.
         shear : tuple(float, float)
             Amounts of shearing to apply in the x and y axes.
@@ -343,6 +343,8 @@ def linear_transform(scale=None, shear=None, shift=None):
     '''
     affine_matrix = np.eye(3)
     if not scale is None:
+        if isinstance(scale,float) or isinstance(scale,int) or len(scale)==1:
+            scale=(scale, scale)
         affine_matrix[0, 0] = scale[0]
         affine_matrix[1, 1] = scale[1]
     if not shear is None:
