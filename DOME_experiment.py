@@ -25,52 +25,6 @@ from datetime import datetime
 from datetime import date
 from scipy import signal as sig
 
-# class SettingsFileFormatError(Exception):
-#     '''
-#     Exception class for handling errors raised when calibration settings cannot be read from a
-#     file. The file should specify values for "brightness", "threshold", "region size" and
-#     "scan increment".
-#     '''
-    
-#     def __init__(self, key : str):
-#         '''
-#         Sets up the parent class for exceptions and provides an error message.
-#         ---
-#         Parameters
-#             key : str
-#                 The settings dictionary key that is missing from the json file.
-#         '''
-#         self.error_message = f'Format of calibration settings file is not recognised.\n Setting ' \
-#                              f'key "{key}" not specified.'
-#         super().__init__(self.error_message)
-    
-#     def print_error_message(self):
-#         '''
-#         Prints the error message without interupting execution.
-#         '''
-#         print(self.error_message)
-
-
-# def load_calibration_settings(file_name : str, keys : list):
-#     '''
-#     Reads calibration setting values from a json file.
-#     ---
-#     Parameters
-#         file_name : str
-#             Name of json file to read settings from.
-#     ---
-#     Outputs
-#         stored_settings : dict
-#             Dictionary of calibration settings.
-#     '''
-#     with open(file_name, 'r') as file:
-#         stored_settings = json.load(file)
-#     for setting in keys:
-#         # Check that the file contains all of the expected parameters.
-#         if not setting in stored_settings.keys():
-#             raise SettingsFileFormatError(setting)
-#     return stored_settings
-
 
 def init(camera_settings=None, gpio_light=None):
     '''
@@ -112,6 +66,23 @@ def init(camera_settings=None, gpio_light=None):
         print('Connection error')
         
     return dome_pi4node, dome_camera, dome_gpio
+
+def save_to_json(var, file_name : str):
+    if '.json' not in file_name:
+        file_name = file_name + '.json'
+    DOMEcomm.recursive_tolist(var)
+    with open(file_name, 'w') as file:
+        json.dump(var, file, indent=2)
+    
+def load_json(file_name : str):
+    '''
+    Reads calibration setting values from a json file.
+    '''
+    if '.json' not in file_name:
+        file_name = file_name + '.json'
+    with open(file_name, 'r') as file:
+        var = json.load(file)
+    return var
 
 def set_color(newcolor, prevent_print=False, prevent_log=False):
     '''
@@ -514,10 +485,12 @@ if __name__ == '__main__':
     sample='XX'      # details about the sample (volume, frame, etc)
     temp='XX' # temperature of the sample
     
-    output_directory='/home/pi/Documents/experiments'
+    output_directory      = '/home/pi/Documents/experiments'
+    commands_file         = '/home/pi/Documents/config/prova.json'
+    camera2projector_file = '/home/pi/Documents/config/camera2projector.npy'
     
     deltaT= 0.5 # sampling time [s]
-    totalT= 10  # experiment duration [s]
+    totalT= 20  # experiment duration [s]
     
     white = np.array([1, 1, 1])
     black = np.array([0, 0, 0])
@@ -546,11 +519,11 @@ if __name__ == '__main__':
     #patterns = np.ndarray([max_time_index, 480, 854, 3], dtype=np.uint8)
     
     scale = 2
-    proj_dim   = ( 480,  854, 3)
     camera_dim = (1080, 1920, 3)
+    proj_dim   = ( 480,  854, 3)
     pattern_dim = (480//scale, 854//scale, 3)
     
-    camera2projector = np.load('camera2projector.npy')
+    camera2projector = np.load(camera2projector_file)
     projector2pattern = DOMEtran.linear_transform(scale=(1/scale,1/scale))
     camera2pattern = projector2pattern @ camera2projector
     pattern2camera = np.linalg.inv(camera2pattern)
@@ -561,47 +534,41 @@ if __name__ == '__main__':
     camera_scale = np.diff(camera_frame)
     
     # experiment description
-    time_instants=np.linspace(0,totalT, max_time_index)
-    
-    # always off
-    outputs=[0]*max_time_index
-    
-    # half off - half on
-    outputs=[0]*max_time_index
-    outputs[get_index_for_time(totalT/2):]=[1]*int(np.ceil(max_time_index/2))
+    # load saved commands from a json file or define new ones
+    commands = load_json(commands_file)    
 
-    # varying frequency
+#     # commands at specific times
+#     camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
+#     circ_pose = DOMEtran.linear_transform(scale=[1,1]*min(camera_scale)/4, shift=camera_center)
+#     green_cam = camera_pose @ DOMEtran.linear_transform(scale=(0.9,0.9))
+#     black_cam = camera_pose @ DOMEtran.linear_transform(scale=(0.8,0.8))
+#     green_prog = np.dot(camera2projector, green_cam)
+#     commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
+#                 #{"t":2, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
+#                 {"t":2, "cmd": on_light},
+#                 {"t":3, "cmd": {"add": {"label": 'prova', "shape type": 'circle',
+#                                 "pose": circ_pose, "colour": [0, 50, 0]}}},
+#                 {"t":4, "cmd": {"screen": 'new',
+#                                 "add": {"label": 'prova', "shape type": 'square',
+#                                 "pose": green_cam, "colour": [0, 50, 0]}}},
+#                 {"t":6, "cmd": {"add": {"label": 'prova', "shape type": 'square',
+#                                 "pose": black_cam, "colour": [0, 0, 0]}}},
+#                 {"t":8, "cmd": {"screen": 'new',
+#                                 "add": {"label": 'prova', "shape type": 'circle',
+#                                 "pose": circ_pose, "colour": [0, 50, 0]}}},
+#                 {"t":10, "cmd": {"gradient": {'points': camera_frame[1,:], 'values': [off_light, off_light*5]}}}
+#                 ]
+    
+#     # varying frequency
 #     outputs[get_index_for_time(10):get_index_for_time(15)]=sig.square(2*np.pi*(time_instants[get_index_for_time(10):get_index_for_time(15)]+deltaT/2))*0.5+0.5
 #     outputs[get_index_for_time(15):get_index_for_time(20)]=sig.square(0.5*2*np.pi*(time_instants[get_index_for_time(15):get_index_for_time(20)]+deltaT/2))*0.5+0.5
 #     outputs[get_index_for_time(20):get_index_for_time(40)]=sig.square(0.2*2*np.pi*(time_instants[get_index_for_time(20):get_index_for_time(40)]+deltaT/2))*0.5+0.5
 #     outputs[get_index_for_time(40):get_index_for_time(60)]=sig.square(0.1*2*np.pi*(time_instants[get_index_for_time(40):get_index_for_time(60)]+deltaT/2))*0.5+0.5
     
-    # commands at specific times
-    camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
-    circ_pose = DOMEtran.linear_transform(scale=[1,1]*min(camera_scale)/4, shift=camera_center)
-    green_cam = camera_pose @ DOMEtran.linear_transform(scale=(0.9,0.9))
-    black_cam = camera_pose @ DOMEtran.linear_transform(scale=(0.8,0.8))
-    green_prog = np.dot(camera2projector, green_cam)
-#     cmd = {"screen": '0', "add": {"label": 'prova', "shape type": 'square',"pose": green_cam.tolist(), "colour": [0, 100, 0]}}
-#     cmd2 = {"transform": {"matrix": camera2projector.tolist()}}
-    commands = [{"t":0, "cmd": f'all' + f' {int(off_light[0])} {int(off_light[1])} {int(off_light[2])}'},
-                #{"t":2, "cmd": f'all' + f' {int(on_light[0])} {int(on_light[1])} {int(on_light[2])}'},
-                {"t":2, "cmd": on_light},
-                {"t":3, "cmd": {"add": {"label": 'prova', "shape type": 'circle',
-                                "pose": circ_pose.tolist(), "colour": [0, 50, 0]}}},
-                {"t":4, "cmd": {"screen": 'new',
-                                "add": {"label": 'prova', "shape type": 'square',
-                                "pose": green_cam.tolist(), "colour": [0, 50, 0]}}},
-                {"t":6, "cmd": {"add": {"label": 'prova', "shape type": 'square',
-                                "pose": black_cam.tolist(), "colour": [0, 0, 0]}}},
-                {"t":8, "cmd": {"screen": 'new',
-                                "add": {"label": 'prova', "shape type": 'circle',
-                                "pose": circ_pose.tolist(), "colour": [0, 50, 0]}}}
-                ]
-     
+    # init camera and projector
     [dome_pi4node, dome_camera, dome_gpio]=init()
     
-    # start video preview
+    # setup camera and start video preview
     set_camera_value('brightness', camera_bright_base, autoload=False)
     set_camera_value('framerate', 10, autoload=False)
     #set_camera_value('exposure comp', -18, autoload=False)
@@ -613,7 +580,7 @@ if __name__ == '__main__':
     #  cmd = {"set": {'param':'default_transformation', "value": camera2projector.tolist()}}
     #  update_projector(cmd)
     color=off_value
-    update_projector()
+    update_projector(off_light)
     
     # handle program termination
     atexit.register(terminate_session)

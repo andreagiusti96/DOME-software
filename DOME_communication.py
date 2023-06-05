@@ -138,8 +138,8 @@ class NetworkNode:
 #                 num_bytes_to_send = bytes(str(message.shape), self.encrypt)
                 label = self.formatting[np.ndarray]
             else:
+                recursive_tolist(message)
                 message_data = bytes(json.dumps(message), self.encrypt)
-#                 num_bytes_to_send = bytes(str(len(message_data)), self.encrypt)
                 label = self.formatting['default']
             num_bytes_to_send = bytes(str(len(message_data)), self.encrypt)
             prefix = label + num_bytes_to_send + self.formatting['separator']
@@ -255,6 +255,20 @@ def decode_array(shape_array_bytes : bytes, encryption : str):
     flat_array = np.array([int(val) for val in array_values.split(',')[:-1]])
     array = flat_array.reshape(array_shape)
     return array
+
+def recursive_tolist(var):
+    if isinstance(var, dict):
+        keys = var.keys()
+    elif isinstance(var, list):
+        keys = range(len(var))
+    else:
+        return
+    
+    for k in keys:
+        if isinstance(var[k], dict) or isinstance(var[k], list):
+            recursive_tolist(var[k])
+        elif isinstance(var[k], np.ndarray):
+            var[k] = var[k].tolist()
 
 
 def main(i_am : str, terminate = 'exit'):

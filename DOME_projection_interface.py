@@ -44,6 +44,14 @@ class ScreenManager():
                                         'shown': []}
         self.current = new_screen
     
+    def make_gradient(self, points, values):
+        x = np.arange(0, self.dimensions[1])
+        v = np.ndarray([len(x),len(values[0])])
+        for i in range(len(values[0])):
+            v[:,i] = np.interp(x, points, [val[i] for val in values])
+        pattern = np.multiply.outer(np.ones(self.dimensions[0]), v)
+        return pattern.astype(np.uint8)
+        
     def shapes_shown_to_screen(self, shown_list):
         self.screens[self.current]['shown'] = shown_list
     
@@ -101,11 +109,21 @@ class ScreenManager():
         #              'colour': {'colour': [255], 'label': 'spotlight', 'indices': [0]},
         #              'shown': ['name1', 'name2']}
         elif isinstance(message, dict):
-            all_command_types = ['get', 'set', 'screen', 'image', 'add', 'transform', 'colour', 'shown']
+            all_command_types = ['get', 'set', 'gradient',
+                                 'screen', 'image', 'add',
+                                 'transform', 'colour', 'shown']
             for command_type in all_command_types:
                 commands = [c for c in message.keys()
                             if command_type in c]
                 for c in commands:
+                    # message = {"gradient": {'points': [x1, x2], 'values': [light1, light2]}}                        
+                    if command_type == 'gradient':
+                        points = message[c]['points']
+                        values = message[c]['values']
+                        pattern = self.make_gradient(points, values)
+                        self.store_image(pattern)
+                        self.set_image_to_screen(len(self.images)-1)
+                    
                     # message = {"get": {'param': name_of_the_attribute}}                        
                     if command_type == 'get':
                         if hasattr(self, message[c]['param']):
