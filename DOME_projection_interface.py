@@ -122,7 +122,8 @@ class ScreenManager():
             all_command_types = ['get', 'set', 'scale', 'gradient',
                                  'screen', 'image', 'add',
                                  'transform', 'colour', 'shown']
-            if not all(c in all_command_types for c in message.keys()):
+            if not all([any([command_type in c for command_type in all_command_types])
+                        for c in message.keys()]):
                 out_msg=f'Unrecognized command!'
             
             for command_type in all_command_types:
@@ -141,7 +142,6 @@ class ScreenManager():
                             print(f'{message[c]["param"]} = {out_msg}')
                         else:
                             out_msg = f'{message[c]["param"]} is not valid!'
-                            print(f'{message[c]["param"]} is not valid!')
                     
                     # message = {"set": {'param': name_of_the_attribute , 'value': new_value}}                        
                     elif command_type == 'set':
@@ -155,7 +155,6 @@ class ScreenManager():
                             print(f'{message[c]["param"]} = {getattr(self, message[c]["param"])}')
                         else:
                             out_msg = f'{message[c]["param"]} is not valid!'
-                            print(f'{message[c]["param"]} is not valid!')
                     
                     # message = {"scale": new_value}                        
                     elif command_type == 'scale':
@@ -285,6 +284,7 @@ def main(output_dims, refresh_delay, scale=1):
             
             toc=datetime.now()
             ellapsed_time = (toc - tic).total_seconds()
+            print(f'{out_msg}')
             print(f'Update time = {ellapsed_time:4.3}s\n')
             dome_pi0node.transmit(out_msg)
 

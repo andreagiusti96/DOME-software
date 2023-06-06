@@ -17,7 +17,9 @@ import numpy as np
 import cv2
 import json
 import time
-
+import os
+from datetime import datetime
+from datetime import date
 
 class SettingsFileFormatError(Exception):
     '''
@@ -297,34 +299,14 @@ def get_bright_lines(intensities : list):
 #                 break
     return bright_lines
 
-def main(margin : float, pixelation : list, camera_grid_spacing : int,
-         camera_grid_thickness : int, camera_settings=None, gpio_light=None):
-    
+def start_calibration(out_file : str):
     projector_dims = (480, 854, 3)
-    settings = {'brightness': None,
-                'threshold': None,
-                'margin': margin,
-                'pixelation': pixelation,
-                'corners': None,
-                'spacing cam': camera_grid_spacing,
-                'thickness cam': camera_grid_thickness,
-                'spacing proj': None,
-                'thickness proj': None,
-                'magnification': None,
-                'increment': None}
     camera_mode = 'default'
     response = None
-    bright_lines = None
     with DOMEcomm.NetworkNode() as dome_pi4node, \
             DOMEutil.CameraManager() as dome_camera, \
             DOMEutil.PinManager() as dome_gpio:
         try:
-            if not camera_settings is None:
-                camera_mode = 'custom'
-                dome_camera.store_settings(camera_mode, camera_settings)
-            if not gpio_light is None:
-                dome_gpio.add_pin_label('light source', gpio_light)
-                dome_gpio.toggle('light source', 'on')
             print('On the projector Pi run "DOME_calibration_projector.py" and wait for a black ' \
                   'screen to appear (this may take several seconds). Once a black screen is ' \
                   'shown, click anywhere on the black screen, then press any key (such as ALT).')
@@ -342,10 +324,11 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
             
             # project three squares
             delta = 50
+            sq_size = 10
             pos =[]
-            pos.append( DOMEtran.linear_transform(scale=(20,20), shift=(480/2-delta,854/2-delta)) )
-            pos.append( DOMEtran.linear_transform(scale=(20,20), shift=(480/2-delta,854/2+delta)) )
-            pos.append( DOMEtran.linear_transform(scale=(20,20), shift=(480/2+delta,854/2-delta)) )
+            pos.append( DOMEtran.linear_transform(scale=sq_size, shift=(480/2-delta,854/2-delta)) )
+            pos.append( DOMEtran.linear_transform(scale=sq_size, shift=(480/2-delta,854/2+delta)) )
+            pos.append( DOMEtran.linear_transform(scale=sq_size, shift=(480/2+delta,854/2-delta)) )
             cmd = {"screen": '0',
                     "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
                     "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
@@ -551,9 +534,9 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                                                               projector_points)
                     camera2projector = np.concatenate((camera2projector, np.array([[0, 0, 1]])), 0)
                     print(camera2projector)
-                    mapping_filename = 'camera2projector.npy'
-                    np.save(mapping_filename, camera2projector)
-                    print(f'Calibration complete.\n--- Affine transform saved to {mapping_filename}')
+                    #mapping_filename = 'camera2projector.npy'
+                    np.save(out_file, camera2projector)
+                    print(f'Calibration complete.\n--- Affine transform saved to {out_file}')
                     dome_pi4node.transmit('all' + 3 * ' 0')
                     response = dome_pi4node.receive()
                     step += 1
@@ -562,9 +545,9 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
                 if step == 9:
                     print('The camera frame should now be exactly filled by a green frame.')
                     user_args, step = custom_input('Input \'next\' to finish.', step)
-                    camera2projector = np.load('camera2projector.npy')
-                    green_cam = DOMEtran.linear_transform(scale=(1080-20,1920-20), shift=(1080/2,1920/2))
-                    black_cam = DOMEtran.linear_transform(scale=(1080-40,1920-40), shift=(1080/2,1920/2))
+                    camera2projector = np.load(out_file)
+                    green_cam = DOMEtran.linear_transform(scale=(1080,1920), shift=(1080/2,1920/2))
+                    black_cam = DOMEtran.linear_transform(scale=(1080-10,1920-10), shift=(1080/2,1920/2))
                     green_proj = np.dot(camera2projector, green_cam)
                     black_proj = np.dot(camera2projector, black_cam)
                     cmd = {"screen": 'new',
@@ -580,11 +563,14 @@ def main(margin : float, pixelation : list, camera_grid_spacing : int,
 
 
 if __name__ == '__main__':
-    default_margin = 0.33
-    default_pixelation = [10, 10]
-    default_spacing_cam = 100
-    default_thickness_cam = 5
-    main(default_margin, default_pixelation, default_spacing_cam, default_thickness_cam)
+    out_folder = '/home/pi/Documents/config'
+    name = 'camera2projector_x9'
+    
+    date = datetime.today().strftime('%Y_%m_%d')
+    name_date = name + '_' + date + '.npy'
+    out_file = os.path.join(out_folder,name_date)
+    
+    start_calibration(out_file)
     
     
     

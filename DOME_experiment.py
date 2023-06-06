@@ -376,6 +376,37 @@ def load_experiment(name : str, output_directory='/home/pi/Documents/experiments
     print(f'Now working in folder {current_experiment.path}\n')
     return current_experiment
 
+def get_index_for_time(time : float):
+    index=int(time/deltaT)
+    return index
+
+def validate_calibration(camera2projector : np.ndarray, size=50):
+    # get prevous pattern scale and set to 1
+    old_scale = update_projector({'get':{'param':'scale'}})
+    update_pattern({"scale": 1}, prevent_log=True)
+    
+    pos_cam =[]
+    pos_proj =[]
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,0)))
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,0)))
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,1920)))
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,1920)))
+    
+    for pos in pos_cam:
+        pos_proj.append(np.dot(camera2projector, pos))
+    
+    cmd = {"screen": 'new',
+            "add0": {"label": 'a', "shape type": 'square',"pose": pos_proj[0], "colour": [0, 0, 100]},
+            "add1": {"label": 'a', "shape type": 'square',"pose": pos_proj[1], "colour": [0, 100, 100]},
+            "add2": {"label": 'a', "shape type": 'square',"pose": pos_proj[2], "colour": [100, 0, 100]},
+            "add3": {"label": 'a', "shape type": 'square',"pose": pos_proj[3], "colour": [0, 100, 0]}}
+    out_msg = update_projector(cmd)
+    
+    # reset previous pattern scale
+    time.sleep(2)
+    update_pattern({"scale": old_scale}, prevent_log=True)
+    return out_msg
+
 def start_experiment():
     # start the experiment
     global current_experiment
@@ -386,6 +417,7 @@ def start_experiment():
     current_experiment.add_detail(f'Duration={totalT}s', include_in_exp_list=True)
     current_experiment.add_detail(f'Sampling time={deltaT}s\n')
     current_experiment.add_detail(f'Sample temperature={temp}°C\n')
+    current_experiment.add_detail(f'Calibration file = {camera2projector_file}')
     current_experiment.add_detail('Camera settings:\n'+dome_camera.print_settings()+'\n')
     current_experiment.add_detail(f'camera_bright_reduction={camera_bright_reduction}\n')
     current_experiment.add_detail('Log:')
@@ -449,10 +481,6 @@ def start_experiment():
     pattern, msg_out = update_pattern(off_light, prevent_log=True)
     terminate_experiment()
 
-def get_index_for_time(time : float):
-    index=int(time/deltaT)
-    return index
-
 def terminate_experiment():
     global current_experiment
     
@@ -460,7 +488,11 @@ def terminate_experiment():
     stop_rec()
     print('Saving data...\n')
     #current_experiment.save_data(title="data", activation_times=activation_times, images=images, patterns=patterns)
-    current_experiment.save_data(title="data", activation_times=activation_times)
+    current_experiment.save_data(title="data",
+                                 activation_times=activation_times,
+                                 commands = commands,
+                                 camera2projector=camera2projector,
+                                 scale=scale)
     current_experiment=None
 
 def disconnect():
@@ -492,10 +524,13 @@ if __name__ == '__main__':
     
     output_directory      = '/home/pi/Documents/experiments'
     commands_file         = '/home/pi/Documents/config/cmd_prova.json'
-    camera2projector_file = '/home/pi/Documents/config/camera2projector.npy'
+    camera2projector_file = '/home/pi/Documents/config/camera2projector_x9_2023_06_06.npy'
     
     deltaT= 0.5 # sampling time [s]
     totalT= 15  # experiment duration [s]
+    
+    scale = 5
+    bright= 200
     
     white = np.array([1, 1, 1])
     black = np.array([0, 0, 0])
@@ -505,8 +540,6 @@ if __name__ == '__main__':
 
     off_value = red*0.1
     on_value = blue + off_value
-    
-    bright=200
     off_light = np.rint( bright * off_value ).astype(np.uint8)
     on_light = np.rint( bright * on_value ).astype(np.uint8)
     
@@ -523,16 +556,11 @@ if __name__ == '__main__':
     #images = np.ndarray([max_time_index, 1080, 1920, 3], dtype=np.uint8)
     #patterns = np.ndarray([max_time_index, 480, 854, 3], dtype=np.uint8)
     
-    scale = 10
     camera_dim = (1080, 1920, 3)
     proj_dim   = ( 480,  854, 3)
-    #pattern_dim = (480//scale, 854//scale, 3)
     
     camera2projector = np.load(camera2projector_file)
     projector2camera = np.linalg.inv(camera2projector)
-    #projector2pattern = DOMEtran.linear_transform(scale=1/scale)
-    #camera2pattern = projector2pattern @ camera2projector
-    #pattern2camera = np.linalg.inv(camera2pattern)
 
     camera_frame = np.array(DOMEtran.map_coordinates(
                     np.array([0,camera_dim[0]]), np.array([0,camera_dim[1]]),
@@ -547,8 +575,19 @@ if __name__ == '__main__':
     # commands at specific times
     camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
     circ_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
-    green_cam = camera_pose @ DOMEtran.linear_transform(scale=0.9)
-    black_cam = camera_pose @ DOMEtran.linear_transform(scale=0.8)
+    green_cam = camera_pose @ DOMEtran.linear_transform(scale=1)
+    black_cam = camera_pose @ DOMEtran.linear_transform(scale=0.9)
+    
+#     pos_cam =[]
+#     pos_proj =[]
+#     pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,0)))
+#     pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,0)))
+#     pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,1920)))
+#     pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,1920)))
+#    
+#     for pos in pos_cam:
+#         pos_proj.append(np.dot(camera2projector, pos))
+    
     commands = [{"t":0, "cmd": on_light},
                 {"t":2, "cmd": off_light},
                 {"t":3, "cmd": {"add": {"label": 'prova', "shape type": 'circle',
@@ -595,14 +634,6 @@ if __name__ == '__main__':
     signal.signal(signal.SIGSEGV, terminate_session)
     
     # start session
-    print('Now adjust focus and camera parameters, then use start_experiment() to run the experiment.\n')
+    print('Now adjust focus and camera parameters, test the calibration with validate_calibration(camera2projector) and then use start_experiment() to run the experiment.\n')
     
-    
-    # pattern description with camera pov and arbitrary resolution
-    # scaling to camera resolution using transform
-    # transform to projector reference frame
-    # send to projector
-    
-    # pattern description wrt progector
-    # send to projector
     
