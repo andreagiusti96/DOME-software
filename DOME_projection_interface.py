@@ -4,6 +4,7 @@ import DOME_transformation as DOMEtran
 import numpy as np
 import time
 import cv2
+import sys
 from datetime import datetime
 
 class ScreenManager():
@@ -49,7 +50,7 @@ class ScreenManager():
         
         if not new_screen in self.screens.keys():
             poses = DOMEtran.PoseManager()
-            self.screens[new_screen] = {'image': 0,
+            self.screens[new_screen] = {'image': len(self.images)-1,
                                         'poses': poses,
                                         'shown': []}
         self.current = new_screen
@@ -95,8 +96,8 @@ class ScreenManager():
         
         # if the message is an array scale it to the right size
         # and use it as the pattern
-        if isinstance(message, np.ndarray):
-            image = message.copy().astype(np.uint8)
+        if isinstance(message, (np.ndarray, list)):
+            image = np.array(message, np.uint8)
             if len(image.shape) == 1:
                 image = (np.ones(self.pattern_dims)*image).astype(np.uint8)
             if image.shape[0:2] != self.pattern_dims[0:2]:
@@ -225,13 +226,14 @@ class ScreenManager():
         # if the message is a string extract the command from it
         elif isinstance(message, str):
             pattern = np.zeros(self.pattern_dims)
+            segments = message.split(' ')
             if message == 'exit':
                 cv2.destroyAllWindows()
                 out_msg='exit'
                 time.sleep(1)
                 projecting = False
-            segments = message.split(' ')
-            if segments[0] == 'dimensions':
+                sys.exit()
+            elif segments[0] == 'dimensions':
                 out_msg = self.output_dims
             elif segments[0] == 'all':
                 for c in range(0, 3):
@@ -243,7 +245,7 @@ class ScreenManager():
                 pattern[:, int(segments[1]):int(segments[2]),
                         :] = 255
             else:
-                out_msg=f'Unrecognised string:' + f'{message}'
+                out_msg=f'Unrecognised string: ' + f'{message}'
         
         # if the message is of a different type throw an error
         else:

@@ -21,10 +21,11 @@ import time
 import os
 import signal
 import atexit
+import gc
 from datetime import datetime
 from datetime import date
 from scipy import signal as sig
-
+from concurrent.futures import ThreadPoolExecutor
 
 def init(camera_settings=None, gpio_light=None):
     '''
@@ -226,12 +227,12 @@ def capture(file_name = '', autosave=True, show=False, prevent_print=False, prev
     if autosave:
         if not prevent_print: print('Image captured.\n')
         save(image, file_name, prevent_print)
-    else:
+    elif not prevent_print:
         print('Image captured. Use save(image, file_name) to store it.\n')
     
     return image
 
-def save(image : np.ndarray, file_name = '', prevent_print=False):
+def save(image : np.ndarray, file_name = '', prevent_print=False, ):
     '''
     Save image acquired with capture() command.
     ---
@@ -407,6 +408,28 @@ def validate_calibration(camera2projector : np.ndarray, size=50):
     update_pattern({"scale": old_scale}, prevent_log=True)
     return out_msg
 
+def save_parameters(parameters_file : str):
+    parameters = {'totalT': totalT, 'max_time_index': max_time_index,
+                  'commands': commands}
+    save_to_json(parameters, parameters_file)
+    print('parameters saved to '+ parameters_file)
+
+def load_parameters(parameters_file : str):
+    global totalT, max_time_index, commands
+    
+    parameters = load_json(parameters_file)
+    
+    totalT = parameters['totalT']
+    max_time_index = parameters['max_time_index']
+    commands = parameters['commands']
+
+def busy_wait(dt):
+    dt = max(0,dt)
+    start_time = datetime.now()
+    ellapsed_time = (datetime.now() - start_time).total_seconds()
+    while ellapsed_time < dt:
+        ellapsed_time = (datetime.now() - start_time).total_seconds()
+    
 def start_experiment():
     # start the experiment
     global current_experiment
@@ -417,6 +440,8 @@ def start_experiment():
     current_experiment.add_detail(f'Duration={totalT}s', include_in_exp_list=True)
     current_experiment.add_detail(f'Sampling time={deltaT}s\n')
     current_experiment.add_detail(f'Sample temperature={temp}°C\n')
+    current_experiment.add_detail(f'Scale = {scale}')
+    current_experiment.add_detail(f'OFF value = {off_light}, ON value = {on_light}')
     current_experiment.add_detail(f'Calibration file = {camera2projector_file}')
     current_experiment.add_detail('Camera settings:\n'+dome_camera.print_settings()+'\n')
     current_experiment.add_detail(f'camera_bright_reduction={camera_bright_reduction}\n')
@@ -428,9 +453,14 @@ def start_experiment():
     count=0
     cmd_count=0
     
+    executor = ThreadPoolExecutor()
+    gc.disable()
+    
     update_pattern({"screen": 'new'}, prevent_log=True)
     pattern, msg_out = update_pattern(off_light, prevent_log=True)
-    
+    pattern_cam = DOMEtran.transform_image(pattern, projector2camera, camera_dim)
+    pattern_cam = cv2.resize(pattern_cam, (camera_dim[1]//scale, camera_dim[0]//scale))
+
     current_experiment.reset_starting_time()
     rec('video')
     print('Experiment running...\n')
@@ -443,47 +473,43 @@ def start_experiment():
         tic=datetime.now()
         activation_times[count]=(tic - current_experiment.start_time).total_seconds()
         out_img=os.path.join('images', 'fig_' + '%04.1f' % t)
-        #images[count,:,:,:]=capture(out_img, prevent_print=True, prevent_log=False)
-        capture(out_img, prevent_print=True, prevent_log=False)
-        
-#         # compute output
-#         output=outputs[count]
-#         newcolor=off_value*(1-output)+on_value*output
-#         #dome_camera.camera.brightness=int(camera_bright_base-camera_bright_reduction*output)
-        
+        executor.submit(capture(out_img, prevent_print=True,
+                                prevent_log=False, autosave=True))
+
         # apply output
-        if cmd_count < len(commands):
-            if t >= commands[cmd_count]["t"]:
-                message = commands[cmd_count]["cmd"]
-                #update_projector(message, prevent_log=False)
-                #pattern, msg_out = screen_manager.make_pattern_from_cmd(message)
-                pattern, msg_out = update_pattern(message)
-                pattern_cam = DOMEtran.transform_image(pattern, projector2camera, camera_dim)
-                cmd_count+=1
+        if cmd_count < len(commands) and t >= commands[cmd_count]["t"]:
+            message = commands[cmd_count]["cmd"]
+            pattern, msg_out = update_pattern(message)
+            pattern_cam = DOMEtran.transform_image(pattern, projector2camera, camera_dim)
+            pattern_cam = cv2.resize(pattern_cam, (camera_dim[1]//scale, camera_dim[0]//scale))
+            cmd_count+=1
         
         # save output pattern
         out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
-        cv2.imwrite(out_patt, pattern)
+        executor.submit(cv2.imwrite(out_patt, pattern, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]))
         out_patt=os.path.join(current_experiment.path, 'patterns_cam', 'pattern_' + '%04.1f' % t + '.jpeg')
-        cv2.imwrite(out_patt, pattern_cam)
+        executor.submit(cv2.imwrite(out_patt, pattern_cam, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]))
         
         # wait
         toc=datetime.now()
         ellapsed_time=toc - current_experiment.start_time
         time_to_wait=t+deltaT-ellapsed_time.total_seconds()
-        if time_to_wait<-0.01:
+        if time_to_wait<-0.05:
             print(f't={t}: {-time_to_wait:3.2}s delay!\n')
-        else:
-            time.sleep(max(0, time_to_wait ))
+        
+        time.sleep(max(0, time_to_wait ))
+        #busy_wait(time_to_wait)
     
     # terminate the experiment and recording
+    gc.enable()
+    executor.shutdown()
     update_pattern({"screen": 'new'}, prevent_log=True)
     pattern, msg_out = update_pattern(off_light, prevent_log=True)
     terminate_experiment()
 
 def terminate_experiment():
     global current_experiment
-    
+    gc.enable()
     print('Experiment stopped.\n')
     stop_rec()
     print('Saving data...\n')
@@ -492,7 +518,9 @@ def terminate_experiment():
                                  activation_times=activation_times,
                                  commands = commands,
                                  camera2projector=camera2projector,
-                                 scale=scale)
+                                 scale=scale,
+                                 off_light=off_light,
+                                 on_light=on_light)
     current_experiment=None
 
 def disconnect():
@@ -523,28 +551,26 @@ if __name__ == '__main__':
     temp='XX' # temperature of the sample
     
     output_directory      = '/home/pi/Documents/experiments'
-    commands_file         = '/home/pi/Documents/config/cmd_prova.json'
+    parameters_file       = '/home/pi/Documents/config/parameters_test.json'
     camera2projector_file = '/home/pi/Documents/config/camera2projector_x9_2023_06_06.npy'
     
     deltaT= 0.5 # sampling time [s]
-    totalT= 15  # experiment duration [s]
+    totalT= 60*3  # experiment duration [s]
     
-    scale = 5
-    bright= 200
+    scale = 5   # scaling factor for projected pattern, larger=lower resolution
     
-    white = np.array([1, 1, 1])
-    black = np.array([0, 0, 0])
-    blue  = np.array([1, 0, 0])
-    red   = np.array([0, 0, 1])
-    green = np.array([0, 1, 0])
+    white = np.array([255, 255, 255]).astype(np.uint8)
+    black = np.array([  0,   0,   0]).astype(np.uint8)
+    blue  = np.array([255,   0,   0]).astype(np.uint8)
+    red   = np.array([  0,   0, 255]).astype(np.uint8)
+    green = np.array([  0, 255,   0]).astype(np.uint8)
 
-    off_value = red*0.1
-    on_value = blue + off_value
-    off_light = np.rint( bright * off_value ).astype(np.uint8)
-    on_light = np.rint( bright * on_value ).astype(np.uint8)
+    off_light = (red*0.05).astype(np.uint8)
+    on_light  = (off_light + blue*1 + green*0).astype(np.uint8)
     
     camera_bright_base=40
     camera_bright_reduction=0
+    jpeg_quality = 50
     
     # allocate vars
     current_experiment=None
@@ -568,40 +594,46 @@ if __name__ == '__main__':
     camera_center = np.mean(camera_frame, 1)
     camera_scale = np.diff(camera_frame)
     
-    # experiment description
-    # load saved commands from a json file or define new ones
-    # commands = load_json(commands_file)    
+    #experiment description
+    # parameters = {'totalT': totalT, 'commands': commands, 'max_time_index': max_time_index}
+    # save_to_json(parameters, parameters_file)
+    
+    #load saved parameters from a json file
+    # parameters = load_json(parameters_file)
+    # totalT = parameters['totalT']
+    # max_time_index = parameters['max_time_index']
+    # commands = parameters['commands']
 
     # commands at specific times
     camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
     circ_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
     green_cam = camera_pose @ DOMEtran.linear_transform(scale=1)
     black_cam = camera_pose @ DOMEtran.linear_transform(scale=0.9)
-    
-#     pos_cam =[]
-#     pos_proj =[]
-#     pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,0)))
-#     pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,0)))
-#     pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,1920)))
-#     pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,1920)))
-#    
-#     for pos in pos_cam:
-#         pos_proj.append(np.dot(camera2projector, pos))
-    
-    commands = [{"t":0, "cmd": on_light},
-                {"t":2, "cmd": off_light},
-                {"t":3, "cmd": {"add": {"label": 'prova', "shape type": 'circle',
-                                "pose": circ_pose, "colour": [0, 50, 0]}}},
-                {"t":4, "cmd": {"screen": 'new',
-                                "add": {"label": 'prova', "shape type": 'square',
-                                "pose": green_cam, "colour": [0, 50, 0]}}},
-                {"t":6, "cmd": {"add": {"label": 'prova', "shape type": 'square',
-                                "pose": black_cam, "colour": [0, 0, 0]}}},
-                {"t":8, "cmd": {"screen": 'new',
-                                "add": {"label": 'prova', "shape type": 'circle',
-                                "pose": circ_pose, "colour": [0, 50, 0]}}},
-                {"t":10, "cmd": {"gradient": {'points': camera_frame[1,:], 'values': [off_light, off_light*10]}}}
+
+    # always off
+    commands = []
+
+    # off-on-off
+    commands = [{"t":totalT//3, "cmd": on_light},
+                {"t":totalT//3*2, "cmd": off_light}
                 ]
+
+#     # test features
+#     commands = [{"t":0, "cmd": on_light},
+#                 {"t":2, "cmd": off_light},
+#                 {"t":3, "cmd": {"add": {"label": 'test', "shape type": 'circle',
+#                                 "pose": circ_pose, "colour": on_light}}},
+#                 {"t":4, "cmd": {"screen": 'new',
+#                                 "add": {"label": 'test', "shape type": 'square',
+#                                 "pose": green_cam, "colour": on_light}}},
+#                 {"t":6, "cmd": {"add": {"label": 'test', "shape type": 'square',
+#                                 "pose": black_cam, "colour": off_light}}},
+#                 {"t":8, "cmd": {"screen": 'new',
+#                                 "add": {"label": 'test', "shape type": 'circle',
+#                                 "pose": circ_pose, "colour": on_light}}},
+#                 {"t":10, "cmd": {"gradient": {'points': camera_frame[1,:],
+#                                         'values': [off_light, on_light]}}}
+#                 ]
     
 #     # varying frequency
 #     outputs[get_index_for_time(10):get_index_for_time(15)]=sig.square(2*np.pi*(time_instants[get_index_for_time(10):get_index_for_time(15)]+deltaT/2))*0.5+0.5
@@ -613,6 +645,7 @@ if __name__ == '__main__':
     [dome_pi4node, dome_camera, dome_gpio]=init()
     
     # setup camera and start video preview
+    dome_camera.jpeg_quality = jpeg_quality
     set_camera_value('brightness', camera_bright_base, autoload=False)
     set_camera_value('framerate', 10, autoload=False)
     #set_camera_value('exposure comp', -18, autoload=False)

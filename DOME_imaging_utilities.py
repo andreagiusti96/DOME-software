@@ -93,6 +93,7 @@ class CameraManager:
         self.save_dir = save_dir
         self.max_duration = max_duration
         self.camera = PiCamera()
+        self.jpeg_quality = 95
         
         default_settings = {}
         # Default resolution = (1920, 1080).
@@ -345,7 +346,7 @@ class CameraManager:
                 Name of file the image will be saved to.
         '''
         destination = os.path.join(self.save_dir, file_name)
-        if not cv2.imwrite(destination, image):
+        if not cv2.imwrite(destination, image, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality]):
             print(destination)
             raise FailedImageWriteError(destination)
     
