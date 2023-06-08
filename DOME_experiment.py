@@ -410,18 +410,21 @@ def validate_calibration(camera2projector : np.ndarray, size=50):
 
 def save_parameters(parameters_file : str):
     parameters = {'totalT': totalT, 'max_time_index': max_time_index,
-                  'commands': commands}
+                  'commands': commands, 'off_light': off_light, 'on_light': on_light}
     save_to_json(parameters, parameters_file)
     print('parameters saved to '+ parameters_file)
 
 def load_parameters(parameters_file : str):
-    global totalT, max_time_index, commands
+    global totalT, max_time_index, commands, activation_times, off_light, on_light
     
     parameters = load_json(parameters_file)
     
     totalT = parameters['totalT']
     max_time_index = parameters['max_time_index']
+    off_light = parameters['off_light']
+    on_light = parameters['on_light']
     commands = parameters['commands']
+    activation_times=np.ndarray([max_time_index])
 
 def busy_wait(dt):
     dt = max(0,dt)
@@ -450,9 +453,6 @@ def start_experiment():
     os.mkdir(os.path.join(current_experiment.path, 'patterns_cam'))
     os.mkdir(os.path.join(current_experiment.path, 'images'))
     
-    count=0
-    cmd_count=0
-    
     executor = ThreadPoolExecutor()
     gc.disable()
     
@@ -464,6 +464,17 @@ def start_experiment():
     current_experiment.reset_starting_time()
     rec('video')
     print('Experiment running...\n')
+    
+    # preallocate vars
+    t=0
+    tic=datetime.now()
+    toc=datetime.now()
+    out_img = ''
+    out_patt = ''
+    count=0
+    cmd_count=0
+    ellapsed_time=toc-tic
+    time_to_wait = 0.0
     
     # run the experiment
     for count in range(0,max_time_index):
@@ -545,10 +556,10 @@ if __name__ == '__main__':
     
     # details of the experiment
     date='today'    # date of the experiment. Use format YYYY_MM_DD
-    species='Prova'     # species used in the experiment
-    culture='XXXX'     # culture used in the experiment
-    sample='XX'      # details about the sample (volume, frame, etc)
-    temp='XX' # temperature of the sample
+    species='PBursaria'     # species used in the experiment
+    culture='05/06/23'     # culture used in the experiment
+    sample='100uL, 11mm disk'      # details about the sample (volume, frame, etc)
+    temp='22.0' # temperature of the sample
     
     output_directory      = '/home/pi/Documents/experiments'
     parameters_file       = '/home/pi/Documents/config/parameters_test.json'
@@ -566,11 +577,11 @@ if __name__ == '__main__':
     green = np.array([  0, 255,   0]).astype(np.uint8)
 
     off_light = (red*0.05).astype(np.uint8)
-    on_light  = (off_light + blue*1 + green*0).astype(np.uint8)
+    on_light  = (off_light + blue*1).astype(np.uint8)
     
     camera_bright_base=40
     camera_bright_reduction=0
-    jpeg_quality = 50
+    jpeg_quality = 90
     
     # allocate vars
     current_experiment=None
@@ -605,20 +616,70 @@ if __name__ == '__main__':
     # commands = parameters['commands']
 
     # commands at specific times
-    camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
-    circ_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
-    green_cam = camera_pose @ DOMEtran.linear_transform(scale=1)
-    black_cam = camera_pose @ DOMEtran.linear_transform(scale=0.9)
 
-    # always off
-    commands = []
 
-    # off-on-off
-    commands = [{"t":totalT//3, "cmd": on_light},
-                {"t":totalT//3*2, "cmd": off_light}
-                ]
+#     # always off
+#     commands = []
+
+#     # off-on-off
+#     commands = [{"t":totalT//3, "cmd": on_light},
+#                 {"t":totalT//3*2, "cmd": off_light}
+#                 ]
+    
+#     # switching
+#     step = 1 #s
+#     initial_t = 10 #s
+#     commands = []
+#     for t in np.arange(initial_t,totalT,step*2):
+#         commands.append({"t":t, "cmd": on_light})
+#         commands.append({"t":t+step, "cmd": off_light})
+
+#     # increasing ramp
+#     step = 1 #s
+#     initial_t = 10 #s
+#     commands = []
+#     light = off_light.copy()
+#     for t in np.arange(initial_t,totalT,step):
+#         light[0] = np.interp(t, [initial_t, totalT-initial_t], [off_light[0], on_light[0]])
+#         light[1] = np.interp(t, [initial_t, totalT-initial_t], [off_light[1], on_light[1]])
+#         light[2] = np.interp(t, [initial_t, totalT-initial_t], [off_light[2], on_light[2]])
+#         commands.append({"t":float(t), "cmd": light.tolist()})
+
+#     # centered gradient
+#     margin = camera_scale[1]*0.05
+#     points = np.array([camera_frame[1,0]+margin,
+#                        camera_center[1]-margin,
+#                        camera_center[1]+margin,
+#                        camera_frame[1,1]-margin]).squeeze()
+#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
+#                               'values': [off_light, on_light, on_light, off_light]}}}]
+    
+#     # lateral gradient
+#     margin = camera_scale[1]*0.05
+#     points = np.array([camera_frame[1,0]+margin, camera_frame[1,1]-margin]).squeeze()
+#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
+#                                 'values': [off_light, on_light]}}}]
+
+    # half off - half on
+    points = np.array([camera_center[1]-1, camera_center[1]+1]).squeeze()
+    commands = [{"t":10, "cmd": {"gradient": {'points': points,
+                                'values': [off_light, on_light]}}}]
+
+#     # circle
+#     circ2_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
+#     circ1_pose = circ2_pose @ DOMEtran.linear_transform(scale=1.5)
+#     half_ligth = np.mean([on_light,off_light],0)
+#     commands = [{"t":10, "cmd": {"add1": {"label": 'test', "shape type": 'circle',
+#                                         "pose": circ1_pose, "colour": half_ligth},
+#                                  "add2": {"label": 'test', "shape type": 'circle',
+#                                         "pose": circ2_pose, "colour": on_light}}}
+#                 ]
 
 #     # test features
+#     camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
+#     circ_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
+#     green_cam = camera_pose @ DOMEtran.linear_transform(scale=1)
+#     black_cam = camera_pose @ DOMEtran.linear_transform(scale=0.9)
 #     commands = [{"t":0, "cmd": on_light},
 #                 {"t":2, "cmd": off_light},
 #                 {"t":3, "cmd": {"add": {"label": 'test', "shape type": 'circle',
