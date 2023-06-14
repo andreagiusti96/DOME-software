@@ -286,12 +286,15 @@ def stop_rec():
     '''
     Stop video recording.
     '''
-    dome_camera.stop_rec()
-    
-    if current_experiment:
-        current_experiment.add_log_entry(f'video recording stopped')
-    
-    print('Recording stopped.\n')
+    if dome_camera.camera.recording:
+        dome_camera.stop_rec()
+        print('Recording stopped.')
+        if current_experiment:
+            current_experiment.add_log_entry(f'video recording stopped')
+        
+    else:
+        print('No video was being recorded.')
+        
     
 def close_camera():
     '''
@@ -381,10 +384,13 @@ def get_index_for_time(time : float):
     index=int(time/deltaT)
     return index
 
-def validate_calibration(camera2projector : np.ndarray, size=50):
+def validate_calibration(camera2projector : np.ndarray, size=50, duration=5):
     # get prevous pattern scale and set to 1
-    old_scale = update_projector({'get':{'param':'scale'}})
-    update_pattern({"scale": 1}, prevent_log=True)
+    old_scale = int(update_projector({'get':{'param':'scale'}}))
+    
+    update_projector({"screen": 'new'})
+    update_projector({"scale": 1}, prevent_log=True)
+    update_projector(black)
     
     pos_cam =[]
     pos_proj =[]
@@ -396,15 +402,14 @@ def validate_calibration(camera2projector : np.ndarray, size=50):
     for pos in pos_cam:
         pos_proj.append(np.dot(camera2projector, pos))
     
-    cmd = {"screen": 'new',
-            "add0": {"label": 'a', "shape type": 'square',"pose": pos_proj[0], "colour": [0, 0, 100]},
+    cmd = { "add0": {"label": 'a', "shape type": 'square',"pose": pos_proj[0], "colour": [0, 0, 100]},
             "add1": {"label": 'a', "shape type": 'square',"pose": pos_proj[1], "colour": [0, 100, 100]},
             "add2": {"label": 'a', "shape type": 'square',"pose": pos_proj[2], "colour": [100, 0, 100]},
             "add3": {"label": 'a', "shape type": 'square',"pose": pos_proj[3], "colour": [0, 100, 0]}}
     out_msg = update_projector(cmd)
     
     # reset previous pattern scale
-    time.sleep(2)
+    time.sleep(duration)
     update_pattern({"scale": old_scale}, prevent_log=True)
     return out_msg
 
@@ -413,6 +418,9 @@ def save_parameters(parameters_file : str):
                   'commands': commands, 'off_light': off_light, 'on_light': on_light}
     save_to_json(parameters, parameters_file)
     print('parameters saved to '+ parameters_file)
+    
+    for k in parameters.keys():
+        print(f'{k} = {parameters[k]}')
 
 def load_parameters(parameters_file : str):
     global totalT, max_time_index, commands, activation_times, off_light, on_light
@@ -425,6 +433,12 @@ def load_parameters(parameters_file : str):
     on_light = parameters['on_light']
     commands = parameters['commands']
     activation_times=np.ndarray([max_time_index])
+    
+    print(f'totalT = {totalT}')
+    print(f'max_time_index = {max_time_index}')
+    print(f'off_light = {off_light}')
+    print(f'on_light = {on_light}')
+    print(f'commands = {commands}')
 
 def busy_wait(dt):
     dt = max(0,dt)
@@ -433,7 +447,7 @@ def busy_wait(dt):
     while ellapsed_time < dt:
         ellapsed_time = (datetime.now() - start_time).total_seconds()
     
-def start_experiment():
+def start_experiment(rec_video=True):
     # start the experiment
     global current_experiment
     global screen_manager
@@ -462,7 +476,7 @@ def start_experiment():
     pattern_cam = cv2.resize(pattern_cam, (camera_dim[1]//scale, camera_dim[0]//scale))
 
     current_experiment.reset_starting_time()
-    rec('video')
+    if rec_video: rec('video')
     print('Experiment running...\n')
     
     # preallocate vars
@@ -475,53 +489,64 @@ def start_experiment():
     cmd_count=0
     ellapsed_time=toc-tic
     time_to_wait = 0.0
+    last_delay = 0.0
+    
+    # save output pattern
+    out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
+    executor.submit(cv2.imwrite(out_patt, pattern, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]))
+    out_patt=os.path.join(current_experiment.path, 'patterns_cam', 'pattern_' + '%04.1f' % t + '.jpeg')
+    executor.submit(cv2.imwrite(out_patt, pattern_cam, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]))
     
     # run the experiment
-    for count in range(0,max_time_index):
+    try:
+        for count in range(0,max_time_index):
 
-        # acquire data
-        t=count*deltaT
-        tic=datetime.now()
-        activation_times[count]=(tic - current_experiment.start_time).total_seconds()
-        out_img=os.path.join('images', 'fig_' + '%04.1f' % t)
-        executor.submit(capture(out_img, prevent_print=True,
-                                prevent_log=False, autosave=True))
+            # acquire data
+            t=count*deltaT
+            tic=datetime.now()
+            activation_times[count]=(tic - current_experiment.start_time).total_seconds()
+            out_img=os.path.join('images', 'fig_' + '%04.1f' % t)
+            executor.submit(capture(out_img, prevent_print=True,
+                                    prevent_log=False, autosave=True))
 
-        # apply output
-        if cmd_count < len(commands) and t >= commands[cmd_count]["t"]:
-            message = commands[cmd_count]["cmd"]
-            pattern, msg_out = update_pattern(message)
-            pattern_cam = DOMEtran.transform_image(pattern, projector2camera, camera_dim)
-            pattern_cam = cv2.resize(pattern_cam, (camera_dim[1]//scale, camera_dim[0]//scale))
-            cmd_count+=1
-        
-        # save output pattern
-        out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
-        executor.submit(cv2.imwrite(out_patt, pattern, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]))
-        out_patt=os.path.join(current_experiment.path, 'patterns_cam', 'pattern_' + '%04.1f' % t + '.jpeg')
-        executor.submit(cv2.imwrite(out_patt, pattern_cam, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]))
-        
-        # wait
-        toc=datetime.now()
-        ellapsed_time=toc - current_experiment.start_time
-        time_to_wait=t+deltaT-ellapsed_time.total_seconds()
-        if time_to_wait<-0.05:
-            print(f't={t}: {-time_to_wait:3.2}s delay!\n')
-        
-        time.sleep(max(0, time_to_wait ))
-        #busy_wait(time_to_wait)
+            # apply output
+            if cmd_count < len(commands) and t >= commands[cmd_count]["t"]:
+                message = commands[cmd_count]["cmd"]
+                pattern, msg_out = update_pattern(message)
+                pattern_cam = DOMEtran.transform_image(pattern, projector2camera, camera_dim)
+                pattern_cam = cv2.resize(pattern_cam, (camera_dim[1]//scale, camera_dim[0]//scale))
+                cmd_count+=1
+                
+                # save output pattern
+                out_patt=os.path.join(current_experiment.path, 'patterns', 'pattern_' + '%04.1f' % t + '.jpeg')
+                executor.submit(cv2.imwrite(out_patt, pattern, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]))
+                out_patt=os.path.join(current_experiment.path, 'patterns_cam', 'pattern_' + '%04.1f' % t + '.jpeg')
+                executor.submit(cv2.imwrite(out_patt, pattern_cam, [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]))
+            
+            # wait
+            toc=datetime.now()
+            ellapsed_time=toc - current_experiment.start_time
+            time_to_wait=t+deltaT-ellapsed_time.total_seconds()
+            if time_to_wait<-0.05 and -time_to_wait >= last_delay:
+                print(f't={t}: {-time_to_wait:3.2}s delay!\n')
+            
+            last_delay = max(-time_to_wait, 0.0)
+            time.sleep(max(0, time_to_wait ))
+            #busy_wait(time_to_wait)
     
-    # terminate the experiment and recording
-    gc.enable()
-    executor.shutdown()
-    update_pattern({"screen": 'new'}, prevent_log=True)
-    pattern, msg_out = update_pattern(off_light, prevent_log=True)
-    terminate_experiment()
+    finally:
+        # terminate the experiment and recording
+        gc.enable()
+        executor.shutdown()
+        update_pattern({"screen": 'new'}, prevent_log=True)
+        pattern, msg_out = update_pattern(off_light, prevent_log=True)
+        terminate_experiment()
 
 def terminate_experiment():
     global current_experiment
     gc.enable()
-    print('Experiment stopped.\n')
+    print(f'Experiment {current_experiment.name} stopped.\n')
+    
     stop_rec()
     print('Saving data...\n')
     #current_experiment.save_data(title="data", activation_times=activation_times, images=images, patterns=patterns)
@@ -556,19 +581,21 @@ if __name__ == '__main__':
     
     # details of the experiment
     date='today'    # date of the experiment. Use format YYYY_MM_DD
-    species='PBursaria'     # species used in the experiment
+    species='Euglena'     # species used in the experiment
     culture='05/06/23'     # culture used in the experiment
-    sample='100uL, 11mm disk'      # details about the sample (volume, frame, etc)
-    temp='22.0' # temperature of the sample
+    sample='15uL, no frame'      # details about the sample (volume, frame, etc)
+    temp='23.3' # temperature of the sample
     
     output_directory      = '/home/pi/Documents/experiments'
     parameters_file       = '/home/pi/Documents/config/parameters_test.json'
-    camera2projector_file = '/home/pi/Documents/config/camera2projector_x9_2023_06_06.npy'
+    camera2projector_file = '/home/pi/Documents/config/camera2projector_x90_2023_06_12.npy'
     
     deltaT= 0.5 # sampling time [s]
     totalT= 60*3  # experiment duration [s]
     
     scale = 5   # scaling factor for projected pattern, larger=lower resolution
+    if species in ['Euglena','euglena']:
+        scale = 2
     
     white = np.array([255, 255, 255]).astype(np.uint8)
     black = np.array([  0,   0,   0]).astype(np.uint8)
@@ -579,7 +606,7 @@ if __name__ == '__main__':
     off_light = (red*0.05).astype(np.uint8)
     on_light  = (off_light + blue*1).astype(np.uint8)
     
-    camera_bright_base=40
+    camera_bright_base=50
     camera_bright_reduction=0
     jpeg_quality = 90
     
@@ -605,36 +632,30 @@ if __name__ == '__main__':
     camera_center = np.mean(camera_frame, 1)
     camera_scale = np.diff(camera_frame)
     
-    #experiment description
-    # parameters = {'totalT': totalT, 'commands': commands, 'max_time_index': max_time_index}
-    # save_to_json(parameters, parameters_file)
-    
-    #load saved parameters from a json file
-    # parameters = load_json(parameters_file)
-    # totalT = parameters['totalT']
-    # max_time_index = parameters['max_time_index']
-    # commands = parameters['commands']
+    # experiment description
 
-    # commands at specific times
-
-
-#     # always off
-#     commands = []
+    # always off
+    commands = []
 
 #     # off-on-off
+#     # load_parameters('/home/pi/Documents/config/parameters_OFF_ON_OFF_75.json')
 #     commands = [{"t":totalT//3, "cmd": on_light},
 #                 {"t":totalT//3*2, "cmd": off_light}
 #                 ]
     
-#     # switching
-#     step = 1 #s
-#     initial_t = 10 #s
-#     commands = []
-#     for t in np.arange(initial_t,totalT,step*2):
-#         commands.append({"t":t, "cmd": on_light})
-#         commands.append({"t":t+step, "cmd": off_light})
+    # switching
+    # load_parameters('/home/pi/Documents/config/parameters_switch_1s.json')
+    # load_parameters('/home/pi/Documents/config/parameters_switch_5s.json')
+    # load_parameters('/home/pi/Documents/config/parameters_switch_10s.json')
+    step = 5 #s
+    initial_t = 10 #s
+    commands = []
+    for t in np.arange(initial_t,totalT,step*2):
+        commands.append({"t":float(t), "cmd": on_light.tolist()})
+        commands.append({"t":float(t+step), "cmd": off_light.tolist()})
 
 #     # increasing ramp
+#     # load_parameters('/home/pi/Documents/config/parameters_ramp.json')
 #     step = 1 #s
 #     initial_t = 10 #s
 #     commands = []
@@ -653,17 +674,26 @@ if __name__ == '__main__':
 #                        camera_frame[1,1]-margin]).squeeze()
 #     commands = [{"t":10, "cmd": {"gradient": {'points': points,
 #                               'values': [off_light, on_light, on_light, off_light]}}}]
-    
+
+#     # centered dark gradient
+#     margin = camera_scale[1]*0.05
+#     points = np.array([camera_frame[1,0]+margin,
+#                        camera_center[1]-margin,
+#                        camera_center[1]+margin,
+#                        camera_frame[1,1]-margin]).squeeze()
+#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
+#                               'values': [on_light, off_light, off_light, on_light]}}}]
+
 #     # lateral gradient
 #     margin = camera_scale[1]*0.05
 #     points = np.array([camera_frame[1,0]+margin, camera_frame[1,1]-margin]).squeeze()
 #     commands = [{"t":10, "cmd": {"gradient": {'points': points,
 #                                 'values': [off_light, on_light]}}}]
 
-    # half off - half on
-    points = np.array([camera_center[1]-1, camera_center[1]+1]).squeeze()
-    commands = [{"t":10, "cmd": {"gradient": {'points': points,
-                                'values': [off_light, on_light]}}}]
+#     # half off - half on
+#     points = np.array([camera_center[1]-1, camera_center[1]+1]).squeeze()
+#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
+#                                 'values': [off_light, on_light]}}}]
 
 #     # circle
 #     circ2_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
@@ -673,6 +703,17 @@ if __name__ == '__main__':
 #                                         "pose": circ1_pose, "colour": half_ligth},
 #                                  "add2": {"label": 'test', "shape type": 'circle',
 #                                         "pose": circ2_pose, "colour": on_light}}}
+#                 ]
+
+#     # dark circle
+#     circ2_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
+#     circ1_pose = circ2_pose @ DOMEtran.linear_transform(scale=1.5)
+#     half_ligth = np.mean([on_light,off_light],0)
+#     commands = [{"t":9.5, "cmd": {"add1": {"label": 'test', "shape type": 'circle',
+#                                         "pose": circ1_pose, "colour": half_ligth},
+#                                  "add2": {"label": 'test', "shape type": 'circle',
+#                                         "pose": circ2_pose, "colour": off_light}}},
+#                 {"t":10, "cmd": on_light}
 #                 ]
 
 #     # test features

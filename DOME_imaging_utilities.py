@@ -112,6 +112,8 @@ class CameraManager:
         default_settings['vflip'] = self.camera.vflip
         # Default framerate = 30.
         default_settings['framerate'] = int(self.camera.framerate)
+        ## Default framerate_range = (framerate, framerate).
+        #default_settings['framerate_range'] = self.camera.framerate_range
         # Default shutter speed = 0.
         default_settings['shutter speed'] = self.camera.shutter_speed
         # Default crop = (0.0, 0.0, 1.0, 1.0), possibly depreciated, see zoom instead.

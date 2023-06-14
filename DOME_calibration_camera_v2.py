@@ -299,278 +299,293 @@ def get_bright_lines(intensities : list):
 #                 break
     return bright_lines
 
-def start_calibration(out_file : str):
+def start_calibration(out_file : str, sq_size = 10):
     projector_dims = (480, 854, 3)
     camera_mode = 'default'
     response = None
-    with DOMEcomm.NetworkNode() as dome_pi4node, \
-            DOMEutil.CameraManager() as dome_camera, \
-            DOMEutil.PinManager() as dome_gpio:
-        try:
-            print('On the projector Pi run "DOME_calibration_projector.py" and wait for a black ' \
-                  'screen to appear (this may take several seconds). Once a black screen is ' \
-                  'shown, click anywhere on the black screen, then press any key (such as ALT).')
-            dome_pi4node.accept_connection()
-            print(f'Welcome to the DOME calibration set up procedure.\nAt any point in the ' \
-                  f'calibration, if all requisite parameters have been specified, input "skip" ' \
-                  f'to begin scanning. Alternatively, enter "next" to proceed to the next step, ' \
-                  f'"back" to return to the previous step, "restart" to begin the calibration ' \
-                  'from the start, or "exit" to end the program.')
+    
+    if os.path.isfile(out_file):
+        camera2projector = np.load(out_file)
+    else:
+        camera2projector = DOMEtran.linear_transform(scale=0.25)
+    
+    out_file
+    # project three squares
+    delta = 50
+    off_color = [150, 150, 150]
+    on_color  = [150, 255, 150]
+    
+    pos =[]
+    pos.append( DOMEtran.linear_transform(scale=sq_size, shift=(0,0)) )
+    pos.append( DOMEtran.linear_transform(scale=sq_size, shift=(0,1920)) )
+    pos.append( DOMEtran.linear_transform(scale=sq_size, shift=(1080,0)) )
+    
+    for i in range(len(pos)):
+        pos[i] = np.dot(camera2projector, pos[i])
+    
+    cmd = {"screen": '0',
+            "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": off_color},
+            "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": off_color},
+            "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": off_color}}
+    dome_pi4node.transmit(cmd)
+    response = dome_pi4node.receive()       
             
-            # start live video from the camera
-            dome_camera.camera.start_preview()
-            dome_camera.camera.preview.fullscreen=False
-            dome_camera.camera.preview.window=(1000, 40, 854, 480)
-            
-            # project three squares
-            delta = 50
-            sq_size = 10
-            pos =[]
-            pos.append( DOMEtran.linear_transform(scale=sq_size, shift=(480/2-delta,854/2-delta)) )
-            pos.append( DOMEtran.linear_transform(scale=sq_size, shift=(480/2-delta,854/2+delta)) )
-            pos.append( DOMEtran.linear_transform(scale=sq_size, shift=(480/2+delta,854/2-delta)) )
-            cmd = {"screen": '0',
-                    "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
-                    "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
-                    "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
-            dome_pi4node.transmit(cmd)
-            response = dome_pi4node.receive()       
-                    
-            threshold_picture = None
+    threshold_picture = None
+    loaded_file = None
+    saved_file = None
+    step = 1
+    count = 1
+    while 1 <= step <= 9:
+
+        # STEP 1: adjust the focus
+        while step == 1:
+            message = f'--- STEP 1 ---\nTo begin, we will focus the camera by adjusting ' \
+                      f'the height of the sample stage on the DOME. Input the number of ' \
+                      f'seconds for which to display a live feed of the camera frame as ' \
+                      f'an integer. By turning the lead screw on the DOME, move the ' \
+                      f'sample stage up or down until the image comes in to focus. Once ' \
+                      f'this is done, input "next" to continue. Henceforth, it is ' \
+                      f'crucial that the camera, projector, sample stage and any lenses ' \
+                      f'maintain their relative positions. Any change to the physical ' \
+                      f'setup of the DOME may invalidate the calibration.\n'
+            user_args, step = custom_input(message, step)
+            if len(user_args) == 1 and len(user_args[0]) != 0:
+                try:
+                    duration = int(user_args[0])
+                except ValueError:
+                    print('Please input an integer.')
+                    continue
+            elif step != 1:
+                continue
+            time.sleep(1)
+        if step != 0:
             loaded_file = None
-            saved_file = None
-            step = 1
-            count = 1
-            while 1 <= step <= 9:
-
-                # STEP 1: adjust the focus
-                while step == 1:
-                    message = f'--- STEP 1 ---\nTo begin, we will focus the camera by adjusting ' \
-                              f'the height of the sample stage on the DOME. Input the number of ' \
-                              f'seconds for which to display a live feed of the camera frame as ' \
-                              f'an integer. By turning the lead screw on the DOME, move the ' \
-                              f'sample stage up or down until the image comes in to focus. Once ' \
-                              f'this is done, input "next" to continue. Henceforth, it is ' \
-                              f'crucial that the camera, projector, sample stage and any lenses ' \
-                              f'maintain their relative positions. Any change to the physical ' \
-                              f'setup of the DOME may invalidate the calibration.\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) == 1 and len(user_args[0]) != 0:
-                        try:
-                            duration = int(user_args[0])
-                        except ValueError:
-                            print('Please input an integer.')
-                            continue
-                    elif step != 1:
-                        continue
-                    time.sleep(1)
-                if step != 0:
-                    loaded_file = None
-                    
-                # STEP 2: first square y pos    
-                while step == 2:
-                    s = 0
-                    cmd = {"screen": f'{count}',
-                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 200, 100]},
-                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
-                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
-                    dome_pi4node.transmit(cmd)
-                    response = dome_pi4node.receive()
-                    count+=1
-                    
-                    message = f'--- STEP 2 ---\nMove the first square to the top of the camera view.'\
-                              f' To move the square input positive or negative values.\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) == 1 and len(user_args[0]) != 0:
-                        try:
-                            increment = int(user_args[0])
-                        except ValueError:
-                            print('Please input an integer.')
-                            continue
-                    elif step != 1:
-                        continue
-                    #move = DOMEtran.linear_transform(shift=(step,0))
-                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
-                    pos[s][0,2]+=increment
-
-                # STEP 3: first square x pos     
-                while step == 3:
-                    s = 0
-                    cmd = {"screen": f'{count}',
-                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 200, 100]},
-                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
-                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
-                    dome_pi4node.transmit(cmd)
-                    response = dome_pi4node.receive()
-                    count+=1
-                    
-                    message = f'--- STEP 3 ---\nMove the first square to the left side of the camera view.'\
-                              f' To move the square input positive or negative values.\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) == 1 and len(user_args[0]) != 0:
-                        try:
-                            increment = int(user_args[0])
-                        except ValueError:
-                            print('Please input an integer.')
-                            continue
-                    elif step != 1:
-                        continue
-                    #move = DOMEtran.linear_transform(shift=(step,0))
-                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
-                    pos[s][1,2]+=increment
-                
-                # STEP 4: second square y pos    
-                while step == 4:
-                    s = 1
-                    cmd = {"screen": f'{count}',
-                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
-                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 200, 100]},
-                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
-                    dome_pi4node.transmit(cmd)
-                    response = dome_pi4node.receive()
-                    count+=1
-                    
-                    message = f'--- STEP 4 ---\nMove the second square to the top of the camera view.'\
-                              f' To move the square input positive or negative values.\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) == 1 and len(user_args[0]) != 0:
-                        try:
-                            increment = int(user_args[0])
-                        except ValueError:
-                            print('Please input an integer.')
-                            continue
-                    elif step != 1:
-                        continue
-                    #move = DOMEtran.linear_transform(shift=(step,0))
-                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
-                    pos[s][0,2]+=increment
-
-                # STEP 5: second square x pos     
-                while step == 5:
-                    s = 1
-                    cmd = {"screen": f'{count}',
-                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
-                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 200, 100]},
-                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 100, 100]}}
-                    dome_pi4node.transmit(cmd)
-                    response = dome_pi4node.receive()
-                    count+=1
-                    
-                    message = f'--- STEP 5 ---\nMove the second square to the right side of the camera view.'\
-                              f' To move the square input positive or negative values.\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) == 1 and len(user_args[0]) != 0:
-                        try:
-                            increment = int(user_args[0])
-                        except ValueError:
-                            print('Please input an integer.')
-                            continue
-                    elif step != 1:
-                        continue
-                    #move = DOMEtran.linear_transform(shift=(step,0))
-                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
-                    pos[s][1,2]+=increment
-               
-                # STEP 6: third square y pos    
-                while step == 6:
-                    s = 2
-                    cmd = {"screen": f'{count}',
-                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
-                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
-                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 200, 100]}}
-                    dome_pi4node.transmit(cmd)
-                    response = dome_pi4node.receive()
-                    count+=1
-                    
-                    message = f'--- STEP 6 ---\nMove the third square to the bottom of the camera view.'\
-                              f' To move the square input positive or negative values.\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) == 1 and len(user_args[0]) != 0:
-                        try:
-                            increment = int(user_args[0])
-                        except ValueError:
-                            print('Please input an integer.')
-                            continue
-                    elif step != 1:
-                        continue
-                    #move = DOMEtran.linear_transform(shift=(step,0))
-                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
-                    pos[s][0,2]+=increment
-
-                # STEP 7: third square x pos     
-                while step == 7:
-                    s = 2
-                    cmd = {"screen": f'{count}',
-                        "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": [100, 100, 100]},
-                        "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": [100, 100, 100]},
-                        "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": [100, 200, 100]}}
-                    dome_pi4node.transmit(cmd)
-                    response = dome_pi4node.receive()
-                    count+=1
-                    
-                    message = f'--- STEP 7 ---\nMove the third square to the left side of the camera view.'\
-                              f' To move the square input positive or negative values.\n'
-                    user_args, step = custom_input(message, step)
-                    if len(user_args) == 1 and len(user_args[0]) != 0:
-                        try:
-                            increment = int(user_args[0])
-                        except ValueError:
-                            print('Please input an integer.')
-                            continue
-                    elif step != 1:
-                        continue
-                    #move = DOMEtran.linear_transform(shift=(step,0))
-                    #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
-                    pos[s][1,2]+=increment
-              
-                # STEP 8: perform calibration and save the transformation matrix in 'camera2projector.npy'
-                if step == 8:
-                    camera_points = np.float32([[0,0], [0,1920], [1080,0]])
-                    projector_points = np.float32([[0,0]]*3)
-                    projector_points[0] = pos[0][0:2,2]
-                    projector_points[1] = pos[1][0:2,2]
-                    projector_points[2] = pos[2][0:2,2]
-                    camera2projector = cv2.getAffineTransform(camera_points,
-                                                              projector_points)
-                    camera2projector = np.concatenate((camera2projector, np.array([[0, 0, 1]])), 0)
-                    print(camera2projector)
-                    #mapping_filename = 'camera2projector.npy'
-                    np.save(out_file, camera2projector)
-                    print(f'Calibration complete.\n--- Affine transform saved to {out_file}')
-                    dome_pi4node.transmit('all' + 3 * ' 0')
-                    response = dome_pi4node.receive()
-                    step += 1
-                    
-                # STEP 9: validation
-                if step == 9:
-                    print('The camera frame should now be exactly filled by a green frame.')
-                    user_args, step = custom_input('Input \'next\' to finish.', step)
-                    camera2projector = np.load(out_file)
-                    green_cam = DOMEtran.linear_transform(scale=(1080,1920), shift=(1080/2,1920/2))
-                    black_cam = DOMEtran.linear_transform(scale=(1080-10,1920-10), shift=(1080/2,1920/2))
-                    green_proj = np.dot(camera2projector, green_cam)
-                    black_proj = np.dot(camera2projector, black_cam)
-                    cmd = {"screen": 'new',
-                           "add1": {"label": 'a', "shape type": 'square',"pose": green_proj.tolist(), "colour": [50, 50, 50]},
-                           "add2": {"label": 'a', "shape type": 'square',"pose": black_proj.tolist(), "colour": [0, 0, 0]}}
-                    dome_pi4node.transmit(cmd)
-                    response = dome_pi4node.receive()
-                    
-        finally:
-            dome_pi4node.transmit('all' + 3 * ' 0')
-            dome_pi4node.transmit('exit')
+            
+        # STEP 2: first square y pos    
+        while step == 2:
+            s = 0
+            cmd = {"screen": f'{count}',
+                "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": on_color},
+                "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": off_color},
+                "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": off_color}}
+            dome_pi4node.transmit(cmd)
             response = dome_pi4node.receive()
+            count+=1
+            
+            message = f'--- STEP 2 ---\nMove the first square to the top of the camera view.'\
+                      f' To move the square input positive or negative values.\n'
+            user_args, step = custom_input(message, step)
+            if len(user_args) == 1 and len(user_args[0]) != 0:
+                try:
+                    increment = int(user_args[0])
+                except ValueError:
+                    print('Please input an integer.')
+                    continue
+            elif step != 1:
+                continue
+            #move = DOMEtran.linear_transform(shift=(step,0))
+            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+            pos[s][0,2]+=increment
+
+        # STEP 3: first square x pos     
+        while step == 3:
+            s = 0
+            cmd = {"screen": f'{count}',
+                "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": on_color},
+                "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": off_color},
+                "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": off_color}}
+            dome_pi4node.transmit(cmd)
+            response = dome_pi4node.receive()
+            count+=1
+            
+            message = f'--- STEP 3 ---\nMove the first square to the left side of the camera view.'\
+                      f' To move the square input positive or negative values.\n'
+            user_args, step = custom_input(message, step)
+            if len(user_args) == 1 and len(user_args[0]) != 0:
+                try:
+                    increment = int(user_args[0])
+                except ValueError:
+                    print('Please input an integer.')
+                    continue
+            elif step != 1:
+                continue
+            #move = DOMEtran.linear_transform(shift=(step,0))
+            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+            pos[s][1,2]+=increment
+        
+        # STEP 4: second square y pos    
+        while step == 4:
+            s = 1
+            cmd = {"screen": f'{count}',
+                "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": off_color},
+                "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": on_color},
+                "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": off_color}}
+            dome_pi4node.transmit(cmd)
+            response = dome_pi4node.receive()
+            count+=1
+            
+            message = f'--- STEP 4 ---\nMove the second square to the top of the camera view.'\
+                      f' To move the square input positive or negative values.\n'
+            user_args, step = custom_input(message, step)
+            if len(user_args) == 1 and len(user_args[0]) != 0:
+                try:
+                    increment = int(user_args[0])
+                except ValueError:
+                    print('Please input an integer.')
+                    continue
+            elif step != 1:
+                continue
+            #move = DOMEtran.linear_transform(shift=(step,0))
+            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+            pos[s][0,2]+=increment
+
+        # STEP 5: second square x pos     
+        while step == 5:
+            s = 1
+            cmd = {"screen": f'{count}',
+                "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": off_color},
+                "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": on_color},
+                "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": off_color}}
+            dome_pi4node.transmit(cmd)
+            response = dome_pi4node.receive()
+            count+=1
+            
+            message = f'--- STEP 5 ---\nMove the second square to the right side of the camera view.'\
+                      f' To move the square input positive or negative values.\n'
+            user_args, step = custom_input(message, step)
+            if len(user_args) == 1 and len(user_args[0]) != 0:
+                try:
+                    increment = int(user_args[0])
+                except ValueError:
+                    print('Please input an integer.')
+                    continue
+            elif step != 1:
+                continue
+            #move = DOMEtran.linear_transform(shift=(step,0))
+            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+            pos[s][1,2]+=increment
+       
+        # STEP 6: third square y pos    
+        while step == 6:
+            s = 2
+            cmd = {"screen": f'{count}',
+                "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": off_color},
+                "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": off_color},
+                "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": on_color}}
+            dome_pi4node.transmit(cmd)
+            response = dome_pi4node.receive()
+            count+=1
+            
+            message = f'--- STEP 6 ---\nMove the third square to the bottom of the camera view.'\
+                      f' To move the square input positive or negative values.\n'
+            user_args, step = custom_input(message, step)
+            if len(user_args) == 1 and len(user_args[0]) != 0:
+                try:
+                    increment = int(user_args[0])
+                except ValueError:
+                    print('Please input an integer.')
+                    continue
+            elif step != 1:
+                continue
+            #move = DOMEtran.linear_transform(shift=(step,0))
+            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+            pos[s][0,2]+=increment
+
+        # STEP 7: third square x pos     
+        while step == 7:
+            s = 2
+            cmd = {"screen": f'{count}',
+                "add1": {"label": 'a', "shape type": 'square',"pose": pos[0].tolist(), "colour": off_color},
+                "add2": {"label": 'a', "shape type": 'square',"pose": pos[1].tolist(), "colour": off_color},
+                "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": on_color}}
+            dome_pi4node.transmit(cmd)
+            response = dome_pi4node.receive()
+            count+=1
+            
+            message = f'--- STEP 7 ---\nMove the third square to the left side of the camera view.'\
+                      f' To move the square input positive or negative values.\n'
+            user_args, step = custom_input(message, step)
+            if len(user_args) == 1 and len(user_args[0]) != 0:
+                try:
+                    increment = int(user_args[0])
+                except ValueError:
+                    print('Please input an integer.')
+                    continue
+            elif step != 1:
+                continue
+            #move = DOMEtran.linear_transform(shift=(step,0))
+            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
+            pos[s][1,2]+=increment
+      
+        # STEP 8: perform calibration and save the transformation matrix in 'camera2projector.npy'
+        if step == 8:
+            camera_points = np.float32([[0,0], [0,1920], [1080,0]])
+            projector_points = np.float32([[0,0]]*3)
+            projector_points[0] = pos[0][0:2,2]
+            projector_points[1] = pos[1][0:2,2]
+            projector_points[2] = pos[2][0:2,2]
+            camera2projector = cv2.getAffineTransform(camera_points,
+                                                      projector_points)
+            camera2projector = np.concatenate((camera2projector, np.array([[0, 0, 1]])), 0)
+            print(camera2projector)
+            #mapping_filename = 'camera2projector.npy'
+            np.save(out_file, camera2projector)
+            print(f'Calibration complete.\n--- Affine transform saved to {out_file}')
+            dome_pi4node.transmit('all' + 3 * ' 0')
+            response = dome_pi4node.receive()
+            step += 1
+            
+        # STEP 9: validation
+        if step == 9:
+            print('The camera frame should now be exactly filled by a green frame.')
+            user_args, step = custom_input('Input \'next\' to finish.\n', step)
+            camera2projector = np.load(out_file)
+            green_cam = DOMEtran.linear_transform(scale=(1080,1920), shift=(1080/2,1920/2))
+            black_cam = DOMEtran.linear_transform(scale=(1080-sq_size//2,1920-sq_size//2), shift=(1080/2,1920/2))
+            green_proj = np.dot(camera2projector, green_cam)
+            black_proj = np.dot(camera2projector, black_cam)
+            cmd = {"screen": 'new',
+                   "add1": {"label": 'a', "shape type": 'square',"pose": green_proj.tolist(), "colour": [50, 50, 50]},
+                   "add2": {"label": 'a', "shape type": 'square',"pose": black_proj.tolist(), "colour": [0, 0, 0]}}
+            dome_pi4node.transmit(cmd)
+            response = dome_pi4node.receive()
+            
+#finally:
+    dome_pi4node.transmit('all' + 3 * ' 0')
+    dome_pi4node.transmit('exit')
+    response = dome_pi4node.receive()
 
 
 if __name__ == '__main__':
     out_folder = '/home/pi/Documents/config'
-    name = 'camera2projector_x9'
+    name = 'camera2projector_x90'
+    sq_size = 50
     
     date = datetime.today().strftime('%Y_%m_%d')
     name_date = name + '_' + date + '.npy'
     out_file = os.path.join(out_folder,name_date)
     
-    start_calibration(out_file)
+    dome_pi4node = DOMEcomm.NetworkNode()
+    dome_camera = DOMEutil.CameraManager()
     
+    # connect to projector
+    print('On the projector Pi run "DOME_calibration_projector.py" and wait for a black ' \
+          'screen to appear (this may take several seconds). Once a black screen is ' \
+          'shown, click anywhere on the black screen, then press any key (such as ALT).')
+    dome_pi4node.accept_connection()
+    
+    print(f'Welcome to the DOME calibration set up procedure.\nAt any point in the ' \
+          f'calibration, if all requisite parameters have been specified, input "skip" ' \
+          f'to begin scanning. Alternatively, enter "next" to proceed to the next step, ' \
+          f'"back" to return to the previous step, "restart" to begin the calibration ' \
+          'from the start, or "exit" to end the program.')
+
+    # start live video from the camera
+    dome_camera.camera.start_preview()
+    dome_camera.camera.preview.fullscreen=False
+    dome_camera.camera.preview.window=(1000, 40, 854, 480)
+    
+    print('Use start_calibration(out_file, sq_size) to start the calibration.\n'\
+          'If out_file already exists it will be loaded and modified.')    
     
     
