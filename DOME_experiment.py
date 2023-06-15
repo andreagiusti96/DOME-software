@@ -581,14 +581,14 @@ if __name__ == '__main__':
     
     # details of the experiment
     date='today'    # date of the experiment. Use format YYYY_MM_DD
-    species='Euglena'     # species used in the experiment
+    species='PBursaria'     # species used in the experiment
     culture='05/06/23'     # culture used in the experiment
-    sample='15uL, no frame'      # details about the sample (volume, frame, etc)
-    temp='23.3' # temperature of the sample
+    sample='100uL, 11mm disk'      # details about the sample (volume, frame, etc)
+    temp='23.7' # temperature of the sample
     
     output_directory      = '/home/pi/Documents/experiments'
     parameters_file       = '/home/pi/Documents/config/parameters_test.json'
-    camera2projector_file = '/home/pi/Documents/config/camera2projector_x90_2023_06_12.npy'
+    camera2projector_file = '/home/pi/Documents/config/camera2projector_x90_2023_06_13.npy'
     
     deltaT= 0.5 # sampling time [s]
     totalT= 60*3  # experiment duration [s]
@@ -606,7 +606,7 @@ if __name__ == '__main__':
     off_light = (red*0.05).astype(np.uint8)
     on_light  = (off_light + blue*1).astype(np.uint8)
     
-    camera_bright_base=50
+    camera_bright_base=40
     camera_bright_reduction=0
     jpeg_quality = 90
     
@@ -637,22 +637,12 @@ if __name__ == '__main__':
     # always off
     commands = []
 
-#     # off-on-off
-#     # load_parameters('/home/pi/Documents/config/parameters_OFF_ON_OFF_75.json')
-#     commands = [{"t":totalT//3, "cmd": on_light},
-#                 {"t":totalT//3*2, "cmd": off_light}
-#                 ]
-    
-    # switching
-    # load_parameters('/home/pi/Documents/config/parameters_switch_1s.json')
-    # load_parameters('/home/pi/Documents/config/parameters_switch_5s.json')
-    # load_parameters('/home/pi/Documents/config/parameters_switch_10s.json')
-    step = 5 #s
-    initial_t = 10 #s
-    commands = []
-    for t in np.arange(initial_t,totalT,step*2):
-        commands.append({"t":float(t), "cmd": on_light.tolist()})
-        commands.append({"t":float(t+step), "cmd": off_light.tolist()})
+    # off-on-off
+    # load_parameters('/home/pi/Documents/config/parameters_OFF_ON_OFF_75.json')
+    on_light  = (off_light + blue*0.6).astype(np.uint8)
+    commands = [{"t":totalT//3, "cmd": on_light},
+                {"t":totalT//3*2, "cmd": off_light}
+                ]
 
 #     # increasing ramp
 #     # load_parameters('/home/pi/Documents/config/parameters_ramp.json')
@@ -665,6 +655,28 @@ if __name__ == '__main__':
 #         light[1] = np.interp(t, [initial_t, totalT-initial_t], [off_light[1], on_light[1]])
 #         light[2] = np.interp(t, [initial_t, totalT-initial_t], [off_light[2], on_light[2]])
 #         commands.append({"t":float(t), "cmd": light.tolist()})
+
+#     # switching
+#     # load_parameters('/home/pi/Documents/config/parameters_switch_1s.json')
+#     # load_parameters('/home/pi/Documents/config/parameters_switch_5s.json')
+#     # load_parameters('/home/pi/Documents/config/parameters_switch_10s.json')
+#     step = 5 #s
+#     initial_t = 10 #s
+#     commands = []
+#     for t in np.arange(initial_t,totalT,step*2):
+#         commands.append({"t":float(t), "cmd": on_light.tolist()})
+#         commands.append({"t":float(t+step), "cmd": off_light.tolist()})
+
+#     # half off - half on
+#     points = np.array([camera_center[1]-1, camera_center[1]+1]).squeeze()
+#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
+#                                 'values': [off_light, on_light]}}}]
+
+#     # lateral gradient
+#     margin = camera_scale[1]*0.05
+#     points = np.array([camera_frame[1,0]+margin, camera_frame[1,1]-margin]).squeeze()
+#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
+#                                 'values': [off_light, on_light]}}}]
 
 #     # centered gradient
 #     margin = camera_scale[1]*0.05
@@ -683,17 +695,6 @@ if __name__ == '__main__':
 #                        camera_frame[1,1]-margin]).squeeze()
 #     commands = [{"t":10, "cmd": {"gradient": {'points': points,
 #                               'values': [on_light, off_light, off_light, on_light]}}}]
-
-#     # lateral gradient
-#     margin = camera_scale[1]*0.05
-#     points = np.array([camera_frame[1,0]+margin, camera_frame[1,1]-margin]).squeeze()
-#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
-#                                 'values': [off_light, on_light]}}}]
-
-#     # half off - half on
-#     points = np.array([camera_center[1]-1, camera_center[1]+1]).squeeze()
-#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
-#                                 'values': [off_light, on_light]}}}]
 
 #     # circle
 #     circ2_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
@@ -736,13 +737,7 @@ if __name__ == '__main__':
 #                 {"t":10, "cmd": {"gradient": {'points': camera_frame[1,:],
 #                                         'values': [off_light, on_light]}}}
 #                 ]
-    
-#     # varying frequency
-#     outputs[get_index_for_time(10):get_index_for_time(15)]=sig.square(2*np.pi*(time_instants[get_index_for_time(10):get_index_for_time(15)]+deltaT/2))*0.5+0.5
-#     outputs[get_index_for_time(15):get_index_for_time(20)]=sig.square(0.5*2*np.pi*(time_instants[get_index_for_time(15):get_index_for_time(20)]+deltaT/2))*0.5+0.5
-#     outputs[get_index_for_time(20):get_index_for_time(40)]=sig.square(0.2*2*np.pi*(time_instants[get_index_for_time(20):get_index_for_time(40)]+deltaT/2))*0.5+0.5
-#     outputs[get_index_for_time(40):get_index_for_time(60)]=sig.square(0.1*2*np.pi*(time_instants[get_index_for_time(40):get_index_for_time(60)]+deltaT/2))*0.5+0.5
-    
+        
     # init camera and projector
     [dome_pi4node, dome_camera, dome_gpio]=init()
     

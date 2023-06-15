@@ -550,15 +550,13 @@ def start_calibration(out_file : str, sq_size = 10):
             dome_pi4node.transmit(cmd)
             response = dome_pi4node.receive()
             
-#finally:
     dome_pi4node.transmit('all' + 3 * ' 0')
-    dome_pi4node.transmit('exit')
     response = dome_pi4node.receive()
 
 
 if __name__ == '__main__':
     out_folder = '/home/pi/Documents/config'
-    name = 'camera2projector_x90'
+    name = 'camera2projector_x9'
     sq_size = 50
     
     date = datetime.today().strftime('%Y_%m_%d')
