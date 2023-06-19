@@ -26,11 +26,16 @@ import random
 import DOME_graphics as DOMEgraphics
 import DOME_experiment_manager as DOMEexp
 
+# old parameters without scaling on Typical_D
+# NEW_ID_COST_MIN = 1000
+# NEW_ID_COST_DIST_CAP = 100
+# DISTANCE_COST_FACTORS = [0, 2]
+# INACTIVITY_COST_FACTORS = [0, 1000]
 
-NEW_ID_COST_MIN = 1000
-NEW_ID_COST_DIST_CAP = 100
-DISTANCE_COST_FACTORS = [0, 2]
-INACTIVITY_COST_FACTORS = [0, 1000]
+NEW_ID_COST_MIN = 1
+NEW_ID_COST_DIST_CAP = 3
+DISTANCE_COST_FACTORS = [0, 1]
+INACTIVITY_COST_FACTORS = [0, 1]
 
 def matchingCost(distance, inactivity):
     cost = (distance*DISTANCE_COST_FACTORS[0] + distance**2*DISTANCE_COST_FACTORS[1])/(inactivity**2*0.25+1)
@@ -42,7 +47,7 @@ def plotCosts():
     fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
     plt.title('Matching cost')
     
-    maxdist=100
+    maxdist=4
     distances=np.linspace(0, maxdist)
     inactivity=np.array([0, 1, 2, 3, 4, 5])
     
@@ -59,6 +64,7 @@ def plotCosts():
     plt.legend( inactivity)
     plt.gca().set_ylim([0, new_id_cost_max*1.5])
     plt.gca().set_xlim([0, maxdist])
+    plt.xlabel('distance/TYPICAL_D')
 
 
 def agentMatching(new_positions : np.array, positions : np.array, inactivity : List):
@@ -88,6 +94,7 @@ def agentMatching(new_positions : np.array, positions : np.array, inactivity : L
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
     
     distances = np.squeeze(scipy.spatial.distance.cdist(new_positions, positions))
+    distances = distances/TYPICAL_D
     
     # build the matrix of costs
     for i in range(positions.shape[0]):
@@ -98,7 +105,7 @@ def agentMatching(new_positions : np.array, positions : np.array, inactivity : L
         costs_matching[:,i] = matchingCost(distances[:,i], inactivity[i])
         
     for i in range(new_positions.shape[0]):
-        cost_newid = np.min([DOMEgraphics.distance_from_edges(new_positions[i]), NEW_ID_COST_DIST_CAP])**2 + NEW_ID_COST_MIN
+        cost_newid = np.min([DOMEgraphics.distance_from_edges(new_positions[i])/TYPICAL_D, NEW_ID_COST_DIST_CAP])**2 + NEW_ID_COST_MIN
         costs_newid[i,:] = np.ones([len(new_positions)]) * cost_newid
         
     costs = np.concatenate((costs_matching, costs_newid), axis=1)
@@ -110,7 +117,7 @@ def agentMatching(new_positions : np.array, positions : np.array, inactivity : L
     # update ids
     new_ids = [i for i in col_ind]
     
-    print('matching cost = ' + str(round(cost)) + '\t avg = ' + str(round(cost/(len(new_ids)+0.001))))
+    print('matching cost = ' + str(round(cost,2)) + '\t avg = ' + str(round(cost/(len(new_ids)+0.001),2)))
     
     return new_ids
 
@@ -168,10 +175,12 @@ def estimate_positions(old_pos : np.array, velocity : np.array):
     assert len(velocity.shape) == 2
     assert old_pos.shape[1] == 2
     
-    estimated_pos = old_pos + velocity*0.66
+    inertia = 0.66
+    
+    estimated_pos = old_pos + velocity * inertia
     
     non_valid_pos_idx = ~ DOMEgraphics.valid_positions(estimated_pos)
-    estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx]  - velocity[non_valid_pos_idx] 
+    estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx]  - velocity[non_valid_pos_idx]* inertia 
     
     return estimated_pos
 
@@ -300,13 +309,22 @@ def extract_data_from_images(fileLocation, bright_thresh : List, area_r : List, 
 
 # MAIN
 if __name__ == '__main__':
-    AREA_RANGE = [250, 3000] #[120, 650]
-    COMPAC_RANGE = [0.6, 0.9]
-    BRIGHT_THRESH = [85]
+    
+    # # Euglena
+    # AREA_RANGE = [250, 3000]; COMPAC_RANGE = [0.6, 0.9]; BRIGHT_THRESH = [85]
+    # TYPICAL_D = 25
+    
+    # P. Caudatum
+    #AREA_RANGE = [250, 3000]; COMPAC_RANGE = [0.5, 0.9]; BRIGHT_THRESH = [70]
+    #TYPICAL_D = 50
+    
+    # Volvox
+    AREA_RANGE = [1000, 6000]; COMPAC_RANGE = [0.7, 1.0]; BRIGHT_THRESH = [70]
+    TYPICAL_D = 25
     
     experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-    experiment_name = "2023_02_20_Euglena_4"
-    output_folder ='tracking2'
+    experiment_name = "2023_06_08_Volvox_1"
+    output_folder ='tracking'
     
     current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
     
@@ -315,7 +333,7 @@ if __name__ == '__main__':
     else:
         images_folder=os.path.join(experiments_directory, experiment_name)
     
-    #test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
+    test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
     
     output_dir = os.path.join(experiments_directory, experiment_name, output_folder)
     try:
