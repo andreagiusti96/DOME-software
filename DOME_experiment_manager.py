@@ -11,6 +11,10 @@
 
 import time
 import os
+import glob
+import re
+import cv2
+
 from pathlib import Path
 from datetime import datetime
 #from datetime import date
@@ -108,7 +112,61 @@ class ExperimentManager:
         data=np.load(file_path)
         return data
 
+    def get_totalT(self):
+        try:
+            with self.get_data('data.npz') as data:
+                totalT = data['totalT'] 
+        except KeyError:
+            dirr = os.path.join(self.path, 'images')
+            paths = glob.glob(dirr +  '/*.jpeg')
+            #paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+            totalT = max([get_time_from_title(f) for f in paths])
+        return totalT
     
+    def get_deltaT(self):
+        try:
+            with self.get_data('data.npz') as data:
+                deltaT = data['deltaT'] 
+        except KeyError:
+            dirr = os.path.join(self.path, 'images')
+            paths = glob.glob(dirr +  '/*.jpeg')
+            paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+            deltaT = get_time_from_title(paths[1]) - get_time_from_title(paths[0])
+        return deltaT
+    
+    def get_img_at_time(self, image_time : float):
+        paths=glob.glob(os.path.join(self.path, 'images') +  '/*.jpeg')
+        paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+        
+        for filename in paths:
+            if get_time_from_title(filename) == image_time:
+                img = cv2.imread(filename)
+                break
+        
+        assert os.path.isfile(filename), f'Image {filename} not found!'
+        assert isinstance(img, np.ndarray), f'{filename} is not a valid image!\nType is {type(img)}'
+        return img
+
+    def get_pattern_at_time(self, time:float):
+        pattern = None
+        
+        if os.path.isdir(os.path.join(self.path, 'patterns_cam')):
+            files = glob.glob(os.path.join(self.path, 'patterns_cam') +  '/*.jpeg')
+            files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+            file = [f for f in files if get_time_from_title(f) <= time][-1]
+            pattern=cv2.imread(file)
+        elif os.path.isdir(os.path.join(self.path, 'patterns')):
+            files = glob.glob(os.path.join(self.path, 'patterns') +  '/*.jpeg')
+            files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+            file = [f for f in files if get_time_from_title(f) <= time][-1]
+            pattern=cv2.imread(file)
+        else:
+            with self.get_data('data.npz') as data:
+                 patterns = data['patterns']
+                 pattern = patterns[int(time*2)]
+                 
+        return pattern
+        
     def add_detail(self, message : str, include_in_exp_list : bool =False):
         '''
         Add detail to the experiment log.
@@ -185,6 +243,28 @@ def open_experiment(experiment_name : str, output_directory='/home/pi/Documents/
         experiment.path=path
         print(f'Now working in {path}. \n')
     else:
-        print(f'{path} not found !\n')
+        raise(Exception(f'{path} not found!\n'))
     
     return experiment
+
+def get_time_from_title(filename: str):
+    """
+    Extract time from a string.
+
+    Parameters
+    ----------
+    filename : str
+        String to extract the time from.
+
+    Returns
+    -------
+    time : float
+        Time sxtracted from the string.
+
+    """
+    filename = filename.split("fig_")[-1]
+    filename = filename.split("pattern_")[-1]
+    filename = filename.split(".jpeg")[0]
+    time = float(filename)
+    return time
+    

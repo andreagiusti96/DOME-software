@@ -206,10 +206,14 @@ def interpolate_positions(positions : np.array):
 
 
 def test_detection_parameters(fileLocation, bright_thresh, area_r : List, compactness_r : List):
-    files = glob.glob(fileLocation +  '/*.jpeg')
-    files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+    if os.path.isdir(fileLocation):
+        files = glob.glob(fileLocation +  '/*.jpeg')
+        files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+        filename = random.choice(files)
+    else:
+        filename = fileLocation
+        fileLocation = os.path.dirname(fileLocation)
     
-    filename = random.choice(files)
     img = cv2.imread(filename)
 
     background = DOMEgraphics.build_background(fileLocation, 25)
@@ -238,7 +242,7 @@ def extract_data_from_images(fileLocation, bright_thresh : List, area_r : List, 
         # declare vars
         filename = files[counter]
         img = cv2.imread(filename)
-        time = DOMEgraphics.get_time_from_title(filename)
+        time = DOMEexp.get_time_from_title(filename)
         print('t = ' + str(time))
         
         # collect contours and positions from new image
@@ -318,12 +322,16 @@ if __name__ == '__main__':
     #AREA_RANGE = [250, 3000]; COMPAC_RANGE = [0.5, 0.9]; BRIGHT_THRESH = [70]
     #TYPICAL_D = 50
     
-    # Volvox
-    AREA_RANGE = [1000, 6000]; COMPAC_RANGE = [0.7, 1.0]; BRIGHT_THRESH = [70]
+    # P. Bursaria
+    AREA_RANGE = [150, 1500]; COMPAC_RANGE = [0.6, 0.9]; BRIGHT_THRESH = [60]
     TYPICAL_D = 25
     
+    # Volvox
+    # AREA_RANGE = [1000, 6000]; COMPAC_RANGE = [0.7, 1.0]; BRIGHT_THRESH = [70]
+    # TYPICAL_D = 15
+    
     experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-    experiment_name = "2023_06_08_Volvox_1"
+    experiment_name = "2023_06_16_PBursaria_6"
     output_folder ='tracking'
     
     current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    

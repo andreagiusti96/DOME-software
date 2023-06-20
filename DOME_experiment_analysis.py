@@ -16,6 +16,7 @@ import glob
 import matplotlib.pyplot as plt
 #import plotly.express as px
 import seaborn as sns
+import sys
 import os
 import re
 import random
@@ -337,40 +338,33 @@ def scatter_hist(x, y, n_bins=10):
         ax_histy.barh(y_bins[:-1], y_val, height=1.0*np.diff(y_bins), align='edge', alpha=0.5)
 
     return ax
-    
-    
+
+
 # MAIN -------------------------------------------------------------------------------------
 experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-experiment_name = "2023_02_20_Euglena_4"
-output_folder ='tracking2'
+experiment_name = "2023_06_08_Volvox_14"
+output_folder ='tracking'
 
-current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)    
-
-analysed_data_path = os.path.join(experiments_directory, experiment_name, output_folder, 'analysis_data.npz')
+current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)  
 
 # load data
-if not os.path.isfile(analysed_data_path):
-    print(f'File {analysed_data_path} not found.\nFirst execute tracking with DOME_tracker.')
-    exit()
-
+totalT = current_experiment.get_totalT()  
+deltaT = current_experiment.get_deltaT()  
 with current_experiment.get_data('data.npz') as data:
-    #patterns = data['patterns']
     activation_times = data['activation_times']
+
+patterns = [DOMEgraphics.get_pattern_at_time(current_experiment, t) for t in np.arange(totalT, deltaT)]
+
+# load tracking data
+tracking_data_path = os.path.join(experiments_directory, experiment_name, output_folder, 'analysis_data.npz')
+
+if not os.path.isfile(tracking_data_path):
+    print(f'File {tracking_data_path} not found.\nFirst perform the tracking with DOME_tracker.')
+    sys.exit(0)
     
 with current_experiment.get_data(os.path.join(output_folder,'analysis_data.npz')) as data:
     positions = data['positions']
-    inactivity = data['inactivity']
-    
-if os.path.isdir(os.path.join(experiments_directory, experiment_name, 'patterns')):
-    files= glob.glob(os.path.join(experiments_directory, experiment_name, 'patterns') +  '/*.jpeg')
-    files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
-    patterns=np.ndarray([len(files), 480, 854, 3], dtype=np.uint8)
-    for i in range(len(files)):
-        patterns[i]=cv2.imread(files[i])
-else:
-    with current_experiment.get_data('data.npz') as data:
-         patterns = data['patterns']   
-
+    inactivity = data['inactivity'] 
 
 time_intants = activation_times.shape[0]
 number_of_agents = positions.shape[1]
@@ -380,7 +374,7 @@ positions[inactivity!=0]=np.nan
 interp_positions = DOMEtracker.interpolate_positions(positions)
 
 # plot trajectories
-img = DOMEgraphics.get_img_at_time(os.path.join(experiments_directory, experiment_name, 'images'), 60)
+img = current_experiment.get_img_at_time(60)
 DOMEgraphics.draw_trajectories(interp_positions, [], inactivity, img, "trajectories", 1, -1)
 
 # smooth trajectories
@@ -984,7 +978,7 @@ plt.show()
 #tumbling_pos=interp_positions[:-1,agent,:]
 tumbling_pos = interp_positions[:-1,agent,:][tumbling[:,agent]>0]
 tumbling_pos2 = interp_positions[:,agent,:][tumbling2[:,agent]>0]
-img = DOMEgraphics.get_img_at_time(os.path.join(experiments_directory, experiment_name, 'images'), 60)
+img = current_experiment.get_img_at_time(60)
 DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivity[:,agent:agent+1], img, "trajectory of agent " +str(agent), np.inf, time_window=-1, show=False);
 #plt.scatter(tumbling_pos[:,0], tumbling_pos[:,1], color='green' )
 plt.scatter(tumbling_pos2[:,0], tumbling_pos2[:,1], color='yellow' )

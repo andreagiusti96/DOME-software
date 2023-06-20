@@ -21,6 +21,7 @@ import re
 import os
 from typing import List
 
+import DOME_experiment_manager as DOMEexp
 
 def highligth_inputs(inputs : np.array, color='red', alpha : float = 0.3):
     inputs=np.ma.filled(inputs, fill_value=np.nan)
@@ -102,7 +103,7 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
                 plt.plot(contour[:,0],contour[:,1], color = std_color_for_index(obj))
     
     plt.xlim([0, 1920])
-    plt.ylim([0, 1080])
+    plt.ylim([1080, 0])
     
     if show: 
         plt.show()
@@ -142,7 +143,54 @@ def make_video(directory : str, title : str = "video.mp4", fps : float = 1):
     cv2.destroyAllWindows()
     video.release()
     print(f'Video {title} saved in {directory}')
+
+def overlap_pattern(experiment, time:float, alpha:float=1):
+    img = experiment.get_img_at_time(time)
+    #draw_image(img,'img')
+    pat = experiment.get_pattern_at_time(time)
+    pat = cv2.resize(pat, [img.shape[1], img.shape[0]])
+    pat = cv2.convertScaleAbs(pat, alpha=alpha)
+    #draw_image(pat,'pat')
+    img = cv2.add(img, pat)
+    return img
     
+def overlap_patterns(experiment, alpha:float=1, save_fig:bool=False, save_video:bool=True, fps:float=1):    
+    dim=(1920,1080)
+    
+    files = glob.glob(os.path.join(experiment.path, 'images') +  '/*.jpeg')
+    files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+    
+    totalT = experiment.get_totalT()
+    
+    if save_fig:
+        output_folder = 'images_pat'
+        output_dir = os.path.join(experiment.path, output_folder)
+        try:
+            os.mkdir(output_dir)
+        except OSError:
+            pass
+    
+    if save_video:
+        video_name = f'{experiment.name}_pat.mp4'
+        video_path = os.path.join(experiment.path,video_name)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        video = cv2.VideoWriter(video_path, fourcc, fps, frameSize=dim)
+    
+    for f in files:
+        t = DOMEexp.get_time_from_title(f)
+        print(f'\r{round(t/totalT*100,1)}%', end='\r')
+        new_img = overlap_pattern(experiment, time=t, alpha=alpha)
+        if save_fig: cv2.imwrite(os.path.join(output_dir,'fig_' + '%04.1f' % t + '.jpeg'), new_img)
+        if save_video: video.write(new_img)
+    print('')
+   
+    cv2.destroyAllWindows()
+    if save_video:
+        video.release()
+        print(f'Video saved as {video_name}')
+    if save_fig:
+        print(f'Images saved in {output_dir}')
+        
 def process_img(img : np.array, color : str = "", blur  : int = 0, gain  : float = 1., contrast : bool =False, equalize : bool =False, plot : bool =False):
     
     if color == "gray":
@@ -187,7 +235,7 @@ def process_img(img : np.array, color : str = "", blur  : int = 0, gain  : float
         
     return img
 
-def build_background(fileLocation : str, images_number : int):
+def build_background(fileLocation : str, images_number : int, gain : float = 1.0):
     """
     Extract the background from a set of images excluding moving objects.
     Background is computed as the median pixel-wise of the images.
@@ -232,41 +280,61 @@ def build_background(fileLocation : str, images_number : int):
     background = background.round().astype(np.uint8)
     background = np.squeeze(background)
     
-    background = process_img(background, blur=DEFAULT_BLUR, gain=1.5)
+    background = process_img(background, blur=DEFAULT_BLUR, gain=gain)
 
     draw_image(background, "background from color "+DEFAULT_COLOR)
     
     return background
    
-def get_img_at_time(fileLocation : str, image_time : float):
-    paths=glob.glob(fileLocation +  '/*.jpeg')
-    paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+# def get_img_at_time(fileLocation : str, image_time : float):
+#     paths=glob.glob(fileLocation +  '/*.jpeg')
+#     paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
 
-    for filename in paths:
-        if get_time_from_title(filename) == image_time:
-            img = cv2.imread(filename)
-            
-    return img
+#     for filename in paths:
+#         if get_time_from_title(filename) == image_time:
+#             img = cv2.imread(filename)
+#             return img
+
+# def get_pattern_at_time(experiment, time:float):
+#     pattern = None
     
-def get_time_from_title(filename: str):
-    """
-    Extract time from a string.
+#     if os.path.isdir(os.path.join(experiment.path, 'patterns_cam')):
+#         files = glob.glob(os.path.join(experiment.path, 'patterns_cam') +  '/*.jpeg')
+#         files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+#         file = [f for f in files if get_time_from_title(f) <= time][-1]
+#         pattern=cv2.imread(file)
+#     elif os.path.isdir(os.path.join(experiment.path, 'patterns')):
+#         files = glob.glob(os.path.join(experiment.path, 'patterns') +  '/*.jpeg')
+#         files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
+#         file = [f for f in files if get_time_from_title(f) <= time][-1]
+#         pattern=cv2.imread(file)
+#     else:
+#         with experiment.get_data('data.npz') as data:
+#              patterns = data['patterns']
+#              pattern = patterns[int(time*2)]
+             
+#     return pattern
+    
+# def get_time_from_title(filename: str):
+#     """
+#     Extract time from a string.
 
-    Parameters
-    ----------
-    filename : str
-        String to extract the time from.
+#     Parameters
+#     ----------
+#     filename : str
+#         String to extract the time from.
 
-    Returns
-    -------
-    time : float
-        Time sxtracted from the string.
+#     Returns
+#     -------
+#     time : float
+#         Time sxtracted from the string.
 
-    """
-    file_name = filename.split("fig_")[-1]
-    file_name = file_name.split(".jpeg")[0]
-    time = float(file_name)
-    return time
+#     """
+#     file_name = filename.split("fig_")[-1]
+#     file_name = filename.split("pattern_")[-1]
+#     file_name = file_name.split(".jpeg")[0]
+#     time = float(file_name)
+#     return time
 
 def get_contours(img : np.array, bright_thresh : List, area_r : List, compactness_r : List, background_model=None, expected_obj_number : int =0, plot : bool = False): 
     """

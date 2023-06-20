@@ -476,7 +476,7 @@ def start_experiment(rec_video=True):
     pattern_cam = cv2.resize(pattern_cam, (camera_dim[1]//scale, camera_dim[0]//scale))
 
     current_experiment.reset_starting_time()
-    if rec_video: rec('video')
+    if rec_video: rec(current_experiment.name)
     print('Experiment running...\n')
     
     # preallocate vars
@@ -549,9 +549,10 @@ def terminate_experiment():
     
     stop_rec()
     print('Saving data...\n')
-    #current_experiment.save_data(title="data", activation_times=activation_times, images=images, patterns=patterns)
     current_experiment.save_data(title="data",
                                  activation_times=activation_times,
+                                 totalT = totalT,
+                                 deltaT = deltaT,
                                  commands = commands,
                                  camera2projector=camera2projector,
                                  scale=scale,
