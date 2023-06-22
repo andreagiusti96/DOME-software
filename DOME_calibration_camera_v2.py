@@ -299,6 +299,38 @@ def get_bright_lines(intensities : list):
 #                 break
     return bright_lines
 
+def validate_calibration(camera2projector : [np.ndarray, str], size=40, duration=5):   
+    if isinstance(camera2projector, str):
+        camera2projector = np.load(camera2projector)
+        
+    dome_pi4node.transmit({"screen": 'new'})
+    response = dome_pi4node.receive()
+    dome_pi4node.transmit({"scale": 1})
+    response = dome_pi4node.receive()
+    dome_pi4node.transmit(np.array([0,0,0], dtype=np.uint8))
+    response = dome_pi4node.receive()
+    
+    pos_cam =[]
+    pos_proj =[]
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,0)))
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,0)))
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,1920)))
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,1920)))
+    
+    for pos in pos_cam:
+        pos_proj.append(np.dot(camera2projector, pos))
+    
+    cmd = { "add0": {"label": 'a', "shape type": 'square',"pose": pos_proj[0], "colour": [0, 0, 100]},
+            "add1": {"label": 'a', "shape type": 'square',"pose": pos_proj[1], "colour": [0, 100, 100]},
+            "add2": {"label": 'a', "shape type": 'square',"pose": pos_proj[2], "colour": [100, 0, 100]},
+            "add3": {"label": 'a', "shape type": 'square',"pose": pos_proj[3], "colour": [0, 100, 0]}}
+    dome_pi4node.transmit(cmd)
+    out_msg = dome_pi4node.receive()
+    
+    time.sleep(duration)
+    return out_msg
+
+
 def start_calibration(out_file : str, sq_size = 10):
     projector_dims = (480, 854, 3)
     camera_mode = 'default'
@@ -309,7 +341,9 @@ def start_calibration(out_file : str, sq_size = 10):
     else:
         camera2projector = DOMEtran.linear_transform(scale=0.25)
     
-    out_file
+    dome_pi4node.transmit({"scale": 1})
+    response = dome_pi4node.receive()
+    
     # project three squares
     delta = 50
     off_color = [150, 150, 150]
@@ -329,7 +363,13 @@ def start_calibration(out_file : str, sq_size = 10):
             "add3": {"label": 'a', "shape type": 'square',"pose": pos[2].tolist(), "colour": off_color}}
     dome_pi4node.transmit(cmd)
     response = dome_pi4node.receive()       
-            
+    
+    print(f'Welcome to the DOME calibration set up procedure.\nAt any point in the ' \
+    f'calibration, if all requisite parameters have been specified, input "skip" ' \
+    f'to begin scanning. Alternatively, enter "next" to proceed to the next step, ' \
+    f'"back" to return to the previous step, "restart" to begin the calibration ' \
+    'from the start, or "exit" to end the program.')
+        
     threshold_picture = None
     loaded_file = None
     saved_file = None
@@ -348,6 +388,7 @@ def start_calibration(out_file : str, sq_size = 10):
                       f'crucial that the camera, projector, sample stage and any lenses ' \
                       f'maintain their relative positions. Any change to the physical ' \
                       f'setup of the DOME may invalidate the calibration.\n'
+            
             user_args, step = custom_input(message, step)
             if len(user_args) == 1 and len(user_args[0]) != 0:
                 try:
@@ -373,7 +414,8 @@ def start_calibration(out_file : str, sq_size = 10):
             count+=1
             
             message = f'--- STEP 2 ---\nMove the first square to the top of the camera view.'\
-                      f' To move the square input positive or negative values.\n'
+                      f' To move the square input positive or negative values. \n'\
+                      f' Enter next when you are done. Enter back to go to the previous step.'
             user_args, step = custom_input(message, step)
             if len(user_args) == 1 and len(user_args[0]) != 0:
                 try:
@@ -557,7 +599,7 @@ def start_calibration(out_file : str, sq_size = 10):
 if __name__ == '__main__':
     out_folder = '/home/pi/Documents/config'
     name = 'camera2projector_x9'
-    sq_size = 50
+    sq_size = 40
     
     date = datetime.today().strftime('%Y_%m_%d')
     name_date = name + '_' + date + '.npy'
@@ -571,12 +613,6 @@ if __name__ == '__main__':
           'screen to appear (this may take several seconds). Once a black screen is ' \
           'shown, click anywhere on the black screen, then press any key (such as ALT).')
     dome_pi4node.accept_connection()
-    
-    print(f'Welcome to the DOME calibration set up procedure.\nAt any point in the ' \
-          f'calibration, if all requisite parameters have been specified, input "skip" ' \
-          f'to begin scanning. Alternatively, enter "next" to proceed to the next step, ' \
-          f'"back" to return to the previous step, "restart" to begin the calibration ' \
-          'from the start, or "exit" to end the program.')
 
     # start live video from the camera
     dome_camera.camera.start_preview()
@@ -584,6 +620,7 @@ if __name__ == '__main__':
     dome_camera.camera.preview.window=(1000, 40, 854, 480)
     
     print('Use start_calibration(out_file, sq_size) to start the calibration.\n'\
-          'If out_file already exists it will be loaded and modified.')    
+          'If out_file already exists it will be loaded and modified.\n'\
+          'Use validate_calibration(calibration_file) to test an existing calibration.')    
     
     

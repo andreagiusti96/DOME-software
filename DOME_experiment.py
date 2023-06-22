@@ -384,35 +384,6 @@ def get_index_for_time(time : float):
     index=int(time/deltaT)
     return index
 
-def validate_calibration(camera2projector : np.ndarray, size=50, duration=5):
-    # get prevous pattern scale and set to 1
-    old_scale = int(update_projector({'get':{'param':'scale'}}))
-    
-    update_projector({"screen": 'new'})
-    update_projector({"scale": 1}, prevent_log=True)
-    update_projector(black)
-    
-    pos_cam =[]
-    pos_proj =[]
-    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,0)))
-    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,0)))
-    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,1920)))
-    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,1920)))
-    
-    for pos in pos_cam:
-        pos_proj.append(np.dot(camera2projector, pos))
-    
-    cmd = { "add0": {"label": 'a', "shape type": 'square',"pose": pos_proj[0], "colour": [0, 0, 100]},
-            "add1": {"label": 'a', "shape type": 'square',"pose": pos_proj[1], "colour": [0, 100, 100]},
-            "add2": {"label": 'a', "shape type": 'square',"pose": pos_proj[2], "colour": [100, 0, 100]},
-            "add3": {"label": 'a', "shape type": 'square',"pose": pos_proj[3], "colour": [0, 100, 0]}}
-    out_msg = update_projector(cmd)
-    
-    # reset previous pattern scale
-    time.sleep(duration)
-    update_pattern({"scale": old_scale}, prevent_log=True)
-    return out_msg
-
 def save_parameters(parameters_file : str):
     parameters = {'totalT': totalT, 'max_time_index': max_time_index,
                   'commands': commands, 'off_light': off_light, 'on_light': on_light}
@@ -439,6 +410,39 @@ def load_parameters(parameters_file : str):
     print(f'off_light = {off_light}')
     print(f'on_light = {on_light}')
     print(f'commands = {commands}')
+    
+def validate_calibration(camera2projector : [np.ndarray, str], size=40, duration=5):   
+    if isinstance(camera2projector, str):
+        camera2projector = np.load(camera2projector)
+    
+    old_scale = update_projector({'get':{'param':'scale'}})
+        
+    update_projector({"screen": 'new'})
+    update_projector({"scale": 1})
+    update_projector(np.array([0,0,0], dtype=np.uint8))
+    
+    pos_cam =[]
+    pos_proj =[]
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,0)))
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,0)))
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(0,1920)))
+    pos_cam.append( DOMEtran.linear_transform(scale=size, shift=(1080,1920)))
+    
+    for pos in pos_cam:
+        pos_proj.append(np.dot(camera2projector, pos))
+    
+    cmd = { "add0": {"label": 'a', "shape type": 'square',"pose": pos_proj[0], "colour": [0, 0, 100]},
+            "add1": {"label": 'a', "shape type": 'square',"pose": pos_proj[1], "colour": [0, 100, 100]},
+            "add2": {"label": 'a', "shape type": 'square',"pose": pos_proj[2], "colour": [100, 0, 100]},
+            "add3": {"label": 'a', "shape type": 'square',"pose": pos_proj[3], "colour": [0, 100, 0]}}
+    out_msg=update_projector(cmd)
+    
+    time.sleep(duration)
+
+    # reset previous pattern scale
+    update_projector({"scale": old_scale})
+    
+    return out_msg
 
 def busy_wait(dt):
     dt = max(0,dt)
@@ -544,6 +548,8 @@ def start_experiment(rec_video=True):
 
 def terminate_experiment():
     global current_experiment
+    global dome_camera
+    
     gc.enable()
     print(f'Experiment {current_experiment.name} stopped.\n')
     
@@ -558,6 +564,8 @@ def terminate_experiment():
                                  scale=scale,
                                  off_light=off_light,
                                  on_light=on_light)
+    
+    dome_camera.save_dir = os.path.join(output_directory,'default')
     current_experiment=None
 
 def disconnect():
@@ -583,13 +591,14 @@ if __name__ == '__main__':
     # details of the experiment
     date='today'    # date of the experiment. Use format YYYY_MM_DD
     species='PBursaria'     # species used in the experiment
-    culture='05/06/23'     # culture used in the experiment
-    sample='100uL, 11mm disk'      # details about the sample (volume, frame, etc)
-    temp='23.7' # temperature of the sample
+    culture='08/06/23'     # culture used in the experiment
+    sample='20uL, no frame'      # details about the sample (volume, frame, etc)
+    temp='23.9' # temperature of the sample
     
     output_directory      = '/home/pi/Documents/experiments'
     parameters_file       = '/home/pi/Documents/config/parameters_test.json'
-    camera2projector_file = '/home/pi/Documents/config/camera2projector_x90_2023_06_13.npy'
+    #camera2projector_file = '/home/pi/Documents/config/camera2projector_x90_2023_06_13.npy'
+    camera2projector_file = '/home/pi/Documents/config/camera2projector_x9_2023_06_22.npy'
     
     deltaT= 0.5 # sampling time [s]
     totalT= 60*3  # experiment duration [s]
@@ -638,12 +647,12 @@ if __name__ == '__main__':
     # always off
     commands = []
 
-    # off-on-off
-    # load_parameters('/home/pi/Documents/config/parameters_OFF_ON_OFF_75.json')
-    on_light  = (off_light + blue*0.6).astype(np.uint8)
-    commands = [{"t":totalT//3, "cmd": on_light},
-                {"t":totalT//3*2, "cmd": off_light}
-                ]
+#     # off-on-off
+#     # load_parameters('/home/pi/Documents/config/parameters_OFF_ON_OFF_75.json')
+#     on_light  = (off_light + blue*0.6).astype(np.uint8)
+#     commands = [{"t":totalT//3, "cmd": on_light},
+#                 {"t":totalT//3*2, "cmd": off_light}
+#                 ]
 
 #     # increasing ramp
 #     # load_parameters('/home/pi/Documents/config/parameters_ramp.json')
