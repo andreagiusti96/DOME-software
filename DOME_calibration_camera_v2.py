@@ -375,7 +375,7 @@ def start_calibration(out_file : str, sq_size = 10):
     saved_file = None
     step = 1
     count = 1
-    while 1 <= step <= 9:
+    while 1 <= step <= 10:
 
         # STEP 1: adjust the focus
         while step == 1:
@@ -415,7 +415,7 @@ def start_calibration(out_file : str, sq_size = 10):
             
             message = f'--- STEP 2 ---\nMove the first square to the top of the camera view.'\
                       f' To move the square input positive or negative values. \n'\
-                      f' Enter next when you are done. Enter back to go to the previous step.'
+                      f' Enter next when you are done. Enter back to go to the previous step.\n'
             user_args, step = custom_input(message, step)
             if len(user_args) == 1 and len(user_args[0]) != 0:
                 try:
@@ -559,7 +559,7 @@ def start_calibration(out_file : str, sq_size = 10):
             #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
             pos[s][1,2]+=increment
       
-        # STEP 8: perform calibration and save the transformation matrix in 'camera2projector.npy'
+        # STEP 8: perform calibration
         if step == 8:
             camera_points = np.float32([[0,0], [0,1920], [1080,0]])
             projector_points = np.float32([[0,0]]*3)
@@ -569,28 +569,30 @@ def start_calibration(out_file : str, sq_size = 10):
             camera2projector = cv2.getAffineTransform(camera_points,
                                                       projector_points)
             camera2projector = np.concatenate((camera2projector, np.array([[0, 0, 1]])), 0)
-            print(camera2projector)
-            #mapping_filename = 'camera2projector.npy'
-            np.save(out_file, camera2projector)
-            print(f'Calibration complete.\n--- Affine transform saved to {out_file}')
-            dome_pi4node.transmit('all' + 3 * ' 0')
-            response = dome_pi4node.receive()
+            print('camera2projector='); print(camera2projector)
             step += 1
             
         # STEP 9: validation
         if step == 9:
             print('The camera frame should now be exactly filled by a green frame.')
-            user_args, step = custom_input('Input \'next\' to finish.\n', step)
-            camera2projector = np.load(out_file)
             green_cam = DOMEtran.linear_transform(scale=(1080,1920), shift=(1080/2,1920/2))
-            black_cam = DOMEtran.linear_transform(scale=(1080-sq_size//2,1920-sq_size//2), shift=(1080/2,1920/2))
+            black_cam = DOMEtran.linear_transform(scale=(1080-sq_size,1920-sq_size), shift=(1080/2,1920/2))
             green_proj = np.dot(camera2projector, green_cam)
             black_proj = np.dot(camera2projector, black_cam)
             cmd = {"screen": 'new',
-                   "add1": {"label": 'a', "shape type": 'square',"pose": green_proj.tolist(), "colour": [50, 50, 50]},
+                   "add1": {"label": 'a', "shape type": 'square',"pose": green_proj.tolist(), "colour": on_color},
                    "add2": {"label": 'a', "shape type": 'square',"pose": black_proj.tolist(), "colour": [0, 0, 0]}}
             dome_pi4node.transmit(cmd)
             response = dome_pi4node.receive()
+            user_args, step = custom_input('Input \'next\' to finish and save the calibration or \'back\' to adjust it.\n', step)
+         
+        # STEP 10: save the transformation matrix in 'camera2projector.npy'
+        if step == 10:
+            np.save(out_file, camera2projector)
+            print(f'Calibration complete.\n--- Affine transform saved to {out_file}')
+            dome_pi4node.transmit('all' + 3 * ' 0')
+            response = dome_pi4node.receive()
+            step += 1
             
     dome_pi4node.transmit('all' + 3 * ' 0')
     response = dome_pi4node.receive()
@@ -598,12 +600,12 @@ def start_calibration(out_file : str, sq_size = 10):
 
 if __name__ == '__main__':
     out_folder = '/home/pi/Documents/config'
-    name = 'camera2projector_x9'
+    name = 'camera2projector_x90'
     sq_size = 40
     
     date = datetime.today().strftime('%Y_%m_%d')
     name_date = name + '_' + date + '.npy'
-    out_file = os.path.join(out_folder,name_date)
+    calibration_file = os.path.join(out_folder,name_date)
     
     dome_pi4node = DOMEcomm.NetworkNode()
     dome_camera = DOMEutil.CameraManager()
@@ -619,8 +621,8 @@ if __name__ == '__main__':
     dome_camera.camera.preview.fullscreen=False
     dome_camera.camera.preview.window=(1000, 40, 854, 480)
     
-    print('Use start_calibration(out_file, sq_size) to start the calibration.\n'\
+    print('Use start_calibration(calibration_file, sq_size) to start the calibration.\n'\
           'If out_file already exists it will be loaded and modified.\n'\
-          'Use validate_calibration(calibration_file) to test an existing calibration.')    
+          'Use validate_calibration(calibration_file, sq_size) to test an existing calibration.')    
     
     
