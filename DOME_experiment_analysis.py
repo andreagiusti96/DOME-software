@@ -353,7 +353,7 @@ deltaT = current_experiment.get_deltaT()
 with current_experiment.get_data('data.npz') as data:
     activation_times = data['activation_times']
 
-patterns = [DOMEgraphics.get_pattern_at_time(current_experiment, t) for t in np.arange(totalT, deltaT)]
+patterns = [current_experiment.get_pattern_at_time(t) for t in np.arange(totalT, deltaT)]
 
 # load tracking data
 tracking_data_path = os.path.join(experiments_directory, experiment_name, output_folder, 'analysis_data.npz')
