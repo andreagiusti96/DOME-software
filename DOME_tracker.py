@@ -210,10 +210,12 @@ def test_detection_parameters(fileLocation, bright_thresh, area_r : List, compac
         files = glob.glob(fileLocation +  '/*.jpeg')
         files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
         filename = random.choice(files)
-    else:
+    elif os.path.isfile(fileLocation):
         filename = fileLocation
         fileLocation = os.path.dirname(fileLocation)
-    
+    else:
+        raise(Exception(f'Not a file or a directory: {fileLocation}'))
+        
     img = cv2.imread(filename)
 
     background = build_background(fileLocation, 25)
@@ -496,10 +498,7 @@ def valid_positions(positions : np.array):
     assert len(validity) == positions.shape[0]
     return validity
 
-def extract_data_from_images(fileLocation, bright_thresh : List, area_r : List, compactness_r : List, output_folder : str):
-    
-    print("Building the background model...")
-    background = build_background(fileLocation, 25)
+def extract_data_from_images(fileLocation, background : np.ndarray, bright_thresh : List, area_r : List, compactness_r : List, output_folder : str):
 
     files = glob.glob(fileLocation +  '/*.jpeg')
     files = sorted(files, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
@@ -629,8 +628,12 @@ if __name__ == '__main__':
     except OSError:
         pass
     
+    # Build background model
+    print("Building the background model...")
+    background = build_background(images_folder, 25)
+    
     # extract data
-    positions, inactivity = extract_data_from_images(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE, output_dir)
+    positions, inactivity = extract_data_from_images(images_folder, background, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE, output_dir)
     
     # make video from images
     DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2)
