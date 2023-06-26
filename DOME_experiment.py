@@ -590,14 +590,15 @@ if __name__ == '__main__':
     
     # details of the experiment
     date='today'    # date of the experiment. Use format YYYY_MM_DD
-    species='Euglena'     # species used in the experiment
-    culture='05/06/23'     # culture used in the experiment
-    sample='15uL, no frame'      # details about the sample (volume, frame, etc)
-    temp='23.7' # temperature of the sample
+    species='PBursaria'     # species used in the experiment
+    culture='13/06/23'     # culture used in the experiment
+    sample='20uL, no frame'      # details about the sample (volume, frame, etc)
+    temp='23.9' # temperature of the sample
     
     output_directory      = '/home/pi/Documents/experiments'
-    parameters_file       = '/home/pi/Documents/config/parameters_test.json'
-    camera2projector_file = '/home/pi/Documents/config/camera2projector_x90_2023_06_23.npy'
+    #parameters_file       = '/home/pi/Documents/config/parameters_test.json'
+    #camera2projector_file = '/home/pi/Documents/config/camera2projector_x90_2023_06_26.npy'
+    camera2projector_file = '/home/pi/Documents/config/camera2projector_x36_2023_06_26.npy'
     #camera2projector_file = '/home/pi/Documents/config/camera2projector_x9_2023_06_22.npy'
     
     deltaT= 0.5 # sampling time [s]
@@ -606,15 +607,6 @@ if __name__ == '__main__':
     scale = 5   # scaling factor for projected pattern, larger=lower resolution
     if species in ['Euglena','euglena']:
         scale = 2
-    
-    print(f'species =\t{species}')
-    print(f'culture =\t{culture}')
-    print(f'sample =\t{sample}')
-    print(f'temperature =\t{temp}')
-    print(f'camera2projector =\t{camera2projector_file}')
-    print(f'deltaT =\t{deltaT}')
-    print(f'totalT =\t{totalT}')
-    print(f'scale =\t{scale}\n')
     
     white = np.array([255, 255, 255]).astype(np.uint8)
     black = np.array([  0,   0,   0]).astype(np.uint8)
@@ -625,7 +617,7 @@ if __name__ == '__main__':
     off_light = (red*0.05).astype(np.uint8)
     on_light  = (off_light + blue*1).astype(np.uint8)
     
-    camera_bright_base=40
+    camera_bright_base=50
     camera_bright_reduction=0
     jpeg_quality = 90
     
@@ -783,6 +775,14 @@ if __name__ == '__main__':
     signal.signal(signal.SIGSEGV, terminate_session)
     
     # start session
+    print(f'species =\t{species}')
+    print(f'culture =\t{culture}')
+    print(f'sample =\t{sample}')
+    print(f'temperature =\t{temp}')
+    print(f'camera2projector ={camera2projector_file}')
+    print(f'deltaT =\t{deltaT}')
+    print(f'totalT =\t{totalT}')
+    print(f'scale =\t\t{scale}\n')
     print('Now adjust focus and camera parameters, test the calibration with validate_calibration(camera2projector) and then use start_experiment() to run the experiment.\n')
     
     

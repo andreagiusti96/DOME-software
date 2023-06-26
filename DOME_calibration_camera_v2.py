@@ -600,7 +600,7 @@ def start_calibration(out_file : str, sq_size = 10):
 
 if __name__ == '__main__':
     out_folder = '/home/pi/Documents/config'
-    name = 'camera2projector_x90'
+    name = 'camera2projector_x36'
     sq_size = 40
     
     date = datetime.today().strftime('%Y_%m_%d')
