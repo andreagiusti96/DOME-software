@@ -409,7 +409,7 @@ def load_parameters(parameters_file : str):
     print(f'max_time_index = {max_time_index}')
     print(f'off_light = {off_light}')
     print(f'on_light = {on_light}')
-    print(f'commands = {commands}')
+    print(f'commands = {commands[0:min(2,len(commands))]},...,{commands[-1]}]')
     
 def validate_calibration(camera2projector : [np.ndarray, str], size=40, duration=5):   
     if isinstance(camera2projector, str):
@@ -590,10 +590,10 @@ if __name__ == '__main__':
     
     # details of the experiment
     date='today'    # date of the experiment. Use format YYYY_MM_DD
-    species='PBursaria'     # species used in the experiment
-    culture='13/06/23'     # culture used in the experiment
+    species='Euglena'     # species used in the experiment
+    culture='05/06/23'    # culture used in the experiment
     sample='20uL, no frame'      # details about the sample (volume, frame, etc)
-    temp='23.9' # temperature of the sample
+    temp='22.6' # temperature of the sample
     
     output_directory      = '/home/pi/Documents/experiments'
     #parameters_file       = '/home/pi/Documents/config/parameters_test.json'
@@ -683,50 +683,50 @@ if __name__ == '__main__':
 #     commands = [{"t":10, "cmd": {"gradient": {'points': points,
 #                                 'values': [off_light, on_light]}}}]
 
-#     # lateral gradient
-#     margin = camera_scale[1]*0.05
-#     points = np.array([camera_frame[1,0]+margin, camera_frame[1,1]-margin]).squeeze()
-#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
-#                                 'values': [off_light, on_light]}}}]
+    # lateral gradient
+    margin = camera_scale[1]*0.05
+    points = np.array([camera_frame[1,0]+margin, camera_frame[1,1]-margin]).squeeze()
+    commands = [{"t":10, "cmd": {"gradient": {'points': points,
+                                'values': [off_light, on_light]}}}]
 
-#     # centered gradient
-#     margin = camera_scale[1]*0.05
-#     points = np.array([camera_frame[1,0]+margin,
-#                        camera_center[1]-margin,
-#                        camera_center[1]+margin,
-#                        camera_frame[1,1]-margin]).squeeze()
-#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
-#                               'values': [off_light, on_light, on_light, off_light]}}}]
+    # centered gradient
+    margin = camera_scale[1]*0.05
+    points = np.array([camera_frame[1,0]+margin,
+                       camera_center[1]-margin,
+                       camera_center[1]+margin,
+                       camera_frame[1,1]-margin]).squeeze()
+    commands = [{"t":10, "cmd": {"gradient": {'points': points,
+                              'values': [off_light, on_light, on_light, off_light]}}}]
 
-#     # centered dark gradient
-#     margin = camera_scale[1]*0.05
-#     points = np.array([camera_frame[1,0]+margin,
-#                        camera_center[1]-margin,
-#                        camera_center[1]+margin,
-#                        camera_frame[1,1]-margin]).squeeze()
-#     commands = [{"t":10, "cmd": {"gradient": {'points': points,
-#                               'values': [on_light, off_light, off_light, on_light]}}}]
+    # centered dark gradient
+    margin = camera_scale[1]*0.05
+    points = np.array([camera_frame[1,0]+margin,
+                       camera_center[1]-margin,
+                       camera_center[1]+margin,
+                       camera_frame[1,1]-margin]).squeeze()
+    commands = [{"t":10, "cmd": {"gradient": {'points': points,
+                              'values': [on_light, off_light, off_light, on_light]}}}]
 
-#     # circle
-#     circ2_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
-#     circ1_pose = circ2_pose @ DOMEtran.linear_transform(scale=1.5)
-#     half_ligth = np.mean([on_light,off_light],0)
-#     commands = [{"t":10, "cmd": {"add1": {"label": 'test', "shape type": 'circle',
-#                                         "pose": circ1_pose, "colour": half_ligth},
-#                                  "add2": {"label": 'test', "shape type": 'circle',
-#                                         "pose": circ2_pose, "colour": on_light}}}
-#                 ]
+    # circle
+    circ2_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
+    circ1_pose = circ2_pose @ DOMEtran.linear_transform(scale=1.5)
+    half_ligth = np.mean([on_light,off_light],0)
+    commands = [{"t":10, "cmd": {"add1": {"label": 'test', "shape type": 'circle',
+                                        "pose": circ1_pose, "colour": half_ligth},
+                                 "add2": {"label": 'test', "shape type": 'circle',
+                                        "pose": circ2_pose, "colour": on_light}}}
+                ]
 
-#     # dark circle
-#     circ2_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
-#     circ1_pose = circ2_pose @ DOMEtran.linear_transform(scale=1.5)
-#     half_ligth = np.mean([on_light,off_light],0)
-#     commands = [{"t":9.5, "cmd": {"add1": {"label": 'test', "shape type": 'circle',
-#                                         "pose": circ1_pose, "colour": half_ligth},
-#                                  "add2": {"label": 'test', "shape type": 'circle',
-#                                         "pose": circ2_pose, "colour": off_light}}},
-#                 {"t":10, "cmd": on_light}
-#                 ]
+    # dark circle
+    circ2_pose = DOMEtran.linear_transform(scale=np.min(camera_scale)/4, shift=camera_center)
+    circ1_pose = circ2_pose @ DOMEtran.linear_transform(scale=1.5)
+    half_ligth = np.mean([on_light,off_light],0)
+    commands = [{"t":9.5, "cmd": {"add1": {"label": 'test', "shape type": 'circle',
+                                        "pose": circ1_pose, "colour": half_ligth},
+                                 "add2": {"label": 'test', "shape type": 'circle',
+                                        "pose": circ2_pose, "colour": off_light}}},
+                {"t":10, "cmd": on_light}
+                ]
 
 #     # test features
 #     camera_pose = DOMEtran.linear_transform(scale=camera_scale, shift=camera_center)
