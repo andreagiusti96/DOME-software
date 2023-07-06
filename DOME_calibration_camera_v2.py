@@ -331,7 +331,7 @@ def validate_calibration(camera2projector : [np.ndarray, str], size=40, duration
     return out_msg
 
 
-def start_calibration(out_file : str, sq_size = 10):
+def start_calibration(out_file : str, sq_size = 40):
     projector_dims = (480, 854, 3)
     camera_mode = 'default'
     response = None
