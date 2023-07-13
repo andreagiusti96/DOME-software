@@ -1,3 +1,15 @@
+# DOME_projection_interface.py
+# #################################################################################################
+# This code is intended to run on the projector Pi ZERO.
+# This code interprets the commands and update the projected pattern.
+# #################################################################################################
+# Authors = Matthew Uppington <mu15531@bristol.ac.uk>
+#           Andrea Giusti <andrea.giusti@unina.it>
+# Affiliation = Farscope CDT, University of Bristol, University of West England
+#               Universityof Naples Federico II
+# #################################################################################################
+# This work is licensed under a Creative Commons Attribution 4.0 International License.
+
 import DOME_communication as DOMEcomm
 import DOME_transformation as DOMEtran
 
@@ -8,8 +20,21 @@ import sys
 from datetime import datetime
 
 class ScreenManager():
+    '''
+    Class for managing patterns to be projected.
+    '''
     
-    def __init__(self, output_dims, scale=1):
+    def __init__(self, output_dims:tuple, scale:int=1):
+        '''
+        Instantiate a ScreenManager object.
+        ---
+        Parameters:
+            output_dims:tuple
+                Dimensions of the projected pattern
+            scale:int=1
+                Scaling factor to reduce in internal resolution.
+                Larger values reduce pattern resolution and increase execution speed.
+        '''
         self.output_dims = output_dims
         self.scale = scale
         self.pattern_dims = (output_dims[0]//scale, output_dims[1]//scale, 3)
@@ -20,7 +45,16 @@ class ScreenManager():
         self.store_image(np.zeros(self.pattern_dims))
         self.switch_to_screen('default')
     
-    def set_scale(self, scale):
+    def set_scale(self, scale:int):
+        '''
+        Set the scale.
+        ---
+        Parameters:
+            scale:int
+                Scaling factor to reduce in internal resolution.
+                Larger values reduce pattern resolution and increase execution speed.
+                Default value is 1.
+        '''
         old_scale = self.scale
         self.scale = scale
         self.pattern_dims = (self.output_dims[0]//scale, self.output_dims[1]//scale, 3)
@@ -90,11 +124,52 @@ class ScreenManager():
                                            labels)
         return display
 
-    def make_pattern_from_cmd(self, message):
+    def make_pattern_from_cmd(self, message:[list, np.ndarray, str, dict]):
+        '''
+        Interpret command and generate a pattern.
+        ---
+        Parameters:
+            message
+                Command to generate the pattern.
+                If it is a uint8 list or array with 3 elements it is interpreded as a color and a uniform pattern is prjected.
+                If it is a uint8 array with NxMx3 elements it is interpreded as an image, it is scaled to the projector dimensions.
+                If it is a str it is interpreded, valid str are:
+                    message = 'exit'
+                    message = 'dimensions'
+                    message = 'all RR GG BB' where RR GG BB are uint8 values coding a color
+                    message = 'row ROW1 ROW2' where ROW1 ROW2 are initial and final indices of rows to be turn on
+                    message = 'column COL1 COL2' where COL1 COL2 are initial and final indices of columns to be turn on
+                    
+                If it is a dictionary it is interpreded, valid dictionaries structures are:
+                    message = {"get": {'param': name_of_the_attribute}}
+                    message = {"set": {'param': name_of_the_attribute , 'value': new_value}}
+                    message = {"scale": new_value}
+                    message = {"gradient": {'points': [x1, x2], 'values': [light1, light2]}}                        
+                    message = {"screen": screen_name}
+                    message = {"image": image_index}
+                    message = {"add": {"label": 'a', "shape type": 'square',
+                                       "pose": [[20, 0, 300], [0, 100, 500],[0, 0, 1]],
+                                       "colour": [0, 255, 0]}}
+                    message = {'transform': {'matrix': [[1,0,0],[0,1,0],[0,0,1]], 'labels': ['a']}}
+                    message = {'colour': {'colour': [255], 'label': 'a','indices': [0]}}
+                    message = {"shown": list_of_labels_to_show}
+                
+                Multiple commands can be combained in the same dictionary, e.g.:
+                    message ={'screen': 'default',
+                              'add': {'label': 'spotlight', 'shape': 'circle', 'pose': [[1,0,0],[0,1,0],[0,0,1]], 'colour':[255]},
+                              'add2': {'label': 'spotlight', 'shape': 'circle', 'pose': [[1,0,0],[0,1,0],[0,0,1]], 'colour':[255]}}
+        ---
+        Outputs:
+            pattern: ndarray
+                Resulting pattern to be projected. pattern.shape=output_dims.
+            out_msg: str
+                Output message.
+        '''
+        
         out_msg = 'Done'
         pattern = None
         
-        # if the message is an array scale it to the right size
+        # if the message is an array or a list scale it to the right size
         # and use it as the pattern
         if isinstance(message, (np.ndarray, list)):
             image = np.array(message, np.uint8)
@@ -227,20 +302,30 @@ class ScreenManager():
         elif isinstance(message, str):
             pattern = np.zeros(self.pattern_dims)
             segments = message.split(' ')
+            
+            # message = 'exit'
             if message == 'exit':
                 cv2.destroyAllWindows()
                 out_msg='exit'
                 time.sleep(1)
                 projecting = False
                 sys.exit()
+            
+            # message = 'dimensions'
             elif segments[0] == 'dimensions':
                 out_msg = self.output_dims
+                
+            # message = 'all RR GG BB' where RR GG BB are uint8 values coding a color
             elif segments[0] == 'all':
                 for c in range(0, 3):
                     pattern[:, :, c] = int(segments[c + 1])
+            
+            # message = 'row ROW1 ROW2' where ROW1 ROW2 are initial and final indices of rows to turn on
             elif segments[0] == 'row':
                 pattern[int(segments[1]):int(segments[2]),
                         :, :] = 255
+            
+            # message = 'column COL1 COL2' where COL1 COL2 are initial and final indices of columns to turn on
             elif segments[0] == 'column':
                 pattern[:, int(segments[1]):int(segments[2]),
                         :] = 255
@@ -257,6 +342,9 @@ class ScreenManager():
         return pattern, out_msg
 
 def main(output_dims, refresh_delay, scale=1):
+    '''
+    Instantiate the screen manager and start the communication with the camera Pi 4.
+    '''
     screen_manager = ScreenManager(output_dims, scale)
     pattern = screen_manager.get_pattern_for_screen()
     cv2.namedWindow('Pattern', cv2.WND_PROP_FULLSCREEN)
@@ -277,10 +365,6 @@ def main(output_dims, refresh_delay, scale=1):
             
             if out_msg == 'Done':                
                 # update projected pattern
-                #ratio = (output_dims[0]/pattern.shape[0], output_dims[1]/pattern.shape[1])
-                #pattern2output = DOMEtran.linear_transform(scale=ratio)
-                #pattern2camera = np.dot(pattern2output,screen_manager.default_transformation)
-                #out_pattern = DOMEtran.transform_image(pattern, screen_manager.default_transformation, output_dims)
                 cv2.imshow('Pattern', pattern)
                 cv2.waitKey(refresh_delay)
             

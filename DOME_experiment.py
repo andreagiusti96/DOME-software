@@ -147,7 +147,7 @@ def update_projector(command, prevent_log=False):
             Command to send to the projector.
             If it is a uint8 list with 3 elements it is interpreded as a color and a uniform pattern is prjected.
             If it is a uint8 array with NxMx3 elements it is interpreded as an image, it is scaled to the projector dimensions.
-            If it is a dictionary it is interpreded by the screen manager. See DOME_projection_interface.py for more info.
+            If it is a dictionary ora a str it is interpreded by the screen manager. See DOME_projection_interface.py for more info.
         prevent_log:bool=False
             If False the a log entry is added to experiment_log.txt file.
     ---
@@ -157,12 +157,6 @@ def update_projector(command, prevent_log=False):
         msg_out : str
             Response from the projector module.
     '''
-#     if command is None: 
-#         light = np.rint( bright * color )
-#         dome_pi4node.transmit(f'all' + f' {int(light[0])} {int(light[1])} {int(light[2])}')
-#         if current_experiment and not prevent_log:
-#             current_experiment.add_log_entry(f'light={light}')
-#     else:
     if isinstance(command, np.ndarray):
         command.astype(np.uint8)
     
@@ -481,7 +475,7 @@ def validate_calibration(camera2projector : [np.ndarray, str], size=40, duration
     ---
     Parameters:
         camera2projector : [np.ndarray, str]
-            Affine transformation matrix or path to a .npy file containing the affine transformation matrix.
+            3x3 affine transformation matrix or path to a .npy file containing the affine transformation matrix.
         size=40
             Size of the sqaures to be projected.
         duration=5

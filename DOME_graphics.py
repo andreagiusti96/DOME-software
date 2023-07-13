@@ -1,17 +1,11 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-This code reads in figures from a folder and for each frame, performs basic image analysis to try and detect agents using contour detection. 
-The "agents" detected are then run though an agent matching algorithm to try and figure out if they correspond with an agent in a previous frame
-Displacement is then calculated by comaparing the position of the agent in the new frame to the previous frame.
-Time between frames is also calcuated by reading the filename, which is timestamped.
-A csv file is output with a list of agents with unique agent numbers, and for each frame where they are detected a data point is stored with (displacement, time, frame)
-
-Created by Andrea
-
-@author: andrea
-"""
-
+# DOME_graphics.py
+# #################################################################################################
+# This code provides utility functions for plots and videos.
+# #################################################################################################
+# Authors = Andrea Giusti <andrea.giusti@unina.it>
+# Affiliation = University of Naples Federico II
+# #################################################################################################
+# This work is licensed under a Creative Commons Attribution 4.0 International License.
 
 import cv2
 import numpy as np

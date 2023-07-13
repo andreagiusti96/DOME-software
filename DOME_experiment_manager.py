@@ -1,8 +1,7 @@
+# DOME_experiment_manager.py
+# #################################################################################################
 # The ExperimentManager calss is provided to handle experiments and store the outputs, while
 # keeping a timestamped log.
-# The DOME (Dynamic Optical Micro Environment) was developed by Ana Rubio Denniss. This code requires
-# the "DOME_caibration_projector.py" file to be run in parallel on the Raspberry Pi 0 connected to
-# the DOME projector.
 # #################################################################################################
 # Authors = Andrea Giusti <andrea.giusti@unina.it>
 # Affiliation = University of Naples Federico II
@@ -17,13 +16,12 @@ import cv2
 
 from pathlib import Path
 from datetime import datetime
-#from datetime import date
 import numpy as np
 
 
 class ExperimentManager:
     '''
-    Class for managing DOME experiments.
+    Class for managing the data generated during DOME experiments.
     '''
     
     def __init__(self, date='', species='', culture ='', output_directory='/home/pi/Documents/experiments'):
@@ -90,6 +88,23 @@ class ExperimentManager:
             self.start_time=datetime.strptime(time, '%H:%M:%S')
     
     def save_data(self, title : str, *args, **kwds):
+        '''
+        Save data in an .npz file in the experiment folder.
+        This function can be called as:
+            current_experiment.save_data(title="data",
+                                 activation_times=activation_times,
+                                 totalT = totalT)
+        ---
+        Parameters:
+            title : str
+                Name of the npz file.
+            *args
+                Data to be saved.
+            **kwds
+                Keywords to assign to the data.
+        ---
+        See also get_data.
+        '''
         
         file_path = os.path.join(self.path, title + ".npz")
         
@@ -104,6 +119,20 @@ class ExperimentManager:
         np.savez(file_path, *args, **kwds)
         
     def get_data(self, title : str = 'data.npz'):
+        '''
+        Read data from an .npz or .npy file in the experiment folder.
+        ---
+        Parameters:
+            title : str = 'data.npz'
+                Name of the npz or npy file.
+        ---
+        Outputs:
+            data
+                Data loaded from the file.
+        ---
+        See also save_data.
+        '''
+        
         file_path = os.path.join(self.path, title)
         
         if not os.path.exists(file_path):
@@ -113,6 +142,13 @@ class ExperimentManager:
         return data
 
     def get_totalT(self):
+        '''
+        Get the total duration of the experiment in seconds.
+        ---
+        Outputs:
+            totalT
+                Total duration of the experiment in seconds.
+        '''
         try:
             with self.get_data('data.npz') as data:
                 totalT = data['totalT'] 
@@ -124,6 +160,13 @@ class ExperimentManager:
         return totalT
     
     def get_deltaT(self):
+        '''
+        Get the sampling time of the experiment in seconds.
+        ---
+        Outputs:
+            deltaT
+                Sampling time of the experiment in seconds.
+        '''
         try:
             with self.get_data('data.npz') as data:
                 deltaT = data['deltaT'] 
@@ -135,6 +178,17 @@ class ExperimentManager:
         return deltaT
     
     def get_img_at_time(self, image_time : float):
+        '''
+        Get the image captured from the camera at a given time instant.
+        ---
+        Parameters:
+            time:float
+                Time instant to get the image.
+        ---
+        Outputs:
+            img : np.ndarray
+                Image.
+        '''
         paths=glob.glob(os.path.join(self.path, 'images') +  '/*.jpeg')
         paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
         
@@ -148,6 +202,17 @@ class ExperimentManager:
         return img
 
     def get_pattern_at_time(self, time:float):
+        '''
+        Get the projected pattern at a given time instant.
+        ---
+        Parameters:
+            time:float
+                Time instant to get the pattern.
+        ---
+        Outputs:
+            pattern : np.ndarray
+                Projected pattern image.
+        '''
         pattern = None
         
         if os.path.isdir(os.path.join(self.path, 'patterns_cam')):
@@ -169,11 +234,13 @@ class ExperimentManager:
         
     def add_detail(self, message : str, include_in_exp_list : bool =False):
         '''
-        Add detail to the experiment log.
+        Add detail to the experiment log file.
         ---
         Parameters
             message : str
-                message to append
+                Message to add in the log file.
+            include_in_exp_list : bool =False
+                If True the message is also added in the experiments_list.txt file.
         '''
         
         if self.name=='default':
@@ -205,7 +272,7 @@ class ExperimentManager:
         ---
         Parameters
             message : str
-                message to append
+                Message to append
         '''
         ellapsed_time= datetime.now() - self.start_time
         file_path = os.path.join(self.path, 'experiment_log.txt')
@@ -227,13 +294,19 @@ class ExperimentManager:
             file.write('\n' + timestamp + ', ' + message)    
 
 # other functions
-def open_experiment(experiment_name : str, output_directory='/home/pi/Documents/experiments'):
+def open_experiment(experiment_name : str, output_directory:str ='/home/pi/Documents/experiments'):
     '''
     Start working in existing experiment folder.
     ---
     Parameters
         experiment_name : str
-            Name of the experiment to open
+            Name of the experiment to open.
+        output_directory:str ='/home/pi/Documents/experiments'
+            Containing directory.
+    ---
+    Outputs:
+        experiment:ExperimentManager
+            Opened experiment.
     '''
     path = os.path.join(output_directory, experiment_name)
     
@@ -250,17 +323,14 @@ def open_experiment(experiment_name : str, output_directory='/home/pi/Documents/
 def get_time_from_title(filename: str):
     """
     Extract time from a string.
-
-    Parameters
-    ----------
-    filename : str
-        String to extract the time from.
-
-    Returns
-    -------
-    time : float
-        Time sxtracted from the string.
-
+    ---
+    Parameters:
+        filename : str
+            String to extract the time from.
+    ---
+    Outputs:
+        time : float
+            Time extracted from the string.
     """
     filename = filename.split("fig_")[-1]
     filename = filename.split("pattern_")[-1]
