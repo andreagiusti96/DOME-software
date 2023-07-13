@@ -21,52 +21,6 @@ import os
 from datetime import datetime
 from datetime import date
 
-# class SettingsFileFormatError(Exception):
-#     '''
-#     Exception class for handling errors raised when calibration settings cannot be read from a
-#     file. The file should specify values for "brightness", "threshold", "region size" and
-#     "scan increment".
-#     '''
-#     
-#     def __init__(self, key : str):
-#         '''
-#         Sets up the parent class for exceptions and provides an error message.
-#         ---
-#         Parameters
-#             key : str
-#                 The settings dictionary key that is missing from the json file.
-#         '''
-#         self.error_message = f'Format of calibration settings file is not recognised.\n Setting ' \
-#                              f'key "{key}" not specified.'
-#         super().__init__(self.error_message)
-#     
-#     def print_error_message(self):
-#         '''
-#         Prints the error message without interupting execution.
-#         '''
-#         print(self.error_message)
-# 
-# 
-# def load_settings(file_name : str, keys : list):
-#     '''
-#     Reads calibration setting values from a json file.
-#     ---
-#     Parameters
-#         file_name : str
-#             Name of json file to read settings from.
-#     ---
-#     Outputs
-#         stored_settings : dict
-#             Dictionary of calibration settings.
-#     '''
-#     with open(file_name, 'r') as file:
-#         stored_settings = json.load(file)
-#     for setting in keys:
-#         # Check that the file contains all of the expected parameters.
-#         if not setting in stored_settings.keys():
-#             raise SettingsFileFormatError(setting)
-#     return stored_settings
-
 def custom_input(message : str, step : int):
     '''
     Augmented version of input command to facilitate adjustments to variable representing
@@ -102,202 +56,6 @@ def custom_input(message : str, step : int):
         new_step = step
     return user_input_segments, new_step
 
-# def overlay_grid(image : np.ndarray, spacing : int, thickness : int, colour : tuple):
-#     '''
-#     Draw a grid pattern over an image.
-#     ---
-#     Parameters
-#         image : np.ndarray
-#             Original image.
-#         spacing : int
-#             Separation between the start of grid lines in number of pixels.
-#         thickness : int
-#             Thickness of grid lines in number of pixels.
-#         colour : tuple[int, int, int]
-#             Colour of grid lines, specified in BGR order.
-#     ---
-#     Outputs
-#         image_with_grid : np.ndarray
-#             Original image with grid drawn over it.
-#     '''
-#     image_with_grid = image.copy()
-#     for c in range(0, len(colour)):
-#         for s in range(1, int(np.ceil(image.shape[0] / spacing))):
-#             image_with_grid[s * spacing:s * spacing + thickness, :, c] = colour[c]
-#         for s in range(1, int(np.ceil(image.shape[1] / spacing))):
-#             image_with_grid[:, s * spacing:s * spacing + thickness, c] = colour[c]
-#     return image_with_grid
-# 
-# def pixelate(image : np.ndarray, pixel_dims : list):
-#     '''
-#     Pixelate a gray-scale image by averaging pixel values over tiled areas.
-#     ---
-#     Parameters
-#         image : np.ndarray
-#             Grey-scale image to be pixelated.
-#         pixel_dims : list[int, int]
-#             A list of two integers containing the dimensions of tiled areas over which pixel values
-#             will be averaged.
-#     ---
-#     Outputs
-#         pixelated_image : np.ndarray
-#             A pixelated version of the input image.
-#         reduced_image : np.ndarry
-#             A version of the pixelated image with the dimensions reduced by a factor equal to the
-#             specified pixel dimensions.
-#     '''
-#     pixelated_image = np.zeros(image.shape, dtype=np.uint8)
-#     reduced_image = np.zeros((int(np.ceil(image.shape[0] / pixel_dims[0])),
-#                               int(np.ceil(image.shape[1] / pixel_dims[1]))))###################
-#     for x_block in range(0, reduced_image.shape[0]):
-#         limits_x = [x_block * pixel_dims[0],
-#                     min([(x_block + 1) * pixel_dims[0], image.shape[0]])]
-#         for y_block in range(0, reduced_image.shape[1]):
-#             limits_y = [y_block * pixel_dims[1],
-#                         min([(y_block + 1) * pixel_dims[1], image.shape[1]])]
-#             pixel = image[limits_x[0]:limits_x[1], limits_y[0]:limits_y[1]]
-#             pixel_value = int(np.sum(pixel) / (np.prod(pixel_dims)))
-#             pixelated_image[limits_x[0]:limits_x[1], limits_y[0]:limits_y[1]] = pixel_value
-#             reduced_image[x_block, y_block] = pixel_value
-#     return pixelated_image, reduced_image
-# 
-# def find_grid_corners(binary_image : np.ndarray, margin : float, pixel_dims : list):
-#     '''
-#     Find the four corner locations of a square which is centered on the middle of the largest
-#     region of high intensity in the image and is not closer than margin (percent) to the
-#     surrounding region with 0 intensity.
-#     ---
-#     Parameters
-#         binary_image : np.ndarray
-#             Image containing a region of high intensity pixels surrounded by pixels with 0
-#             intensity.
-#         margin : float
-#             Value between 0 - 0.5 specifying the relative distance between the square corners and
-#             the boundary of the region of high intensity.
-#         pixel_dim : list[int, int]
-#             Size of pixelation to apply.
-#     ---
-#     Outputs
-#         corners : np.ndarray
-#             4x2 matrix of corner coordinates.
-#         reduced_frontier_scaled : np.ndarray
-#             Inverse intensity map of proximity to black or border pixels.
-#     '''
-#     # Start with a lower resolution image for time efficiency.
-#     pixelated_image, reduced_image = pixelate(binary_image, pixel_dims)
-#     # Map the pixel values in the reduced image to 1 if on a border of the image, or the pixel...
-#     # ...intensity is 0, and map to 0 otherwise.
-#     reduced_frontier = np.where(reduced_image == 0, 1, 0)
-#     reduced_frontier[[0, -1], :] = 1
-#     reduced_frontier[:, [0, -1]] = 1
-#     # Propagate through the frontier to record the hamiltonian distance between each pixel and...
-#     # ...the nearest pixel in the reduced image that either has 0 intensity or is at a border.
-#     for k in range(1, min(reduced_image.shape)):
-#         if np.sum(np.where(reduced_frontier == 0, 1, 0)) == 0:
-#             break
-#         neighbours = np.zeros(reduced_frontier.shape)
-#         neighbours[1:, :] = neighbours[1:, :] + reduced_frontier[:-1, :]
-#         neighbours[:-1, :] = neighbours[:-1, :] + reduced_frontier[1:, :]
-#         neighbours[:, :-1] = neighbours[:, :-1] + reduced_frontier[:, 1:]
-#         neighbours[:, 1:] = neighbours[:, 1:] + reduced_frontier[:, :-1]
-#         reduced_frontier = np.where((reduced_frontier == 0) & (neighbours > 0),
-#                                     k + 1, reduced_frontier)
-#     # Normalise the frontier on to the scale 0 - 255.
-#     reduced_frontier_scaled = (reduced_frontier - 1) * 255 / np.max(reduced_frontier - 1)
-#     reduced_rows = np.tile(np.array([range(0, reduced_frontier_scaled.shape[0])]).T,
-#                            (1, reduced_frontier_scaled.shape[1]))
-#     reduced_cols = np.tile(np.array([range(0, reduced_frontier_scaled.shape[1])]),
-#                            (reduced_frontier_scaled.shape[0], 1))
-#     # Find the furthest pixel from black or border pixels by taking a weighted average.
-#     reduced_center = np.array([np.sum(reduced_rows * reduced_frontier_scaled) /
-#                                reduced_frontier_scaled.sum(),
-#                                np.sum(reduced_cols * reduced_frontier_scaled) /
-#                                reduced_frontier_scaled.sum()])
-#     reduced_center_rounded = np.floor(reduced_center).astype(int)
-#     reduced_diags = np.array([0, 1])
-#     # Search diagonally from the centroid pixel until specified margin is reached.
-#     for s in range(0, 2 * min(reduced_image.shape)):
-#         square = reduced_frontier_scaled[reduced_center_rounded[0] - reduced_diags[0]:
-#                                          reduced_center_rounded[0] + reduced_diags[1],
-#                                          reduced_center_rounded[1] - reduced_diags[0]:
-#                                          reduced_center_rounded[1] + reduced_diags[1]]
-#         if square.min() < margin * 255:
-#             break
-#         else:
-#             reduced_diags[s % 2] += 1
-#     # Calculate position of centroid pixel and corners in original image.
-#     center = np.floor(reduced_center * np.array(pixel_dims)).astype(int)
-#     side_lengths = (reduced_diags.sum() + 1) * np.array(pixel_dims)
-#     corners = [[int(center[0] + 0.5 * side_lengths[0]), int(center[1] - 0.5 * side_lengths[1])],
-#                [int(center[0] + 0.5 * side_lengths[0]), int(center[1] + 0.5 * side_lengths[1])],
-#                [int(center[0] - 0.5 * side_lengths[0]), int(center[1] + 0.5 * side_lengths[1])],
-#                [int(center[0] - 0.5 * side_lengths[0]), int(center[1] - 0.5 * side_lengths[1])]]
-#     return corners, reduced_frontier_scaled.astype(np.uint8)
-# 
-# def measure_intensities(image : np.ndarray, points : np.ndarray, scan_range : int):
-#     '''
-#     Extracts the total, summed intensities of pixels around a set of points.
-#     ---
-#     Parameters
-#         image : np.ndarray
-#             Picture from which pixel intensities will be measured.
-#         points : np.ndarray
-#             Nx2 array containing N coordinates around which pixel intensities will be summed.
-#         scan_range : int
-#             Maximum distance in each axis of measured pixels from the specified coordinates.
-#     ---
-#     Outputs
-#         total_intensities : np.ndarray
-#             Nx0 array of total measured pixel intensities for each specified coordinate.
-#     '''
-#     total_intensities = np.zeros(points.shape[0])
-#     for p in range(0, points.shape[0]):
-#         square = image[points[p][0] - scan_range:points[p][0] + scan_range,
-#                        points[p][1] - scan_range:points[p][1] + scan_range]
-#         total_intensities[p] = square.sum()
-#     return total_intensities
-# 
-# def get_bright_lines(intensities : list):
-#     '''
-#     Identifies indexes with globally maximal recorded intensities and returns the approximate
-#     locations of the sampling regions.
-#     ---
-#     Parameters
-#         intensities : list[np.ndarray, np.ndarray]
-#             List containing two arrays of shapes NxA / NxB respectively, where N is the number
-#             of sampled regions and A / B is the number of scanning rows / columns.
-#     ---
-#     Outputs
-#         bright_lines : 
-#     '''
-# #     bright_lines= [[[] for _ in range(0, intensities[d].shape[0])]
-# #                    for d in range(0, len(intensities))]
-#     bright_lines = -1 * np.ones((intensities[0].shape[0], 2))
-# #     envelope = np.array([-1, 0, 1])
-#     for d in range(0, len(intensities)):
-#         #sorted_intensities = np.sort(intensities[d], 1)
-#         for c in range(0, intensities[d].shape[0]):
-#             dir_corner_ints = intensities[d][c, :]
-#             envelope_totals = dir_corner_ints[:-2] + dir_corner_ints[1:-1] + dir_corner_ints[2:]
-#             main_line = np.argmax(envelope_totals)
-#             bright_lines[c, d] = (((main_line - 1) * dir_corner_ints[main_line - 1] +
-#                                    main_line * dir_corner_ints[main_line] +
-#                                    (main_line + 1) * dir_corner_ints[main_line + 1]) /
-#                                   np.sum(dir_corner_ints[main_line - 1:main_line + 2]))
-# #             #set threshold as twice the median intensity value, add one to set above 0
-# #             threshold = 2 * np.sort(dir_corner_ints)[int(len(dir_corner_ints) / 2)] + 1#########
-# #             num_checks = np.sum((dir_corner_ints >= threshold).astype(int))############
-# #             lines_checked = []
-# #             for _ in range(0, num_checks):
-# #                 max_index = np.argsort(dir_corner_ints)[-1]###########
-# #                 if len(set.intersection(set(max_index + envelope),
-# #                                         set(lines_checked))) == 0:
-# #                     bright_lines[d][c].append(max_index)
-# #                 lines_checked.append(max_index)
-# #                 dir_corner_ints[max_index] = 0
-# #                 # For simplicity, only output the single brightest line
-# #                 break
-#     return bright_lines
 
 def validate_calibration(camera2projector : [np.ndarray, str], size=40, duration=5):   
     if isinstance(camera2projector, str):
@@ -425,8 +183,6 @@ def start_calibration(out_file : str, sq_size = 40):
                     continue
             elif step != 1:
                 continue
-            #move = DOMEtran.linear_transform(shift=(step,0))
-            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
             pos[s][0,2]+=increment
 
         # STEP 3: first square x pos     
@@ -451,8 +207,6 @@ def start_calibration(out_file : str, sq_size = 40):
                     continue
             elif step != 1:
                 continue
-            #move = DOMEtran.linear_transform(shift=(step,0))
-            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
             pos[s][1,2]+=increment
         
         # STEP 4: second square y pos    
@@ -477,8 +231,6 @@ def start_calibration(out_file : str, sq_size = 40):
                     continue
             elif step != 1:
                 continue
-            #move = DOMEtran.linear_transform(shift=(step,0))
-            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
             pos[s][0,2]+=increment
 
         # STEP 5: second square x pos     
@@ -503,8 +255,6 @@ def start_calibration(out_file : str, sq_size = 40):
                     continue
             elif step != 1:
                 continue
-            #move = DOMEtran.linear_transform(shift=(step,0))
-            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
             pos[s][1,2]+=increment
        
         # STEP 6: third square y pos    
@@ -529,8 +279,6 @@ def start_calibration(out_file : str, sq_size = 40):
                     continue
             elif step != 1:
                 continue
-            #move = DOMEtran.linear_transform(shift=(step,0))
-            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
             pos[s][0,2]+=increment
 
         # STEP 7: third square x pos     
@@ -555,8 +303,6 @@ def start_calibration(out_file : str, sq_size = 40):
                     continue
             elif step != 1:
                 continue
-            #move = DOMEtran.linear_transform(shift=(step,0))
-            #cmd = {'transform': {'matrix': move.tolist(), 'labels': ['sq1']}}
             pos[s][1,2]+=increment
       
         # STEP 8: perform calibration and validation
@@ -608,7 +354,7 @@ if __name__ == '__main__':
     dome_camera = DOMEutil.CameraManager()
     
     # connect to projector
-    print('On the projector Pi run "DOME_calibration_projector.py" and wait for a black ' \
+    print('On the projector Pi run "DOME_projection_interface.py" and wait for a black ' \
           'screen to appear (this may take several seconds). Once a black screen is ' \
           'shown, click anywhere on the black screen, then press any key (such as ALT).')
     dome_pi4node.accept_connection()

@@ -594,19 +594,19 @@ if __name__ == '__main__':
     
     # details of the experiment
     date='today'    # date of the experiment. Use format YYYY_MM_DD
-    species='Volvox'     # species used in the experiment
-    culture='04/07/23'    # culture used in the experiment
-    sample = '150uL, 11mm disk, centrifuged'      # details about the sample (volume, frame, etc)
-    temp='21.4' # temperature of the sample
+    species='Euglena'     # species used in the experiment
+    culture='20/02/23'    # culture used in the experiment
+    sample = '20uL, no frame'      # details about the sample (volume, frame, etc)
+    temp='22.1' # temperature of the sample
     
     output_directory      = '/home/pi/Documents/experiments'
     #parameters_file       = '/home/pi/Documents/config/parameters_test.json'
-    #camera2projector_file = '/home/pi/Documents/config/camera2projector_x90_2023_06_26.npy'
-    #camera2projector_file = '/home/pi/Documents/config/camera2projector_x36_2023_06_26.npy'
-    camera2projector_file = '/home/pi/Documents/config/camera2projector_x9_2023_07_04.npy'
+    #camera2projector_file = '/home/pi/Documents/config/camera2projector_x90_2023_07_10.npy'
+    camera2projector_file = '/home/pi/Documents/config/camera2projector_x36_2023_07_10.npy'
+    #camera2projector_file = '/home/pi/Documents/config/camera2projector_x9_2023_07_04.npy'
     
     deltaT= 0.5 # sampling time [s]
-    totalT= 60*3  # experiment duration [s]
+    totalT= 60*5  # experiment duration [s]
     
     scale = 5   # scaling factor for projected pattern, larger=lower resolution
     if species in ['Euglena','euglena']:
@@ -752,6 +752,16 @@ if __name__ == '__main__':
 #                 {"t":10, "cmd": {"gradient": {'points': camera_frame[1,:],
 #                                         'values': [off_light, on_light]}}}
 #                 ]
+
+    # project image
+    img = cv2.imread('/home/pi/Desktop/images/Slide8.jpeg')
+    img_cam = cv2.resize(img, (camera_dim[1], camera_dim[0]))
+    img_prog = DOMEtran.transform_image(img_cam, camera2projector,
+                                        proj_dim[0:2], cv2.BORDER_REPLICATE)
+    img_prog = cv2.resize(img_prog, (proj_dim[1]//scale, proj_dim[0]//scale))
+    commands = [{"t":0, "cmd": off_light},
+                {"t":30, "cmd": img_prog},
+                {"t":totalT-30, "cmd": off_light}]
         
     # init camera and projector
     [dome_pi4node, dome_camera, dome_gpio]=init()
