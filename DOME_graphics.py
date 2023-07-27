@@ -129,14 +129,16 @@ def make_video(directory : str, title : str = "video.mp4", fps : float = 1):
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     video = cv2.VideoWriter(os.path.join(directory,title), fourcc, fps, frameSize=dim)
     
+    i=0;
     for path in paths:
         frame=cv2.imread(path)
         resized = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
         video.write(resized)
-    
+        i+=1; print(f'\r{round(i/len(paths)*100,1)}%', end='\r')
+        
     cv2.destroyAllWindows()
     video.release()
-    print(f'Video {title} saved in {directory}')
+    print(f'\nVideo {title} saved in {directory}')
 
 def overlap_pattern(experiment, time:float, alpha:float=1):
     img = experiment.get_img_at_time(time)

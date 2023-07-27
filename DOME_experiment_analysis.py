@@ -341,8 +341,9 @@ def scatter_hist(x, y, n_bins=10):
 
 
 # MAIN -------------------------------------------------------------------------------------
-experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-experiment_name = "2023_06_08_Volvox_14"
+#experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
+experiments_directory = '/Volumes/DOMEPEN/Experiments'
+experiment_name = "2023_07_07_Volvox_7"
 output_folder ='tracking'
 
 current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)  
