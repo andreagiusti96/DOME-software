@@ -136,7 +136,7 @@ def make_video(directory : str, title : str = "video.mp4", fps : float = 1):
         frame=cv2.imread(path)
         resized = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
         video.write(resized)
-        i+=1; print(f'\r{round(i/len(paths)*100,1)}%', end='\r')
+        i+=1; print(f'\rGenerating video: {round(i/len(paths)*100,1)}%', end='\r')
         
     cv2.destroyAllWindows()
     video.release()

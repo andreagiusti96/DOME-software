@@ -513,9 +513,12 @@ def valid_positions(positions: np.array):
 
 
 def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh: List, area_r: List,
-                             compactness_r: List, output_folder: str):
+                             compactness_r: List, output_folder: str, terminal_time : float = -1):
     files = glob.glob(fileLocation + '/*.jpeg')
     files = sorted(files, key=lambda x: float(re.findall("(\d+.\d+)", x)[-1]))
+    
+    if terminal_time < 0:
+        terminal_time = DOMEexp.get_time_from_title(files[-1])
 
     frames_number = len(files)
     number_of_objects = 0
@@ -524,9 +527,13 @@ def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh
     contours = [];
     positions = np.empty([frames_number, 0, 2], dtype=float) * np.nan;
     inactivity = - np.ones([frames_number, 0], dtype=int);
-
+    
+    time = 0.0
+    counter = 0
+    
     print("Performing detection and tracking...")
-    for counter in range(len(files)):
+    while time < terminal_time and counter < len(files):
+    #for counter in range(len(files)):
         # for counter in range(10):
         # declare vars
         filename = files[counter]
@@ -541,7 +548,7 @@ def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh
         new_positions = get_positions(new_contours)
         n_detected_objects = len(new_positions)
 
-        # on first iteration assign new susequent ids to all agents
+        # on first iteration assign new ids to all agents
         if counter == 0:
             new_ids = list(range(0, n_detected_objects))
 
@@ -599,6 +606,8 @@ def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh
         print('detected objects = ' + str(n_detected_objects))
         print('new ids = ' + str(newly_allocated_ids) + '\t tot = ' + str(len(newly_allocated_ids)))
         print('total lost ids = ' + str(len(lost_obj_ids)) + '\n')
+        
+        counter+=1
 
     return positions, inactivity
 
@@ -630,9 +639,12 @@ if __name__ == '__main__':
 
     # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
     # experiments_directory = '\\\\tsclient\DOMEPEN\Experiments'
-    experiments_directory = 'D:\AndreaG_DATA\Experiments'
+    experiments_directory = '/Volumes/DOMEPEN/Experiments'
+    #experiments_directory = 'D:\AndreaG_DATA\Experiments'
     experiment_name = "2023_06_26_Euglena_37"
-    output_folder = 'tracking1'
+    output_folder = 'tracking_prova'
+    
+    terminal_time = -1;
 
     current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)
 
@@ -656,15 +668,12 @@ if __name__ == '__main__':
 
     # extract data
     positions, inactivity = extract_data_from_images(images_folder, background, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE,
-                                                     output_dir)
+                                                     output_dir, terminal_time)
 
     # make video from images
     DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2)
 
-    # If the file analysis_data.npz is not already existing data are saved
+    # Save tracking data
     analised_data_path = os.path.join(output_dir, 'analysis_data.npz')
-    if not os.path.isfile(analised_data_path):
-        current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), positions=positions,
+    current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), positions=positions,
                                      inactivity=inactivity)
-    else:
-        print(f'The file {analised_data_path} already exists. Data cannot be saved.')
