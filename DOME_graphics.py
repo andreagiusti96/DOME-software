@@ -98,10 +98,12 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
     
     plt.xlim([0, 1920])
     plt.ylim([1080, 0])
-    
-    if show: 
+
+    if show:
         plt.show()
-    
+    if not show:
+        plt.close()
+
     return fig
 
 def draw_image(img : np.array = np.zeros([1080, 1920]), title : str =""):
@@ -114,7 +116,7 @@ def draw_image(img : np.array = np.zeros([1080, 1920]), title : str =""):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         plt.imshow(img)
     
-    plt.show()
+    plt.show(block=False)
 
 def histogram(img : np.array):
     plt.title("Histogram");
