@@ -87,7 +87,7 @@ class ExperimentManager:
         else:
             self.start_time=datetime.strptime(time, '%H:%M:%S')
     
-    def save_data(self, title : str, *args, **kwds):
+    def save_data(self, title : str, force:bool=False, *args, **kwds):
         '''
         Save data in an .npz file in the experiment folder.
         This function can be called as:
@@ -109,8 +109,11 @@ class ExperimentManager:
         file_path = os.path.join(self.path, title + ".npz")
         
         if os.path.isfile(file_path):
-            print(f'File {file_path} already exists!\n')
-            return
+            if force: 
+                print(f'File {file_path} was overwritten\n')
+            else:
+                print(f'File {file_path} already exists!\n')
+                return
         
         if self.name=='default':
             print('First create an experiment with new_experiment().\n')

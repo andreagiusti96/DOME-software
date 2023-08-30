@@ -511,12 +511,44 @@ def valid_positions(positions: np.array):
     assert len(validity) == positions.shape[0]
     return validity
 
+def overlap_trajectories():
+    files = glob.glob(images_folder + '/*.jpeg')
+    files = sorted(files, key=lambda x: float(re.findall("(\d+.\d+)", x)[-1]))
+    
+    for counter in range(len(files)):
+        filename = files[counter]
+        time = DOMEexp.get_time_from_title(filename)
+        img = cv2.imread(filename)
+        fig = DOMEgraphics.draw_trajectories(positions[:counter + 1], [], inactivity[:counter + 1], img,
+                                             title='time=' + str(time), max_inactivity=3, time_window=5, show=False)
+        fig.savefig(os.path.join(experiments_directory, experiment_name, output_folder, 'trk_' + '%04.1f' % time + '.jpeg'), dpi=100)
+        print(f'\rGenerating tracking images: {round(counter/len(files)*100,1)}%', end='\r')
+
+def merge_trajectories(id1 : int, id2 : int):
+    assert id1 < id2, "id2 must be greater than id1!"
+    assert id1 < positions.shape[1], "id1 cannot be greater than the number of agents!"
+    assert id2 < positions.shape[1], "id2 cannot be greater than the number of agents!"
+    
+    print("inactivity of "+str(id1)+":\n"+ str(inactivity[:,id1]))
+    print("inactivity of "+str(id2)+":\n"+ str(inactivity[:,id2]))
+    
+    assert all(inactivity[inactivity[:,id1]==0,id2]!=0), f"Agents {id1} and {id2} are active at the same time, their trajectories cannot be merged!"
+    
+    positions[inactivity[:,id2]>=0, id1] = positions[inactivity[:,id2]>=0, id2]
+    inactivity[inactivity[:,id2]>=0, id1] = inactivity[inactivity[:,id2]>=0, id2]
+    
+    positions[:,id2,:] = np.nan
+    inactivity[:,id2] = -1
+    
+    print("inactivity of "+str(id1)+" after merge:\n"+ str(inactivity[:,id1]))
+
 
 def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh: List, area_r: List,
                              compactness_r: List, output_folder: str, terminal_time : float = -1):
     files = glob.glob(fileLocation + '/*.jpeg')
     files = sorted(files, key=lambda x: float(re.findall("(\d+.\d+)", x)[-1]))
     
+    # if terminal_time is negative perform tracking on the whole experiment
     if terminal_time < 0:
         terminal_time = DOMEexp.get_time_from_title(files[-1])
 
@@ -533,8 +565,6 @@ def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh
     
     print("Performing detection and tracking...")
     while time < terminal_time and counter < len(files):
-    #for counter in range(len(files)):
-        # for counter in range(10):
         # declare vars
         filename = files[counter]
         img = cv2.imread(filename)
@@ -644,7 +674,7 @@ if __name__ == '__main__':
     experiment_name = "2023_06_26_Euglena_37"
     output_folder = 'tracking_prova'
     
-    terminal_time = -1;
+    terminal_time = 5;
 
     current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)
 
