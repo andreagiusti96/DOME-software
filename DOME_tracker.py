@@ -125,7 +125,7 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
     return new_ids
 
 
-def estimate_velocities(positions: np.array):
+def estimate_velocities(positions: np.array, deltaT : float):
     """
     Given the past positions of the objects estimates their velocities.
 
@@ -143,22 +143,23 @@ def estimate_velocities(positions: np.array):
     """
     assert len(positions.shape) == 3
     assert positions.shape[2] == 2
+    assert deltaT > 0
 
     velocities = np.zeros(positions.shape[1:3])
 
     if positions.shape[0] >= 2:
         valid_pos_idx = valid_positions(positions[-2])
         velocities[valid_pos_idx] = positions[-1, valid_pos_idx] - positions[-2, valid_pos_idx]
+        velocities = velocities/ deltaT
 
-    speeds = np.linalg.norm(velocities, axis=1)
-
+    # speeds = np.linalg.norm(velocities, axis=1)
     # print("avg speed = " + str(round(np.mean(speeds),1)) + "\tmax = " + str(round(max(speeds),1)) + "\tid =" + str(np.argmax(speeds)))
 
     assert velocities.shape[1] == 2
     return velocities
 
 
-def estimate_positions(old_pos: np.array, velocity: np.array):
+def estimate_positions(old_pos: np.array, velocity: np.array, deltaT:float):
     """
     Given the current positions and velocities returns the future estimated positions of objects.
     Positions are validated to be in the range [0, 1920][0, 1080]
@@ -179,10 +180,11 @@ def estimate_positions(old_pos: np.array, velocity: np.array):
     assert len(old_pos.shape) == 2
     assert len(velocity.shape) == 2
     assert old_pos.shape[1] == 2
+    assert deltaT > 0
 
     inertia = 0.66
 
-    estimated_pos = old_pos + velocity * inertia
+    estimated_pos = old_pos + velocity*deltaT * inertia
 
     non_valid_pos_idx = ~ valid_positions(estimated_pos)
     estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx] - velocity[non_valid_pos_idx] * inertia
@@ -544,7 +546,7 @@ def merge_trajectories(id1 : int, id2 : int):
 
 
 def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh: List, area_r: List,
-                             compactness_r: List, output_folder: str, terminal_time : float = -1):
+                             compactness_r: List, output_folder: str, activation_times : List = [], terminal_time : float = -1):
     files = glob.glob(fileLocation + '/*.jpeg')
     files = sorted(files, key=lambda x: float(re.findall("(\d+.\d+)", x)[-1]))
     
@@ -574,7 +576,7 @@ def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh
         # collect contours and positions from new image
         plot_detection_steps = counter == 0
         new_contours = get_contours(img, bright_thresh, area_r, compactness_r, background, n_detected_objects,
-                                    plot_detection_steps)
+                                    False)
         new_positions = get_positions(new_contours)
         n_detected_objects = len(new_positions)
 
@@ -619,9 +621,10 @@ def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh
 
         # estimate velocities and future positions
         up_to_now_positions = positions[0:counter + 1]  # select positions up to current time instant
-        velocities = estimate_velocities(up_to_now_positions)
+        deltaT = activation_times[counter+1]-activation_times[counter]
+        velocities = estimate_velocities(up_to_now_positions, deltaT)
         if counter < frames_number - 1:
-            positions[counter + 1] = estimate_positions(positions[counter], velocities)
+            positions[counter + 1] = estimate_positions(positions[counter], velocities, deltaT)
 
         # check data integrity
         assert all(valid_positions(positions[counter]))
@@ -670,40 +673,45 @@ if __name__ == '__main__':
     # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
     # experiments_directory = '\\\\tsclient\DOMEPEN\Experiments'
     experiments_directory = '/Volumes/DOMEPEN/Experiments'
-    #experiments_directory = 'D:\AndreaG_DATA\Experiments'
-    experiment_name = "2023_06_26_Euglena_37"
+    # experiments_directory = 'D:\AndreaG_DATA\Experiments'
+    
+    experiment_names = ["2023_06_26_Euglena_37"]
     output_folder = 'tracking_prova'
     
-    terminal_time = 5;
+    terminal_time = 15 #set negative to analyse the whole experiment
 
-    current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)
+    for experiment_name in experiment_names:
+        current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)
 
-    if os.path.isdir(os.path.join(experiments_directory, experiment_name, 'images')):
-        images_folder = os.path.join(experiments_directory, experiment_name, 'images')
-    else:
-        images_folder = os.path.join(experiments_directory, experiment_name)
+        with current_experiment.get_data('data.npz') as data:
+            activation_times = data['activation_times']
 
-    # test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
+        if os.path.isdir(os.path.join(experiments_directory, experiment_name, 'images')):
+            images_folder = os.path.join(experiments_directory, experiment_name, 'images')
+        else:
+            images_folder = os.path.join(experiments_directory, experiment_name)
 
-    output_dir = os.path.join(experiments_directory, experiment_name, output_folder)
-    try:
-        os.mkdir(output_dir)
-    except OSError:
-        pass
+        # test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
 
-    # Build background model
-    print("Building the background model...")
-    background = build_background(images_folder, 25)
-    cv2.imwrite(os.path.join(experiments_directory, experiment_name, output_folder, 'background.jpeg'), background)
+        output_dir = os.path.join(experiments_directory, experiment_name, output_folder)
+        try:
+            os.mkdir(output_dir)
+        except OSError:
+            pass
 
-    # extract data
-    positions, inactivity = extract_data_from_images(images_folder, background, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE,
-                                                     output_dir, terminal_time)
+        # Build background model
+        print("Building the background model...")
+        background = build_background(images_folder, 25)
+        cv2.imwrite(os.path.join(experiments_directory, experiment_name, output_folder, 'background.jpeg'), background)
 
-    # make video from images
-    DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2)
+        # extract data and generate tracking images
+        positions, inactivity = extract_data_from_images(images_folder, background, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE,
+                                                         output_dir, activation_times, terminal_time)
 
-    # Save tracking data
-    analised_data_path = os.path.join(output_dir, 'analysis_data.npz')
-    current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), positions=positions,
-                                     inactivity=inactivity)
+        # make video from images
+        DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2)
+
+        # Save tracking data
+        analised_data_path = os.path.join(output_dir, 'analysis_data.npz')
+        current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), force=True, positions=positions,
+                                         inactivity=inactivity)
