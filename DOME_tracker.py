@@ -548,7 +548,7 @@ def merge_trajectories(id1 : int, id2 : int):
 
 def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh: List, area_r: List,
                              compactness_r: List, output_folder: str, activation_times : List = [], 
-                             terminal_time : float = -1, verbose:bool = False):
+                             terminal_time : float = -1, verbose:bool = False, show:bool = True):
     files = glob.glob(fileLocation + '/*.jpeg')
     files = sorted(files, key=lambda x: float(re.findall("(\d+.\d+)", x)[-1]))
     
@@ -639,7 +639,7 @@ def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh
 
         # print image
         fig = DOMEgraphics.draw_trajectories(positions[:counter + 1], [], inactivity[:counter + 1], img,
-                                             title='time=' + str(time), max_inactivity=3, time_window=5, show=True)
+                                             title='time=' + str(time), max_inactivity=3, time_window=5, show=show)
         fig.savefig(os.path.join(fileLocation, output_folder, 'trk_' + '%04.1f' % time + '.jpeg'), dpi=100)
 
         # print info
@@ -696,8 +696,9 @@ if __name__ == '__main__':
     experiment_names = ["2023_06_26_Euglena_37"]
     output_folder = 'tracking_prova'
     
-    terminal_time = 15   #set negative to analyse the whole experiment
+    terminal_time = 3   #set negative to analyse the whole experiment
     verbose = True      #print info during tracking
+    show_tracking_images = os.name == 'posix'
 
     for experiment_name in experiment_names:
         current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)
@@ -725,7 +726,7 @@ if __name__ == '__main__':
 
         # extract data and generate tracking images
         positions, inactivity, total_cost = extract_data_from_images(images_folder, background, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE,
-                                                         output_dir, activation_times, terminal_time, verbose)
+                                        output_dir, activation_times, terminal_time, verbose, show_tracking_images)
 
         # make video from images
         DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2)
