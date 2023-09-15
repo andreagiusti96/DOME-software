@@ -341,33 +341,30 @@ def scatter_hist(x, y, n_bins=10):
 
 
 # MAIN -------------------------------------------------------------------------------------
-#experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-experiments_directory = '/Volumes/DOMEPEN/Experiments'
-experiment_name = "2023_07_07_Volvox_7"
-output_folder ='tracking'
+# experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
+# experiments_directory = '\\\\tsclient\DOMEPEN\Experiments'
+# experiments_directory = '/Volumes/DOMEPEN/Experiments'
+experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
+experiment_name = "2023_06_15_Euglena_1"
+output_folder ='tracking_2023_09_14'
+
+## LOAD EXPERIMENT AND TRACKING DATA
 current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)  
 
-# load data
+# load experiment data
 totalT = current_experiment.get_totalT()  
 deltaT = current_experiment.get_deltaT()  
 with current_experiment.get_data('data.npz') as data:
     activation_times = data['activation_times']
 
+time_steps = np.diff(activation_times)
 patterns = [current_experiment.get_pattern_at_time(t) for t in np.arange(totalT, deltaT)]
 
 # load tracking data
-tracking_data_path = os.path.join(experiments_directory, experiment_name, output_folder, 'analysis_data.npz')
+positions, inactivity, *_ = DOMEtracker.load_tracking(output_folder, current_experiment)
 
-if not os.path.isfile(tracking_data_path):
-    print(f'File {tracking_data_path} not found.\nFirst perform the tracking with DOME_tracker.')
-    sys.exit(0)
-    
-with current_experiment.get_data(os.path.join(output_folder,'analysis_data.npz')) as data:
-    positions = data['positions']
-    inactivity = data['inactivity'] 
-
-time_intants = activation_times.shape[0]
+time_instants = positions.shape[0]
 number_of_agents = positions.shape[1]
 
 # replace estimated positions with interpolated ones
@@ -419,7 +416,7 @@ outliers_acc=detect_outliers(acc_smooth, m=variance_thresh, side='top')
 outliers = outliers_speed * outliers_acc
 for i in range(number_of_agents):
     if np.ma.max(outliers[:,i]):
-        print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i]))+ ' and has been removed !')
+        print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i])*deltaT)+ ' and has been removed !')
 
 speeds_smooth[:,np.max(outliers, axis=0)]=np.nan
 speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
@@ -499,10 +496,10 @@ inputs = np.mean(np.mean(patterns, axis=1), axis=1)
 # number of agents
 plt.figure(figsize=(9,3))
 agents_number = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=1)
-plt.plot(np.linspace(0, time_intants-1, time_intants),agents_number)
+plt.plot(np.linspace(0, time_instants-1, time_instants),agents_number)
 plt.title('Number of detected agents over time')
 plt.xlabel('Time [frames]')
-plt.gca().set_xlim([0, time_intants-1])
+plt.gca().set_xlim([0, time_instants-1])
 plt.gca().set_ylim(0)
 plt.ylabel('Count')
 plt.grid()
@@ -534,12 +531,12 @@ plt.show()
 
 # Inputs
 plt.figure(figsize=(9,6))
-plt.plot(np.linspace(0, time_intants-1, time_intants),inputs[:,0], color='blue')
-plt.plot(np.linspace(0, time_intants-1, time_intants),inputs[:,1], color='green')
-plt.plot(np.linspace(0, time_intants-1, time_intants),inputs[:,2], color='red')
+plt.plot(np.linspace(0, time_instants-1, time_instants),inputs[:,0], color='blue')
+plt.plot(np.linspace(0, time_instants-1, time_instants),inputs[:,1], color='green')
+plt.plot(np.linspace(0, time_instants-1, time_instants),inputs[:,2], color='red')
 plt.title('Inputs')
 plt.xlabel('Time [frames]')
-plt.gca().set_xlim([0, time_intants-1])
+plt.gca().set_xlim([0, time_instants-1])
 plt.ylabel('Brightness')
 plt.grid()
 plt.show()
@@ -547,40 +544,40 @@ plt.show()
 # Average Speed, Acc, Angular Velocity, and Tumbling
 plt.figure(figsize=(9,8))
 plt.subplot(4, 1, 1)
-#plt.plot(np.linspace(0, time_intants-2, time_intants-1),np.ma.median(speeds,axis=1))
-plt.plot(np.linspace(0, time_intants-1, time_intants),np.ma.median(speeds_smooth,axis=1))
-plt.fill_between(np.linspace(0, time_intants-1, time_intants), np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
+#plt.plot(np.linspace(0, time_instants-2, time_instants-1),np.ma.median(speeds,axis=1))
+plt.plot(np.linspace(0, time_instants-1, time_instants),np.ma.median(speeds_smooth,axis=1))
+plt.fill_between(np.linspace(0, time_instants-1, time_instants), np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
 plt.xlabel('Time [frames]')
 plt.ylabel('Speed [px/frame]')
-plt.gca().set_xlim([0, time_intants-1])
+plt.gca().set_xlim([0, time_instants-1])
 plt.gca().set_ylim(0)
 plt.grid()
 DOMEgraphics.highligth_inputs(inputs[:,0])
 
 plt.subplot(4, 1, 2)
-#plt.plot(np.linspace(0, time_intants-3, time_intants-2),np.ma.median(np.abs(acc),axis=1))
-plt.plot(np.linspace(0, time_intants-1, time_intants),np.ma.median(acc_smooth,axis=1))
-plt.fill_between(np.linspace(0, time_intants-1, time_intants), np.min(acc_smooth,axis=1), np.max(acc_smooth,axis=1),alpha=0.5)
-plt.gca().set_xlim([0, time_intants-1])
+#plt.plot(np.linspace(0, time_instants-3, time_instants-2),np.ma.median(np.abs(acc),axis=1))
+plt.plot(np.linspace(0, time_instants-1, time_instants),np.ma.median(acc_smooth,axis=1))
+plt.fill_between(np.linspace(0, time_instants-1, time_instants), np.min(acc_smooth,axis=1), np.max(acc_smooth,axis=1),alpha=0.5)
+plt.gca().set_xlim([0, time_instants-1])
 plt.ylabel('Acc [px/frame^2]')
 plt.grid()
 DOMEgraphics.highligth_inputs(inputs[:,0])
 
 plt.subplot(4, 1, 3)
-#plt.plot(np.linspace(0, time_intants-3, time_intants-2),np.ma.median(np.abs(ang_vel),axis=1))
-plt.plot(np.linspace(0, time_intants-2, time_intants-1),np.ma.median(np.abs(ang_vel_smooth),axis=1))
-plt.fill_between(np.linspace(0, time_intants-2, time_intants-1), np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
-plt.gca().set_xlim([0, time_intants-1])
+#plt.plot(np.linspace(0, time_instants-3, time_instants-2),np.ma.median(np.abs(ang_vel),axis=1))
+plt.plot(np.linspace(0, time_instants-2, time_instants-1),np.ma.median(np.abs(ang_vel_smooth),axis=1))
+plt.fill_between(np.linspace(0, time_instants-2, time_instants-1), np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
+plt.gca().set_xlim([0, time_instants-1])
 plt.ylabel('Ang Vel [rad/frame]')
 #plt.xlabel('Time steps [frames]')
 plt.grid()
 DOMEgraphics.highligth_inputs(inputs[:,0])
 
 plt.subplot(4, 1, 4)
-#plt.plot(np.linspace(0, time_intants-1, time_intants),np.ma.mean(tumbling2,axis=1)*100)
-plt.plot(np.linspace(0, time_intants-1, time_intants),np.ma.mean(moving_average(tumbling2, 3),axis=1)*100)
-#plt.plot(np.linspace(0, time_intants-1, time_intants),np.ma.mean(moving_average(tumbling2, 5),axis=1)*100)
-plt.gca().set_xlim([0, time_intants-1])
+#plt.plot(np.linspace(0, time_instants-1, time_instants),np.ma.mean(tumbling2,axis=1)*100)
+plt.plot(np.linspace(0, time_instants-1, time_instants),np.ma.mean(moving_average(tumbling2, 3),axis=1)*100)
+#plt.plot(np.linspace(0, time_instants-1, time_instants),np.ma.mean(moving_average(tumbling2, 5),axis=1)*100)
+plt.gca().set_xlim([0, time_instants-1])
 plt.ylabel('Tumbling [% of agents]')
 plt.xlabel('Time steps [frames]')
 plt.grid()
@@ -793,10 +790,10 @@ agent= 102 #145 #127 #40 #109
 # Speed and Acceleration of one agent
 plt.figure(figsize=(9,6))
 plt.subplot(2, 1, 1)
-plt.plot(np.linspace(0, time_intants-1, time_intants),speeds_smooth[:,agent])
-#plt.plot(np.linspace(0, time_intants-1, time_intants),speeds[:,agent], '--')
+plt.plot(np.linspace(0, time_instants-1, time_instants),speeds_smooth[:,agent])
+#plt.plot(np.linspace(0, time_instants-1, time_instants),speeds[:,agent], '--')
 plt.title('Movement of agent '+str(agent))
-plt.gca().set_xlim([0, time_intants-1])
+plt.gca().set_xlim([0, time_instants-1])
 plt.ylabel('Speed [px/frame]')
 plt.grid()
 DOMEgraphics.highligth_inputs(inputs[:,0])
@@ -805,9 +802,9 @@ DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), 'yellow')
 
 
 plt.subplot(2, 1, 2)
-plt.plot(np.linspace(0, time_intants-1, time_intants),acc_smooth[:,agent])
-#plt.plot(np.linspace(0, time_intants-1, time_intants),np.abs(acc[:,agent]),'--')
-plt.gca().set_xlim([0, time_intants-1])
+plt.plot(np.linspace(0, time_instants-1, time_instants),acc_smooth[:,agent])
+#plt.plot(np.linspace(0, time_instants-1, time_instants),np.abs(acc[:,agent]),'--')
+plt.gca().set_xlim([0, time_instants-1])
 plt.ylabel('Abs Acc [px/frame^2]')
 plt.xlabel('Time [frames]')
 plt.grid()
@@ -819,11 +816,11 @@ plt.show()
 # Direction and Angular Velocity of one agent
 plt.figure(figsize=(9,6))
 plt.subplot(2, 1, 1)
-#plt.plot(np.linspace(1, time_intants-1, time_intants-1),directions[:,agent])
-plt.plot(np.linspace(1, time_intants-1, time_intants-1),directions_reg_smooth[:,agent])
-#plt.plot(np.linspace(1, time_intants-1, time_intants-1),directions_reg[:,agent],'--')
+#plt.plot(np.linspace(1, time_instants-1, time_instants-1),directions[:,agent])
+plt.plot(np.linspace(1, time_instants-1, time_instants-1),directions_reg_smooth[:,agent])
+#plt.plot(np.linspace(1, time_instants-1, time_instants-1),directions_reg[:,agent],'--')
 plt.title('Movement of agent '+str(agent))
-plt.gca().set_xlim([0, time_intants-1])
+plt.gca().set_xlim([0, time_instants-1])
 plt.ylabel('Direction [rad]')
 plt.grid()
 DOMEgraphics.highligth_inputs(inputs[:,0])
@@ -831,10 +828,10 @@ DOMEgraphics.highligth_inputs(inputs[:,0])
 DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), 'yellow')
 
 # plt.subplot(3, 1, 2)
-# plt.plot(np.linspace(0, time_intants-2, time_intants-1),directions[:,agent])
-# plt.plot(np.linspace(0, time_intants-2, time_intants-1),directions_smooth[:,agent])
+# plt.plot(np.linspace(0, time_instants-2, time_instants-1),directions[:,agent])
+# plt.plot(np.linspace(0, time_instants-2, time_instants-1),directions_smooth[:,agent])
 # plt.title('Movement of agent '+str(agent))
-# plt.gca().set_xlim([0, time_intants-1])
+# plt.gca().set_xlim([0, time_instants-1])
 # plt.gca().set_ylim([-np.pi, np.pi])
 # plt.ylabel('Direction [rad]')
 # plt.yticks(np.linspace(-np.pi, np.pi, 5))
@@ -842,9 +839,9 @@ DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), 'yellow')
 # DOMEgraphics.highligth_inputs(inputs[:,0])
 
 plt.subplot(2, 1, 2)
-plt.plot(np.linspace(1, time_intants-1, time_intants-1),np.abs(ang_vel_smooth[:,agent]))
-#plt.plot(np.linspace(1, time_intants-1, time_intants-1),np.abs(ang_vel[:,agent]),'--')
-plt.gca().set_xlim([0, time_intants-1])
+plt.plot(np.linspace(1, time_instants-1, time_instants-1),np.abs(ang_vel_smooth[:,agent]))
+#plt.plot(np.linspace(1, time_instants-1, time_instants-1),np.abs(ang_vel[:,agent]),'--')
+plt.gca().set_xlim([0, time_instants-1])
 plt.ylabel('Abs Angular Vel [rad/frame]')
 plt.xlabel('Time [frames]')
 plt.grid()
@@ -980,7 +977,7 @@ plt.show()
 tumbling_pos = interp_positions[:-1,agent,:][tumbling[:,agent]>0]
 tumbling_pos2 = interp_positions[:,agent,:][tumbling2[:,agent]>0]
 img = current_experiment.get_img_at_time(60)
-DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivity[:,agent:agent+1], img, "trajectory of agent " +str(agent), np.inf, time_window=-1, show=False);
+DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivity[:,agent:agent+1], img, "trajectory of agent " +str(agent), np.inf, time_window=-1, show=False)
 #plt.scatter(tumbling_pos[:,0], tumbling_pos[:,1], color='green' )
 plt.scatter(tumbling_pos2[:,0], tumbling_pos2[:,1], color='yellow' )
 plt.show()

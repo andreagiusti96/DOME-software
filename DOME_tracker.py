@@ -716,12 +716,20 @@ def start_tracking(experiment_names : [List, str]):
 
 
 
-def load_tracking(experiment_name : str):
+def load_tracking(tracking_name : str = None, experiment : [str, DOMEexp.ExperimentManager] = None):
     global positions, inactivity, total_cost, parameters, current_experiment
 
-    current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)
+    # set current experiment
+    if isinstance(experiment, str):
+        current_experiment = DOMEexp.open_experiment(experiment, experiments_directory)
+    elif isinstance(experiment, DOMEexp.ExperimentManager):
+        current_experiment = experiment
 
-    with current_experiment.get_data(os.path.join(output_folder, 'analysis_data.npz'), allow_pickle=True) as data:
+    # get tracking name
+    if not tracking_name:
+        tracking_name = output_folder
+
+    with current_experiment.get_data(os.path.join(tracking_name, 'analysis_data.npz'), allow_pickle=True) as data:
         positions = data['positions']
         inactivity = data['inactivity']
 
@@ -733,7 +741,9 @@ def load_tracking(experiment_name : str):
 
     assert inactivity.shape[0] == positions.shape[0]
     assert inactivity.shape[1] == positions.shape[1]
-    print(f'{output_folder} loaded.\nTotal cost = {np.round(total_cost,2)}, total objects = {inactivity.shape[1]}, time frames = {inactivity.shape[0]}')
+    print(f'{tracking_name} loaded.\nTotal cost = {np.round(total_cost,2)}, total objects = {inactivity.shape[1]}, time frames = {inactivity.shape[0]}')
+
+    return positions, inactivity, total_cost, parameters, current_experiment
 
 # MAIN
 if __name__ == '__main__':

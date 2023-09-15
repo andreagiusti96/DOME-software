@@ -317,7 +317,7 @@ def open_experiment(experiment_name : str, output_directory:str ='/home/pi/Docum
         experiment = ExperimentManager()
         experiment.name=experiment_name
         experiment.path=path
-        print(f'Now working in {path}. \n')
+        print(f'Now working in {path}.')
     else:
         raise(Exception(f'{path} not found!\n'))
     

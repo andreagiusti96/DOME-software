@@ -77,6 +77,8 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
         #pos[:time_window_start,:,:]=np.nan
         pos=pos[time_window_start:,:,:]
         inac = inactivity[time_window_start:, :]
+    else:
+        inac = inactivity.copy()
     
     # Plot trajectories
     plt.plot(pos[:,:,0],pos[:,:,1],'o-', markersize=3)
