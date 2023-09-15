@@ -50,12 +50,16 @@ def highligth_inputs(inputs : np.array, color='red', alpha : float = 0.3):
     for i in range(len(ons)):
         plt.axvspan(ons[i], offs[i], color=color, alpha=alpha, zorder=0)
 
-def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = 3, time_window : int = 10, show:bool = True):
+def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = 0, time_window : int = 10, show:bool = True):
     fig = plt.figure(1,figsize=(19.20,10.80),dpi=100)
     fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
     plt.title(title); 
     
-   # cv2.drawContours(img, contours, -1, (255,0,0), 4)
+    if inactivity.shape[0] == 0:
+        inactivity = np.zeros(positions.shape[0:2])
+    
+    if isinstance(inactivity, List):
+        inactivity=np.array(inactivity)
 
     if len(img.shape)==2:
         plt.imshow(img, cmap='gray', vmin=0, vmax=255)
@@ -65,7 +69,7 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
     
     
     # discard longly inactive objects
-    if max_inactivity > 0:
+    if max_inactivity >= 0:
         counter = inactivity.shape[0] - (inactivity[:,0] >= 0)[::-1].argmax(0) -1
         obsolete_obgs = inactivity[counter,:] > max_inactivity
         pos = positions.copy()

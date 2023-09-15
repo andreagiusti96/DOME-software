@@ -194,8 +194,10 @@ def estimate_positions(old_pos: np.array, velocity: np.array, deltaT:float):
     return estimated_pos
 
 
-def interpolate_positions(positions: np.array):
+def interpolate_positions(positions: np.array, original_times = [], new_times = []):
     interpolated_pos = positions.copy()
+    number_objects = positions.shape[1]
+    interpolated_pos_new = np.ndarray([len(new_times), number_objects, 2]) * np.nan
 
     for obj in range(positions.shape[1]):
         first_index = (~np.isnan(positions[:, obj, 0])).argmax(0)
@@ -210,9 +212,15 @@ def interpolate_positions(positions: np.array):
             trajectory_y = positions[valid_points, obj, 1]
             interpolated_pos[missing_points, obj, 0] = np.interp(missing_points, valid_points, trajectory_x)
             interpolated_pos[missing_points, obj, 1] = np.interp(missing_points, valid_points, trajectory_y)
+        
+        if len(original_times)>0:
+            interpolated_pos_new[:, obj, 0] = np.interp(new_times, original_times, interpolated_pos[:,obj,0])
+            interpolated_pos_new[:, obj, 1] = np.interp(new_times, original_times, interpolated_pos[:,obj,1])
+        else:
+            interpolated_pos_new = interpolated_pos
 
         # print(np.concatenate([positions[:last_index+2,obj], interpolated_pos[:last_index+2,obj]], axis=1))
-    return interpolated_pos
+    return interpolated_pos_new
 
 
 def test_detection_parameters(fileLocation, bright_thresh, area_r: List, compactness_r: List):
