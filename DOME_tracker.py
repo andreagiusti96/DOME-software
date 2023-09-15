@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-This code reads in figures from a folder and for each frame, performs basic image analysis to try and detect agents using contour detection. 
+This code reads in figures from a folder and for each frame, performs basic image analysis to try and detect agents using contour detection.
 The "agents" detected are then run though an agent matching algorithm to try and figure out if they correspond with an agent in a previous frame
 Displacement is then calculated by comaparing the position of the agent in the new frame to the previous frame.
 Time between frames is also calcuated by reading the filename, which is timestamped.
@@ -17,10 +17,12 @@ import numpy as np
 import scipy
 import glob
 import re
-from typing import List
 import os
 import matplotlib.pyplot as plt
 import random
+from datetime import datetime
+from typing import List
+
 
 import DOME_graphics as DOMEgraphics
 import DOME_experiment_manager as DOMEexp
@@ -74,7 +76,7 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
     Track the objects in subsequent time instants assigning IDs.
     The IDs assignment is formulated as a linear optimization problem and solved with the Hungarian method.
     New IDs can be allocated.
-    
+
     Parameters
     ----------
     new_positions : np.array (Shape=Nx2)
@@ -95,8 +97,9 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
     costs_matching = np.ndarray([len(new_positions), number_of_objects])
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
 
+    TYPICAL_VEL = PARAMETERS["TYPICAL_VEL"]
+
     distances = np.squeeze(scipy.spatial.distance.cdist(new_positions, positions))
-    #distances = distances / TYPICAL_D
     distances = distances / (TYPICAL_VEL*deltaT)
 
     # build the matrix of costs
@@ -121,7 +124,7 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
     if verbose:
         print('matching cost = ' + str(round(cost, 2)) + '\t avg = ' + str(round(avg_cost, 2)))
 
-    return new_ids, avg_cost
+    return new_ids, cost
 
 
 def estimate_velocities(positions: np.array, deltaT : float):
@@ -280,7 +283,7 @@ def build_background(fileLocation: str, images_number: int, gain: float = 1.0):
     Extract the background from a set of images excluding moving objects.
     Background is computed as the median pixel-wise of the images.
     Camera has to be static.
-    
+
     Parameters
     ----------
     fileLocation : str
@@ -340,7 +343,7 @@ def get_contours(img: np.array, bright_thresh: List, area_r: List, compactness_r
     min_compactness : float
         Minimum compactness of objects [0, 1].
     background_model : np.array, optional
-        Image of the background to perform background subtraction. 
+        Image of the background to perform background subtraction.
         The default is None.
 
     Returns
@@ -419,10 +422,10 @@ def get_contours(img: np.array, bright_thresh: List, area_r: List, compactness_r
 
         # If the number of detected objects is not close to the expected one adjust the thresholds and iterate
         if verbose:
-            print("thresh=" + str(round(threshold)) + "\t area_r=" + str(np.around(a_r)) + "\t compactness_r=" + 
-                str(np.around(c_r, 2)) + "\t objects=" + str(len(contoursFiltered)) + "\t exp objects=" + 
+            print("thresh=" + str(round(threshold)) + "\t area_r=" + str(np.around(a_r)) + "\t compactness_r=" +
+                str(np.around(c_r, 2)) + "\t objects=" + str(len(contoursFiltered)) + "\t exp objects=" +
                 str(expected_obj_number))
-        
+
         too_many_obgs = len(contoursFiltered) - expected_obj_number > np.ceil(expected_obj_number * margin_factor * 2.0)
         too_few_obgs = len(contoursFiltered) - expected_obj_number < - np.ceil(expected_obj_number * margin_factor)
 
@@ -514,67 +517,80 @@ def valid_positions(positions: np.array):
     assert len(validity) == positions.shape[0]
     return validity
 
-def overlap_trajectories():
-    files = glob.glob(images_folder + '/*.jpeg')
+def overlap_trajectories(experiment : DOMEexp.ExperimentManager = None):
+    if not experiment:
+        experiment = current_experiment
+    files = glob.glob(os.path.join(experiment.path, 'images', '*.jpeg'))
     files = sorted(files, key=lambda x: float(re.findall("(\d+.\d+)", x)[-1]))
-    
-    for counter in range(len(files)):
+
+    frames_number = min(len(files), inactivity.shape[0])
+
+    assert frames_number>0
+
+    for counter in range(frames_number):
         filename = files[counter]
         time = DOMEexp.get_time_from_title(filename)
         img = cv2.imread(filename)
         fig = DOMEgraphics.draw_trajectories(positions[:counter + 1], [], inactivity[:counter + 1], img,
                                              title='time=' + str(time), max_inactivity=3, time_window=5, show=False)
-        fig.savefig(os.path.join(experiments_directory, experiment_name, output_folder, 'trk_' + '%04.1f' % time + '.jpeg'), dpi=100)
-        print(f'\rGenerating tracking images: {round(counter/len(files)*100,1)}%', end='\r')
+        fig.savefig(os.path.join(experiment.path, output_folder, 'trk_' + '%04.1f' % time + '.jpeg'), dpi=100)
+        print(f'\rGenerating tracking images: {round((counter+1)/frames_number*100,1)}% of {frames_number} images', end='\r')
 
 def merge_trajectories(id1 : int, id2 : int):
     assert id1 < id2, "id2 must be greater than id1!"
     assert id1 < positions.shape[1], "id1 cannot be greater than the number of agents!"
     assert id2 < positions.shape[1], "id2 cannot be greater than the number of agents!"
-    
+
     print("inactivity of "+str(id1)+":\n"+ str(inactivity[:,id1]))
     print("inactivity of "+str(id2)+":\n"+ str(inactivity[:,id2]))
-    
+
     assert all(inactivity[inactivity[:,id1]==0,id2]!=0), f"Agents {id1} and {id2} are active at the same time, their trajectories cannot be merged!"
-    
+
     positions[inactivity[:,id2]>=0, id1] = positions[inactivity[:,id2]>=0, id2]
     inactivity[inactivity[:,id2]>=0, id1] = inactivity[inactivity[:,id2]>=0, id2]
-    
+
     positions[:,id2,:] = np.nan
     inactivity[:,id2] = -1
-    
+
     print("inactivity of "+str(id1)+" after merge:\n"+ str(inactivity[:,id1]))
 
 
-def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh: List, area_r: List,
-                             compactness_r: List, output_folder: str, activation_times : List = [], 
+def extract_data_from_images(fileLocation, background: np.ndarray, parameters : dict,
+                             output_folder: str, activation_times : List = [],
                              terminal_time : float = -1, verbose:bool = False, show:bool = True):
     files = glob.glob(fileLocation + '/*.jpeg')
     files = sorted(files, key=lambda x: float(re.findall("(\d+.\d+)", x)[-1]))
-    
+
     # if terminal_time is negative perform tracking on the whole experiment
+    # otherwise cut out excess images
     if terminal_time < 0:
         terminal_time = DOMEexp.get_time_from_title(files[-1])
+    else:
+        files = [f for f in files if DOMEexp.get_time_from_title(f) <= terminal_time]
 
     frames_number = len(files)
     number_of_objects = 0
     n_detected_objects = 0
     total_cost = 0
-    
-    contours = [];
-    positions = np.empty([frames_number, 0, 2], dtype=float) * np.nan;
-    inactivity = - np.ones([frames_number, 0], dtype=int);
-    
+
+    contours = []
+    positions = np.empty([frames_number, 0, 2], dtype=float) * np.nan
+    inactivity = - np.ones([frames_number, 0], dtype=int)
+
     time = 0.0
     counter = 0
-    
+
+    bright_thresh = parameters["BRIGHT_THRESH"]
+    area_r = parameters["AREA_RANGE"]
+    compactness_r = parameters["COMPAC_RANGE"]
+
     print("Performing detection and tracking...")
     while time < terminal_time and counter < len(files):
         # declare vars
         filename = files[counter]
         img = cv2.imread(filename)
         time = DOMEexp.get_time_from_title(filename)
-        
+
         print('\rTracking: t = ' + str(time) + f' (total time = {terminal_time})', end='\r')
         if verbose: print()
 
@@ -595,8 +611,8 @@ def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh
             deltaT = activation_times[counter]-activation_times[counter-1]
             est_positions = positions[counter]  # select positions at previous time instant
             est_positions = est_positions[valid_positions(est_positions)]  # select valid positions
-            new_ids, avg_cost = agentMatching(new_positions, est_positions, inactivity[counter - 1], deltaT, verbose)
-            total_cost += avg_cost
+            new_ids, cost = agentMatching(new_positions, est_positions, inactivity[counter - 1], deltaT, verbose)
+            total_cost += cost
 
         # discern new and lost objects
         newly_allocated_ids = [i for i in new_ids if i not in range(number_of_objects)]
@@ -649,58 +665,22 @@ def extract_data_from_images(fileLocation, background: np.ndarray, bright_thresh
             print('detected objects = ' + str(n_detected_objects))
             print('new ids = ' + str(newly_allocated_ids) + '\t tot = ' + str(len(newly_allocated_ids)))
             print('total lost ids = ' + str(len(lost_obj_ids)), end='\n\n')
-        
+
         counter+=1
-        
+
     # print average info
     print('\ntotal number of detected objects = ' + str(inactivity.shape[1]))
     print('total matching cost = ' + str(round(total_cost,2)), end='\n\n')
 
     return positions, inactivity, total_cost
 
+def start_tracking(experiment_names : [List, str]):
+    if isinstance(experiment_names, str):
+        experiment_names=[experiment_names]
 
-# MAIN
-if __name__ == '__main__':
-    # CONSTANTS
-    DEFAULT_COLOR = "red"
-    DEFAULT_BLUR = 9
-    AUTO_SCALING = -1
-
-    # Euglena
-    AREA_RANGE = [175, 1200]; COMPAC_RANGE = [0.55, 0.90]; BRIGHT_THRESH = [85]
-    #TYPICAL_D = 25
-    TYPICAL_VEL = 50
-
-    # P. Caudatum
-    # AREA_RANGE = [250, 3000]; COMPAC_RANGE = [0.5, 0.9]; BRIGHT_THRESH = [70]
-    # TYPICAL_D = 50
-    TYPICAL_VEL = 100
-
-    # # P. Bursaria
-    # AREA_RANGE = [150, 1500];
-    # COMPAC_RANGE = [0.6, 0.9];
-    # BRIGHT_THRESH = [60]
-    # TYPICAL_D = 25
-    TYPICAL_VEL = 50
-
-    # Volvox
-    # AREA_RANGE = [1000, 6000]; COMPAC_RANGE = [0.7, 1.0]; BRIGHT_THRESH = [70]
-    # TYPICAL_D = 15
-    TYPICAL_VEL = 30
-
-    # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-    # experiments_directory = '\\\\tsclient\DOMEPEN\Experiments'
-    experiments_directory = '/Volumes/DOMEPEN/Experiments'
-    # experiments_directory = 'D:\AndreaG_DATA\Experiments'
-    
-    experiment_names = ["2023_06_26_Euglena_37"]
-    output_folder = 'tracking_prova'
-    
-    terminal_time = 3   #set negative to analyse the whole experiment
-    verbose = True      #print info during tracking
-    show_tracking_images = os.name == 'posix'
-
-    for experiment_name in experiment_names:
+    for exp_counter in range(len(experiment_names)):
+        print(f'Tracking experiment {exp_counter+1} of {len(experiment_names)}')
+        experiment_name = experiment_names[exp_counter]
         current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)
 
         with current_experiment.get_data('data.npz') as data:
@@ -710,8 +690,6 @@ if __name__ == '__main__':
             images_folder = os.path.join(experiments_directory, experiment_name, 'images')
         else:
             images_folder = os.path.join(experiments_directory, experiment_name)
-
-        # test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
 
         output_dir = os.path.join(experiments_directory, experiment_name, output_folder)
         try:
@@ -725,13 +703,103 @@ if __name__ == '__main__':
         cv2.imwrite(os.path.join(experiments_directory, experiment_name, output_folder, 'background.jpeg'), background)
 
         # extract data and generate tracking images
-        positions, inactivity, total_cost = extract_data_from_images(images_folder, background, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE,
+        positions, inactivity, total_cost = extract_data_from_images(images_folder, background, PARAMETERS,
                                         output_dir, activation_times, terminal_time, verbose, show_tracking_images)
 
         # make video from images
-        DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2)
+        DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2, key='/trk_*.jpeg')
 
         # Save tracking data
         analised_data_path = os.path.join(output_dir, 'analysis_data.npz')
         current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), force=True, positions=positions,
-                                         inactivity=inactivity)
+                                         inactivity=inactivity, total_cost=total_cost, parameters=PARAMETERS)
+
+
+
+def load_tracking(experiment_name : str):
+    global positions, inactivity, total_cost, parameters, current_experiment
+
+    current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)
+
+    with current_experiment.get_data(os.path.join(output_folder, 'analysis_data.npz'), allow_pickle=True) as data:
+        positions = data['positions']
+        inactivity = data['inactivity']
+
+        if 'total_cost' in data.files:
+            total_cost = data['total_cost'].item()
+
+        if 'parameters' in data.files:
+            parameters = data['parameters'].item()
+
+    assert inactivity.shape[0] == positions.shape[0]
+    assert inactivity.shape[1] == positions.shape[1]
+    print(f'{output_folder} loaded.\nTotal cost = {np.round(total_cost,2)}, total objects = {inactivity.shape[1]}, time frames = {inactivity.shape[0]}')
+
+# MAIN
+if __name__ == '__main__':
+    # CONSTANTS
+    DEFAULT_COLOR = "red"
+    DEFAULT_BLUR = 9
+    AUTO_SCALING = -1
+
+    # Euglena
+    PARAMETERS = {
+        "AREA_RANGE" : [175, 1200],
+        "COMPAC_RANGE" : [0.55, 0.90],
+        "BRIGHT_THRESH" : [85],
+        "TYPICAL_VEL" : 50
+    }
+
+    # # P. Caudatum
+    # PARAMETERS = {
+    #     "AREA_RANGE" : [250, 3000],
+    #     "COMPAC_RANGE" : [0.5, 0.9],
+    #     "BRIGHT_THRESH" : [70],
+    #     "TYPICAL_VEL" : 100
+    # }
+
+    # # # P. Bursaria
+    # PARAMETERS = {
+    #     "AREA_RANGE" : [150, 1500],
+    #     "COMPAC_RANGE" : [0.6, 0.9],
+    #     "BRIGHT_THRESH" : [60],
+    #     "TYPICAL_VEL" : 50
+    # }
+
+    # # Volvox
+    # PARAMETERS = {
+    #     "AREA_RANGE" : [1000, 6000],
+    #     "COMPAC_RANGE" : [0.7, 1.0],
+    #     "BRIGHT_THRESH" : [70],
+    #     "TYPICAL_VEL" : 30
+    # }
+
+
+    # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
+    # experiments_directory = '\\\\tsclient\DOMEPEN\Experiments'
+    # experiments_directory = '/Volumes/DOMEPEN/Experiments'
+    experiments_directory = 'D:\AndreaG_DATA\Experiments'
+
+    experiment_names = ["2023_06_15_Euglena_1","2023_06_15_Euglena_2","2023_06_26_Euglena_13",
+                        "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6"]
+
+    output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
+    #output_folder = 'tracking_prova'
+
+    terminal_time = -1   #set negative to analyse the whole experiment
+    verbose = False      #print info during tracking
+    show_tracking_images = os.name == 'posix'
+
+    print('Now use one of the following commands:'
+          '\n\ttest_detection_parameters'
+          '\n\tstart_tracking'
+          '\n\tload_tracking')
+
+    # test thresholds for object detection
+    # test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
+
+    # start tracking
+    # start_tracking(experiment_names)
+
+    # load existing tracking data
+    # load_tracking(experiment_name : str)

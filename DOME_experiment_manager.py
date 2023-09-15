@@ -121,7 +121,7 @@ class ExperimentManager:
         
         np.savez(file_path, *args, **kwds)
         
-    def get_data(self, title : str = 'data.npz'):
+    def get_data(self, title : str = 'data.npz', allow_pickle:bool = False):
         '''
         Read data from an .npz or .npy file in the experiment folder.
         ---
@@ -141,7 +141,7 @@ class ExperimentManager:
         if not os.path.exists(file_path):
             raise(Exception(f'{file_path} not found !\n'))
         
-        data=np.load(file_path)
+        data=np.load(file_path, allow_pickle=allow_pickle)
         return data
 
     def get_totalT(self):

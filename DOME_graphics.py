@@ -122,10 +122,10 @@ def histogram(img : np.array):
     plt.title("Histogram");
     plt.hist(img.ravel(),256,[0,256]); plt.show()
     
-def make_video(directory : str, title : str = "video.mp4", fps : float = 1):
+def make_video(directory : str, title : str = "video.mp4", fps : float = 1, key : str = '/*.jpeg'):
     assert os.path.isdir(directory), f'Directory {directory} not found.'
 
-    paths = glob.glob(directory +  '/*.jpeg')
+    paths = glob.glob(directory + key)
     paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
 
     assert len(paths)>0, 'No images found. Video cannot be generated.'
@@ -140,7 +140,7 @@ def make_video(directory : str, title : str = "video.mp4", fps : float = 1):
         frame=cv2.imread(path)
         resized = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
         video.write(resized)
-        i+=1; print(f'\rGenerating video: {round(i/len(paths)*100,1)}%', end='\r')
+        i+=1; print(f'\rGenerating video from {len(paths)} images: {round(i/len(paths)*100,1)}%', end='\r')
         
     #cv2.destroyAllWindows()
     video.release()
