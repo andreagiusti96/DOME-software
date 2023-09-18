@@ -202,8 +202,9 @@ def interpolate_positions(positions: np.array, original_times = [], new_times = 
     for obj in range(positions.shape[1]):
         first_index = (~np.isnan(positions[:, obj, 0])).argmax(0)
         last_index = positions.shape[0] - (~np.isnan(positions[:, obj, 0]))[::-1].argmax(0) - 1
-
-        nans = np.isnan(positions[first_index:last_index + 1, obj, 0])
+        active_points = slice(first_index,last_index+1)
+        
+        nans = np.isnan(positions[active_points, obj, 0])
         missing_points = np.where(nans)[0] + first_index
         valid_points = np.where(~nans)[0] + first_index
 
@@ -214,8 +215,8 @@ def interpolate_positions(positions: np.array, original_times = [], new_times = 
             interpolated_pos[missing_points, obj, 1] = np.interp(missing_points, valid_points, trajectory_y)
         
         if len(original_times)>0:
-            interpolated_pos_new[:, obj, 0] = np.interp(new_times, original_times, interpolated_pos[:,obj,0])
-            interpolated_pos_new[:, obj, 1] = np.interp(new_times, original_times, interpolated_pos[:,obj,1])
+            interpolated_pos_new[active_points, obj, 0] = np.interp(new_times[active_points], original_times[active_points], interpolated_pos[active_points,obj,0])
+            interpolated_pos_new[active_points, obj, 1] = np.interp(new_times[active_points], original_times[active_points], interpolated_pos[active_points,obj,1])
         else:
             interpolated_pos_new = interpolated_pos
 
@@ -795,14 +796,14 @@ if __name__ == '__main__':
 
     # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
     # experiments_directory = '\\\\tsclient\DOMEPEN\Experiments'
-    # experiments_directory = '/Volumes/DOMEPEN/Experiments'
-    experiments_directory = 'D:\AndreaG_DATA\Experiments'
+    experiments_directory = '/Volumes/DOMEPEN/Experiments'
+    # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
     experiment_names = ["2023_06_15_Euglena_1","2023_06_15_Euglena_2","2023_06_26_Euglena_13",
                         "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6"]
 
-    output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
-    #output_folder = 'tracking_prova'
+    #output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
+    output_folder = 'tracking_prova'
 
     terminal_time = -1   #set negative to analyse the whole experiment
     verbose = False      #print info during tracking

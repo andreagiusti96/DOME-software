@@ -372,20 +372,21 @@ number_of_agents = positions.shape[1]
 
 # plot trajectories
 img = current_experiment.get_img_at_time(totalT)
-DOMEgraphics.draw_trajectories(positions, [], inactivity, img, "trajectories", 1, -1)
+DOMEgraphics.draw_trajectories(positions, inactivity=inactivity, img=img, title="trajectories", max_inactivity=0)
 
-# replace estimated positions with interpolated ones
+# replace estimated positions with interpolated ones and apply uniform time sampling
 positions[inactivity!=0]=np.nan
 interp_positions = DOMEtracker.interpolate_positions(positions, activation_times, time_instants)
-DOMEgraphics.draw_trajectories(interp_positions, img=img, title="interpolated trajectories", time_window=30)
+#interp_positions = DOMEtracker.interpolate_positions(positions)
+DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="interpolated trajectories", max_inactivity=0)
 
 # smooth trajectories
 #interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
 interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
-interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
 interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
-interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
-DOMEgraphics.draw_trajectories(interp_positions, img=img, title="smoothed trajectories", time_window=30)
+# interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
+# interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
+DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="smoothed trajectories", max_inactivity=0)
 
 
 # length of trajectories
@@ -496,7 +497,7 @@ inputs = np.mean(np.mean(patterns, axis=1), axis=1)
 
 # timesteps
 plt.figure(figsize=(9,3))
-plt.plot(activation_times[:-1], time_steps)
+plt.plot(time_instants[:-1], time_steps)
 plt.title(f'Time step duration (expected={deltaT}s)')
 plt.xlabel('Time [s]')
 plt.gca().set_xlim([0, totalT])
@@ -798,7 +799,7 @@ sns.heatmap(x, xticklabels=['Light ON','Light OFF'], yticklabels=['Tumbling','Ru
 # Select one agent ---------------------------------------------------------------------------------
 agent=np.argmax(lengths)
 agent=random.choice(np.arange(len(lengths))[lengths >= min_traj_length])
-agent= 102 #145 #127 #40 #109
+#agent= 102 #145 #127 #40 #109
 
 # Speed and Acceleration of one agent
 plt.figure(figsize=(9,6))
@@ -986,15 +987,14 @@ plt.grid()
 plt.show()
 
 # plot trajectory of one agent
-#tumbling_pos=interp_positions[:-1,agent,:]
-tumbling_pos = interp_positions[:-1,agent,:][tumbling[:,agent]>0]
-tumbling_pos2 = interp_positions[:,agent,:][tumbling2[:,agent]>0]
-img = current_experiment.get_img_at_time(60)
-DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivity[:,agent:agent+1], img, "trajectory of agent " +str(agent), np.inf, time_window=-1, show=False)
-#plt.scatter(tumbling_pos[:,0], tumbling_pos[:,1], color='green' )
-plt.scatter(tumbling_pos2[:,0], tumbling_pos2[:,1], color='yellow' )
-plt.show()
-
+last_index = inactivity.shape[0] - (inactivity[:, agent]<=0)[::-1].argmax(0) - 1
+img = current_experiment.get_img_at_time(last_index*deltaT)
+DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivity[:,agent:agent+1], img, "trajectory of agent " +str(agent))
+# #tumbling_pos = interp_positions[:-1,agent,:][tumbling[:,agent]>0]
+# tumbling_pos2 = interp_positions[:,agent,:][tumbling2[:,agent]>0]
+# #plt.scatter(tumbling_pos[:,0], tumbling_pos[:,1], color='green' )
+# plt.scatter(tumbling_pos2[:,0], tumbling_pos2[:,1], color='yellow' )
+# plt.show()
 
 
 

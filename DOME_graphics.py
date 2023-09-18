@@ -50,7 +50,7 @@ def highligth_inputs(inputs : np.array, color='red', alpha : float = 0.3):
     for i in range(len(ons)):
         plt.axvspan(ons[i], offs[i], color=color, alpha=alpha, zorder=0)
 
-def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = 0, time_window : int = 10, show:bool = True):
+def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = -1, time_window : int = -1, show:bool = True):
     fig = plt.figure(1,figsize=(19.20,10.80),dpi=100)
     fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
     plt.title(title); 
@@ -67,12 +67,14 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         plt.imshow(img)
     
+    # get index of last valid position (discard future positions)
+    counter = inactivity.shape[0] - (inactivity[:,0] >= 0)[::-1].argmax(0) -1
+    pos = positions.copy()
+    inac = inactivity.copy()
     
     # discard longly inactive objects
     if max_inactivity >= 0:
-        counter = inactivity.shape[0] - (inactivity[:,0] >= 0)[::-1].argmax(0) -1
-        obsolete_obgs = inactivity[counter,:] > max_inactivity
-        pos = positions.copy()
+        obsolete_obgs = inac[counter,:] > max_inactivity
         pos[:,obsolete_obgs,:]=np.nan
 
     # select recent data
@@ -80,9 +82,7 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
         time_window_start = max([counter+1-time_window, 0])
         #pos[:time_window_start,:,:]=np.nan
         pos=pos[time_window_start:,:,:]
-        inac = inactivity[time_window_start:, :]
-    else:
-        inac = inactivity.copy()
+        inac = inac[time_window_start:, :]      
     
     # Plot trajectories
     plt.plot(pos[:,:,0],pos[:,:,1],'o-', markersize=3)
@@ -104,10 +104,12 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
     
     plt.xlim([0, 1920])
     plt.ylim([1080, 0])
+    plt.xticks(range(0,1921,480))
+    plt.yticks(range(0,1081,270))
 
     if show:
         plt.show()
-    if not show:
+    else:
         plt.close()
 
     return fig
