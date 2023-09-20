@@ -25,7 +25,55 @@ import DOME_experiment_manager as DOMEexp
 import DOME_graphics as DOMEgraphics
 import DOME_tracker as DOMEtracker
 
+def MLE_SDE_parameters(x : np.array, deltaT : float):
+    '''
+    Estimate parameters of a SDE in the form
+        dX = theta * (mu - X) * dt + sigma * dW
+    where dW is gaussian white noise.
+    
+    The algorithm is described in "Calibrating the Ornstein-Uhlenbeck (Vasicek) model" by van den Berg (2011).
 
+    Parameters
+    ----------
+    x : np.array
+        vector of equally spaced data.
+    deltaT : float
+        sampling time step.
+
+    Returns
+    -------
+    mu : float
+        Estimated mean.
+    theta : float
+        Estimated reversion rate.
+    sigma : float
+        Estimated standard deviation of the noise.
+    '''
+    assert len(x.shape == 1), "x must be one-dimensional."
+    
+    #convert masked array and esclude nans
+    x=np.ma.filled(x, fill_value=np.nan)
+    x = x[~np.isnan(x)]
+    
+    n=len(x)
+    
+    # compute moments
+    s_x = np.sum(x[:-1])
+    s_y = np.sum(x[1:])
+    s_xx = np.sum(x[:-1]**2)
+    s_yy = np.sum(x[1:]**2)
+    s_xy = np.sum(x[:-1] * x[1:])
+    
+    # compute estimated parameters
+    mu = (s_y*s_xx - s_x*s_xy) / (n *(s_xx - s_xy) - (s_x**2 - s_x*s_y))
+    theta = -1/deltaT * np.log((s_xy - mu*s_x - mu*s_y + n*mu**2)/(s_xx - 2*mu*s_x + n*mu**2))
+    
+    a = np.exp(-theta*deltaT)
+    sigma = np.sqrt(2*theta/(1-a**2) * 1/n * (s_yy - 2*a*s_xy + a**2*s_xx - 2*mu*(1-a)*(s_y - a*s_x) + n*mu**2*(1-a)**2))
+    
+    return mu, theta, sigma
+    
+    
 def split(data : np.array, condition : np.array):
     out_data=[]
     out_data.append(data[condition])
@@ -985,6 +1033,27 @@ plt.ylabel('Lag 1 similarity')
 plt.title('Agent '+ str(agent))
 plt.grid()
 plt.show()
+
+# v(k+1) vs v(k) plot 
+plt.figure(figsize=(10,4))
+plt.subplot(1, 2, 1)
+x=[speeds_smooth[:-1, agent]]
+y=[speeds_smooth[1:, agent]]
+plt.scatter(x, y)
+plt.xlabel('Speed at time k [px/s]')
+plt.ylabel('Speed at time k+1 [px/s]')
+plt.title('Agent '+ str(agent))
+plt.grid()
+
+plt.subplot(1, 2, 2)
+x=[ang_vel_smooth[:-1, agent]]
+y=[ang_vel_smooth[1:, agent]]
+plt.scatter(x, y)
+plt.xlabel('Ang Vel at time k [rad/s]')
+plt.ylabel('Ang Vel at time k+1 [rad/s]')
+plt.grid()
+plt.show()
+
 
 # plot trajectory of one agent
 last_index = inactivity.shape[0] - (inactivity[:, agent]<=0)[::-1].argmax(0) - 1
