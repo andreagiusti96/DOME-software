@@ -49,7 +49,7 @@ def MLE_SDE_parameters(x : np.array, deltaT : float):
     sigma : float
         Estimated standard deviation of the noise.
     '''
-    assert len(x.shape == 1), "x must be one-dimensional."
+    assert len(x.shape) == 1, "x must be one-dimensional."
     
     #convert masked array and esclude nans
     x=np.ma.filled(x, fill_value=np.nan)
