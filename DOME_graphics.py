@@ -17,10 +17,13 @@ from typing import List
 
 import DOME_experiment_manager as DOMEexp
 
-def highligth_inputs(inputs : np.array, color='red', alpha : float = 0.3):
+def highligth_inputs(inputs : np.array, time_instats = None, color='red', alpha : float = 0.3):
     inputs=np.ma.filled(inputs, fill_value=np.nan)
     input_differences = inputs[1:]-inputs[0:-1]
     input_differences[np.isnan(input_differences)]=0
+    
+    if len(time_instats)==0:
+        time_instats = np.linspace(0, len(inputs)-1, len(inputs))
 
     on_value=max(max(input_differences), 1)
     off_value=min(min(input_differences), -1)
@@ -48,7 +51,7 @@ def highligth_inputs(inputs : np.array, color='red', alpha : float = 0.3):
         return
         
     for i in range(len(ons)):
-        plt.axvspan(ons[i], offs[i], color=color, alpha=alpha, zorder=0)
+        plt.axvspan(time_instats[ons[i]], time_instats[offs[i]], color=color, alpha=alpha, zorder=0)
 
 def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = -1, time_window : int = -1, show:bool = True):
     fig = plt.figure(1,figsize=(19.20,10.80),dpi=100)
@@ -136,12 +139,17 @@ def make_video(directory : str, title : str = "video.mp4", fps : float = 1, key 
     paths = glob.glob(directory + key)
     paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
 
-    assert len(paths)>0, 'No images found. Video cannot be generated.'
+    assert len(paths)>0, 'No images found. Video cannot be generated!'
     
     dim=(1920,1080)
     
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video = cv2.VideoWriter(os.path.join(directory,title), fourcc, fps, frameSize=dim)
+    #fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v') # note the lower case
+    
+    video = cv2.VideoWriter()
+    
+    succes = video.open(os.path.join(directory,title), fourcc, fps, dim, True)
+    assert succes, 'Video creation failed! Try replacing your installation of opencv with opencv-python.'
     
     i=0;
     for path in paths:
@@ -150,7 +158,7 @@ def make_video(directory : str, title : str = "video.mp4", fps : float = 1, key 
         video.write(resized)
         i+=1; print(f'\rGenerating video from {len(paths)} images: {round(i/len(paths)*100,1)}%', end='\r')
         
-    #cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
     video.release()
     print(f'\nVideo {title} saved in {directory}')
 

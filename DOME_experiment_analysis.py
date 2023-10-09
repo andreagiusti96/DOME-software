@@ -98,6 +98,15 @@ def detect_outliers(data, m = 2., side='both'):
     
     return outliers
 
+def remove_agent(agent : int):
+    global speeds_smooth, acc_smooth, velocities, interp_positions
+    
+    speeds_smooth[:,agent]=np.nan
+    speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+    acc_smooth[:,agent]=np.nan
+    acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
+    velocities[:,agent]=np.nan
+    interp_positions[:,agent,:]= np.nan
 
 def detect_tumbling(speed, ang_vel, m=2.):
     speed=np.ma.array(speed, mask=np.isnan(speed))
@@ -355,7 +364,8 @@ def my_histogram(data : np.array, bins=10, normalize=False):
     plt.xlim([min(bins), max(bins)])
 
 
-def scatter_hist(x, y, n_bins=10):
+def scatter_hist(x : np.ndarray, y : np.ndarray, n_bins=10):
+    
     fig = plt.gcf()
     
     ax = fig.add_gridspec(top=0.75, right=0.75).subplots()
@@ -372,12 +382,15 @@ def scatter_hist(x, y, n_bins=10):
     number_of_series=len(x)
     
     for i in range(number_of_series):
+        x_vec = np.ma.filled(x[i], fill_value=np.nan)
+        y_vec = np.ma.filled(y[i], fill_value=np.nan)
+        
         # the scatter plot
-        ax.scatter(x[i], y[i])
+        ax.scatter(x_vec, y_vec)
         
         # the histograms     
-        x_val, x_bins = np.histogram(x[i][~np.isnan(x[i])], n_bins)
-        y_val, y_bins = np.histogram(y[i][~np.isnan(y[i])], n_bins)
+        x_val, x_bins = np.histogram(x_vec[~np.isnan(x_vec)], n_bins)
+        y_val, y_bins = np.histogram(y_vec[~np.isnan(y_vec)], n_bins)
         
         x_val = x_val/sum(x_val)/(x_bins[1]-x_bins[0])
         y_val = y_val/sum(y_val)/(y_bins[1]-y_bins[0])
@@ -394,8 +407,8 @@ def scatter_hist(x, y, n_bins=10):
 experiments_directory = '/Volumes/DOMEPEN/Experiments'
 # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
-experiment_name = "2023_06_15_Euglena_1"
-output_folder ='tracking_2023_09_14'
+experiment_name = "2023_07_10_Euglena_11"
+tracking_folder ='tracking_2023_10_09'
 
 # parameters
 min_traj_length = 10    # minimum length of the trajectories
@@ -415,7 +428,7 @@ time_instants = np.arange(stop=totalT+deltaT, step=deltaT)
 patterns = [current_experiment.get_pattern_at_time(t) for t in time_instants]
 
 # load tracking data
-positions, inactivity, *_ = DOMEtracker.load_tracking(output_folder, current_experiment)
+positions, inactivity, *_ = DOMEtracker.load_tracking(tracking_folder, current_experiment)
 number_of_agents = positions.shape[1]
 
 # plot trajectories
@@ -466,14 +479,8 @@ outliers_acc=detect_outliers(acc_smooth, m=variance_thresh, side='top')
 outliers = outliers_speed * outliers_acc
 for i in range(number_of_agents):
     if np.ma.max(outliers[:,i]):
-        print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i])*deltaT)+ ' and has been removed !')
-
-speeds_smooth[:,np.max(outliers, axis=0)]=np.nan
-speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
-acc_smooth[:,np.max(outliers, axis=0)]=np.nan
-acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
-velocities[:,np.max(outliers, axis=0)]=np.nan
-interp_positions[:,np.max(outliers, axis=0),:]= np.nan
+        print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i])*deltaT)+ 
+              '. Consider removing it with remove_agent(id).')
 
 
 # directions
@@ -564,7 +571,7 @@ plt.gca().set_xlim([0, totalT])
 plt.gca().set_ylim(0)
 plt.ylabel('Count')
 plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0])
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 plt.show()
 
 # length of trajectories histogram
@@ -598,7 +605,7 @@ plt.plot(time_instants,inputs[:,2], color='red')
 plt.title('Inputs')
 plt.xlabel('Time [s]')
 plt.gca().set_xlim([0, totalT])
-plt.gca().set_ylim([0, 255])
+plt.gca().set_ylim([0, 260])
 plt.ylabel('Brightness')
 plt.grid()
 plt.show()
@@ -614,7 +621,7 @@ plt.ylabel('Speed [px/s]')
 plt.gca().set_xlim([0, totalT])
 plt.gca().set_ylim(0)
 plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0])
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 
 plt.subplot(4, 1, 2)
 #plt.plot(np.linspace(0, time_instants-3, time_instants-2),np.ma.median(np.abs(acc),axis=1))
@@ -623,7 +630,7 @@ plt.fill_between(time_instants, np.min(acc_smooth,axis=1), np.max(acc_smooth,axi
 plt.gca().set_xlim([0, totalT])
 plt.ylabel('Acc [px/s^2]')
 plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0])
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 
 plt.subplot(4, 1, 3)
 #plt.plot(np.linspace(0, time_instants-3, time_instants-2),np.ma.median(np.abs(ang_vel),axis=1))
@@ -633,7 +640,7 @@ plt.gca().set_xlim([0, totalT])
 plt.ylabel('Ang Vel [rad/s]')
 #plt.xlabel('Time [s]')
 plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0])
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 
 plt.subplot(4, 1, 4)
 #plt.plot(time_instants,np.ma.mean(tumbling2,axis=1)*100)
@@ -643,7 +650,7 @@ plt.gca().set_xlim([0, totalT])
 plt.ylabel('Tumbling [% of agents]')
 plt.xlabel('Time [s]')
 plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0])
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 plt.show()
 
 # boxplots
@@ -774,6 +781,15 @@ plt.gca().set_xlim([0, 2.5])
 plt.grid()
 plt.show()
 
+# scatter plot MEAN speed and ang velocity
+plt.figure(figsize=(9,6))
+scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(np.ma.abs(ang_vel_smooth), axis=0)], n_bins=10)
+plt.xlabel('Mean Agents Speed [px/s]')
+plt.ylabel('Mean Agents Ang Vel [rad/s]')
+#plt.gca().set_xlim([0, 2.5])
+plt.grid()
+plt.show()
+
 # scatter plot speed and ang velocity - cluster wrt tumbling
 plt.figure(figsize=(9,6))
 x=split(np.ma.divide(speeds_smooth[:-1],np.ma.median(speeds_smooth, axis=0)), condition=tumbling2[:-1]<0.5)
@@ -858,7 +874,7 @@ plt.title('Movement of agent '+str(agent))
 plt.gca().set_xlim([0, totalT])
 plt.ylabel('Speed [px/s]')
 plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0])
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
 DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), 'yellow')
 
@@ -870,7 +886,7 @@ plt.gca().set_xlim([0, totalT])
 plt.ylabel('Abs Acc [px/s^2]')
 plt.xlabel('Time [s]')
 plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0])
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
 DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), 'yellow')
 plt.show()
@@ -885,7 +901,7 @@ plt.title('Movement of agent '+str(agent))
 plt.gca().set_xlim([0, totalT])
 plt.ylabel('Direction [rad]')
 plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0])
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
 DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), 'yellow')
 
@@ -898,7 +914,7 @@ DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), 'yellow')
 # plt.ylabel('Direction [rad]')
 # plt.yticks(np.linspace(-np.pi, np.pi, 5))
 # plt.grid()
-# DOMEgraphics.highligth_inputs(inputs[:,0])
+# DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 
 plt.subplot(2, 1, 2)
 plt.plot(time_instants[1:],np.abs(ang_vel_smooth[:,agent]))
@@ -907,7 +923,7 @@ plt.gca().set_xlim([0, totalT])
 plt.ylabel('Abs Angular Vel [rad/s]')
 plt.xlabel('Time [s]')
 plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0])
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
 DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), 'yellow')
 plt.show()
@@ -1058,7 +1074,7 @@ plt.show()
 # plot trajectory of one agent
 last_index = inactivity.shape[0] - (inactivity[:, agent]<=0)[::-1].argmax(0) - 1
 img = current_experiment.get_img_at_time(last_index*deltaT)
-DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivity[:,agent:agent+1], img, "trajectory of agent " +str(agent))
+DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivity[:,agent:agent+1], img, "trajectory of agent " +str(agent));
 # #tumbling_pos = interp_positions[:-1,agent,:][tumbling[:,agent]>0]
 # tumbling_pos2 = interp_positions[:,agent,:][tumbling2[:,agent]>0]
 # #plt.scatter(tumbling_pos[:,0], tumbling_pos[:,1], color='green' )

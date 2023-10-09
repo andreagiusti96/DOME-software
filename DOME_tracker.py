@@ -208,7 +208,7 @@ def interpolate_positions(positions: np.array, original_times = [], new_times = 
         missing_points = np.where(nans)[0] + first_index
         valid_points = np.where(~nans)[0] + first_index
 
-        if len(missing_points) > 0:
+        if len(missing_points) and len(valid_points)> 0:
             trajectory_x = positions[valid_points, obj, 0]
             trajectory_y = positions[valid_points, obj, 1]
             interpolated_pos[missing_points, obj, 0] = np.interp(missing_points, valid_points, trajectory_x)
@@ -526,6 +526,23 @@ def valid_positions(positions: np.array):
     assert len(validity) == positions.shape[0]
     return validity
 
+def save_tracking(experiment : DOMEexp.ExperimentManager = None):
+    if not experiment:
+        experiment = current_experiment
+    
+    # generate tracking images
+    overlap_trajectories(experiment)
+    
+    # make video from images
+    output_dir = os.path.join(experiment.path, output_folder)
+    DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2, key='/trk_*.jpeg')
+
+    # Save tracking data
+    current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), force=True, positions=positions,
+                                     inactivity=inactivity, total_cost=total_cost, parameters=PARAMETERS)
+    
+    print(output_folder + ": Data, images and video updated.")
+
 def overlap_trajectories(experiment : DOMEexp.ExperimentManager = None):
     if not experiment:
         experiment = current_experiment
@@ -544,14 +561,17 @@ def overlap_trajectories(experiment : DOMEexp.ExperimentManager = None):
                                              title='time=' + str(time), max_inactivity=3, time_window=5, show=False)
         fig.savefig(os.path.join(experiment.path, output_folder, 'trk_' + '%04.1f' % time + '.jpeg'), dpi=100)
         print(f'\rGenerating tracking images: {round((counter+1)/frames_number*100,1)}% of {frames_number} images', end='\r')
+    print("\nNow you can use DOMEgraphics.make_video to generate the video.")
 
 def merge_trajectories(id1 : int, id2 : int):
     assert id1 < id2, "id2 must be greater than id1!"
     assert id1 < positions.shape[1], "id1 cannot be greater than the number of agents!"
     assert id2 < positions.shape[1], "id2 cannot be greater than the number of agents!"
+    assert any(inactivity[:,id1]==0), f"Agent {id1} is never active!"
+    assert any(inactivity[:,id2]==0), f"Agent {id2} is never active!"
 
-    print("inactivity of "+str(id1)+":\n"+ str(inactivity[:,id1]))
-    print("inactivity of "+str(id2)+":\n"+ str(inactivity[:,id2]))
+    #print("inactivity of "+str(id1)+":\n"+ str(inactivity[:,id1]))
+    #print("inactivity of "+str(id2)+":\n"+ str(inactivity[:,id2]))
 
     assert all(inactivity[inactivity[:,id1]==0,id2]!=0), f"Agents {id1} and {id2} are active at the same time, their trajectories cannot be merged!"
 
@@ -561,7 +581,8 @@ def merge_trajectories(id1 : int, id2 : int):
     positions[:,id2,:] = np.nan
     inactivity[:,id2] = -1
 
-    print("inactivity of "+str(id1)+" after merge:\n"+ str(inactivity[:,id1]))
+    #print("inactivity of "+str(id1)+" after merge:\n"+ str(inactivity[:,id1]))
+    print("When you are done use save_tracking() to save updated tracking images and data.")
 
 
 def extract_data_from_images(fileLocation, background: np.ndarray, parameters : dict,
@@ -746,13 +767,13 @@ def load_tracking(tracking_name : str = None, experiment : [str, DOMEexp.Experim
             total_cost = data['total_cost'].item()
 
         if 'parameters' in data.files:
-            parameters = data['parameters'].item()
+            PARAMETERS = data['parameters'].item()
 
     assert inactivity.shape[0] == positions.shape[0]
     assert inactivity.shape[1] == positions.shape[1]
     print(f'{tracking_name} loaded.\nTotal cost = {np.round(total_cost,2)}, total objects = {inactivity.shape[1]}, time frames = {inactivity.shape[0]}')
 
-    return positions, inactivity, total_cost, parameters, current_experiment
+    return positions, inactivity, total_cost, PARAMETERS, current_experiment
 
 # MAIN
 if __name__ == '__main__':
@@ -799,20 +820,22 @@ if __name__ == '__main__':
     experiments_directory = '/Volumes/DOMEPEN/Experiments'
     # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
-    experiment_names = ["2023_06_15_Euglena_1","2023_06_15_Euglena_2","2023_06_26_Euglena_13",
-                        "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6"]
+    #tracked_experiments = ["2023_06_15_Euglena_1","2023_06_15_Euglena_2","2023_06_26_Euglena_13",
+    #                    "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6"]
+    
+    experiment_names = ["2023_07_10_Euglena_11"]
 
-    #output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
-    output_folder = 'tracking_prova'
+    output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
+    #output_folder = 'tracking_prova'
 
     terminal_time = -1   #set negative to analyse the whole experiment
-    verbose = False      #print info during tracking
+    verbose = True      #print info during tracking
     show_tracking_images = os.name == 'posix'
 
     print('Now use one of the following commands:'
           '\n\ttest_detection_parameters'
           '\n\tstart_tracking'
-          '\n\tload_tracking')
+          '\n\tpositions, inactivity, total_cost, PARAMETERS, current_experiment=load_tracking(output_folder,experiment_name)')
 
     # test thresholds for object detection
     # test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
