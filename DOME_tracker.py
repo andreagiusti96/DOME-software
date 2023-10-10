@@ -115,7 +115,7 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
 
     # Hungarian optimization algorithm
     row_ind, col_ind = scipy.optimize.linear_sum_assignment(costs)
-    cost = costs[row_ind, col_ind].sum()
+    cost = costs[row_ind, col_ind].sum()*TYPICAL_VEL
 
     # update ids
     new_ids = [i for i in col_ind]
@@ -184,12 +184,12 @@ def estimate_positions(old_pos: np.array, velocity: np.array, deltaT:float):
     assert old_pos.shape[1] == 2
     assert deltaT > 0
 
-    inertia = 0.66
+    inertia = PARAMETERS["INERTIA"]
 
-    estimated_pos = old_pos + velocity*deltaT * inertia
+    estimated_pos = old_pos + velocity * inertia * deltaT 
 
     non_valid_pos_idx = ~ valid_positions(estimated_pos)
-    estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx] - velocity[non_valid_pos_idx]*deltaT * inertia
+    estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx] - velocity[non_valid_pos_idx] * inertia * deltaT 
 
     return estimated_pos
 
@@ -658,7 +658,8 @@ def extract_data_from_images(fileLocation, background: np.ndarray, parameters : 
 
             # for new objects allocate new data
             else:
-                empty_row = - np.empty([frames_number, 1, 2], dtype=float) * np.nan
+                with np.errstate(invalid='ignore'):
+                    empty_row = np.empty([frames_number, 1, 2], dtype=float) * np.nan
                 positions = np.concatenate([positions, empty_row], axis=1)
                 positions[counter, number_of_objects] = new_positions[new_ids.index(new_id)]
 
@@ -699,8 +700,8 @@ def extract_data_from_images(fileLocation, background: np.ndarray, parameters : 
         counter+=1
 
     # print average info
-    print('\ntotal number of detected objects = ' + str(inactivity.shape[1]))
-    print('total matching cost = ' + str(round(total_cost,2)), end='\n\n')
+    print('\nTotal number of detected objects = ' + str(inactivity.shape[1]))
+    print('Total matching cost = ' + str(round(total_cost,2)), end='\n\n')
 
     return positions, inactivity, total_cost
 
@@ -709,7 +710,7 @@ def start_tracking(experiment_names : [List, str]):
         experiment_names=[experiment_names]
 
     for exp_counter in range(len(experiment_names)):
-        print(f'Tracking experiment {exp_counter+1} of {len(experiment_names)}')
+        print(f'\nTracking experiment {exp_counter+1} of {len(experiment_names)}')
         experiment_name = experiment_names[exp_counter]
         current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)
 
@@ -787,7 +788,8 @@ if __name__ == '__main__':
         "AREA_RANGE" : [175, 1200],
         "COMPAC_RANGE" : [0.55, 0.90],
         "BRIGHT_THRESH" : [85],
-        "TYPICAL_VEL" : 50
+        "TYPICAL_VEL" : 70,             # [px/s]
+        "INERTIA" : 0.9
     }
 
     # # P. Caudatum
@@ -796,6 +798,7 @@ if __name__ == '__main__':
     #     "COMPAC_RANGE" : [0.5, 0.9],
     #     "BRIGHT_THRESH" : [70],
     #     "TYPICAL_VEL" : 100
+    #     "INERTIA" : 0.9
     # }
 
     # # # P. Bursaria
@@ -804,6 +807,7 @@ if __name__ == '__main__':
     #     "COMPAC_RANGE" : [0.6, 0.9],
     #     "BRIGHT_THRESH" : [60],
     #     "TYPICAL_VEL" : 50
+    #     "INERTIA" : 0.9
     # }
 
     # # Volvox
@@ -812,6 +816,7 @@ if __name__ == '__main__':
     #     "COMPAC_RANGE" : [0.7, 1.0],
     #     "BRIGHT_THRESH" : [70],
     #     "TYPICAL_VEL" : 30
+    #     "INERTIA" : 0.9
     # }
 
 
@@ -820,21 +825,25 @@ if __name__ == '__main__':
     experiments_directory = '/Volumes/DOMEPEN/Experiments'
     # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
-    #tracked_experiments = ["2023_06_15_Euglena_1","2023_06_15_Euglena_2","2023_06_26_Euglena_13",
-    #                    "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6"]
-    
+
+    # tracked_experiments = ["2023_06_15_Euglena_1","2023_06_15_Euglena_2",
+    #                     "2023_06_26_Euglena_13", "2023_06_26_Euglena_23", 
+    #                     "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6", 
+    #                     "2023_07_10_Euglena_8","2023_07_10_Euglena_10","2023_07_10_Euglena_12",
+    #                     "2023_07_10_Euglena_15"]
+
     experiment_names = ["2023_07_10_Euglena_11"]
 
-    output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
-    #output_folder = 'tracking_prova'
+    #output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
+    output_folder = 'tracking_prova'
 
-    terminal_time = -1   #set negative to analyse the whole experiment
-    verbose = True      #print info during tracking
+    terminal_time = 10   #set negative to analyse the whole experiment
+    verbose = False      #print info during tracking
     show_tracking_images = os.name == 'posix'
 
     print('Now use one of the following commands:'
           '\n\ttest_detection_parameters'
-          '\n\tstart_tracking'
+          '\n\tstart_tracking(experiment_names)'
           '\n\tpositions, inactivity, total_cost, PARAMETERS, current_experiment=load_tracking(output_folder,experiment_name)')
 
     # test thresholds for object detection
