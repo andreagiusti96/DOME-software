@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 import glob
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 import re
 import os
 from typing import List
@@ -484,6 +485,11 @@ def overlap_patterns(experiment, alpha:float=1, save_fig:bool=False, save_video:
     
 #     assert len(validity) == positions.shape[0]
 #     return validity
+
+def cropCmap(cmap_name : str, minVal:float, maxVal:float):
+    cmap = plt.colormaps[cmap_name]
+    new_cmap = LinearSegmentedColormap.from_list('New'+cmap_name, cmap(np.linspace(minVal, maxVal, 10)), N=256, gamma=1.0)
+    return new_cmap
 
 def std_color_for_index(index : int):
     index = index%len(STD_COLORS)

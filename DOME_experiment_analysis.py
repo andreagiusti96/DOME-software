@@ -364,7 +364,7 @@ def my_histogram(data : np.array, bins=10, normalize=False):
     plt.xlim([min(bins), max(bins)])
 
 
-def scatter_hist(x : np.ndarray, y : np.ndarray, n_bins=10):
+def scatter_hist(x : np.ndarray, y : np.ndarray, c : np.ndarray = None, n_bins : int = 10, cmap = "viridis"):
     
     fig = plt.gcf()
     
@@ -386,7 +386,11 @@ def scatter_hist(x : np.ndarray, y : np.ndarray, n_bins=10):
         y_vec = np.ma.filled(y[i], fill_value=np.nan)
         
         # the scatter plot
-        ax.scatter(x_vec, y_vec)
+        if c is None:
+            ax.scatter(x_vec, y_vec)
+        else:
+            c_vec = np.ma.filled(c[i], fill_value=np.nan)
+            ax.scatter(x_vec, y_vec, c=c_vec, cmap = cmap)
         
         # the histograms     
         x_val, x_bins = np.histogram(x_vec[~np.isnan(x_vec)], n_bins)
@@ -509,7 +513,7 @@ ang_vel_smooth = np.gradient(directions_reg_smooth, deltaT, axis=0)
 #ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
 ang_vel_smooth = moving_average(ang_vel_smooth, 3)
 ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
-
+abs_ang_vel_smooth = np.ma.abs(ang_vel_smooth)
 
 # autocorrelation of velocities
 # disp_acorr=[]
@@ -622,45 +626,71 @@ plt.grid()
 plt.savefig(os.path.join(plots_dir, 'inputs.pdf'), bbox_inches = 'tight')
 plt.show()
 
-# Average Speed, Acc, Angular Velocity, and Tumbling
-plt.figure(figsize=(9,8))
-plt.subplot(4, 1, 1)
+# # Average Speed, Acc, Angular Velocity, and Tumbling
+# plt.figure(figsize=(9,8))
+# plt.subplot(4, 1, 1)
+# #plt.plot(time_instants[:-1],np.ma.median(speeds,axis=1))
+# plt.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
+# plt.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
+# plt.xlabel('Time [s]')
+# plt.ylabel('Speed [px/s]')
+# plt.gca().set_xlim([0, totalT])
+# plt.gca().set_ylim(0)
+# plt.grid()
+# DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+
+# plt.subplot(4, 1, 2)
+# plt.plot(time_instants,np.ma.median(acc_smooth,axis=1))
+# plt.fill_between(time_instants, np.min(acc_smooth,axis=1), np.max(acc_smooth,axis=1),alpha=0.5)
+# plt.gca().set_xlim([0, totalT])
+# plt.ylabel('Acc [px/s^2]')
+# plt.grid()
+# DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+
+# plt.subplot(4, 1, 3)
+# plt.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
+# plt.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
+# plt.gca().set_xlim([0, totalT])
+# plt.ylabel('Ang Vel [rad/s]')
+# #plt.xlabel('Time [s]')
+# plt.grid()
+# DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+
+# plt.subplot(4, 1, 4)
+# plt.plot(time_instants,np.ma.mean(moving_average(tumbling2, 3),axis=1)*100)
+# plt.gca().set_xlim([0, totalT])
+# plt.ylabel('Tumbling [% of agents]')
+# plt.xlabel('Time [s]')
+# plt.grid()
+# DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+# plt.savefig(os.path.join(plots_dir, 'time_evolution.pdf'), bbox_inches = 'tight')
+# plt.show()
+
+# Average Speed and Angular Velocity
+plt.figure(figsize=(9,4))
+plt.subplot(2, 1, 1)
 #plt.plot(time_instants[:-1],np.ma.median(speeds,axis=1))
 plt.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
 plt.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
-plt.xlabel('Time [s]')
+#plt.xlabel('Time [s]')
 plt.ylabel('Speed [px/s]')
 plt.gca().set_xlim([0, totalT])
 plt.gca().set_ylim(0)
 plt.grid()
 DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 
-plt.subplot(4, 1, 2)
-plt.plot(time_instants,np.ma.median(acc_smooth,axis=1))
-plt.fill_between(time_instants, np.min(acc_smooth,axis=1), np.max(acc_smooth,axis=1),alpha=0.5)
-plt.gca().set_xlim([0, totalT])
-plt.ylabel('Acc [px/s^2]')
-plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-
-plt.subplot(4, 1, 3)
+plt.subplot(2, 1, 2)
 plt.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
 plt.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
 plt.gca().set_xlim([0, totalT])
-plt.ylabel('Ang Vel [rad/s]')
-#plt.xlabel('Time [s]')
-plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-
-plt.subplot(4, 1, 4)
-plt.plot(time_instants,np.ma.mean(moving_average(tumbling2, 3),axis=1)*100)
-plt.gca().set_xlim([0, totalT])
-plt.ylabel('Tumbling [% of agents]')
+plt.ylabel('Ang. Vel. [rad/s]')
 plt.xlabel('Time [s]')
 plt.grid()
 DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 plt.savefig(os.path.join(plots_dir, 'time_evolution.pdf'), bbox_inches = 'tight')
 plt.show()
+
+
 
 # boxplots
 plt.figure(figsize=(4,8))
@@ -783,20 +813,9 @@ plt.show()
 # plt.xlim([0, 20])
 # plt.show()
 
-
-# scatter plot speed and ang velocity
-plt.figure(figsize=(9,6))
-scatter_hist([speeds_smooth[:-1]/np.ma.median(speeds_smooth, axis=0)], [np.ma.abs(ang_vel_smooth)], n_bins=20)
-plt.xlabel('Speed / Agents median speed')
-plt.ylabel('Ang Vel [rad/s]')
-plt.gca().set_xlim([0, 2.5])
-plt.grid()
-plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_all.pdf'), bbox_inches = 'tight')
-plt.show()
-
 # scatter plot MEAN speed and MEAN ang velocity
 plt.figure(figsize=(9,6))
-scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(np.ma.abs(ang_vel_smooth), axis=0)], n_bins=10)
+scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(abs_ang_vel_smooth, axis=0)], n_bins=10)
 plt.xlabel('Mean Agents Speed [px/s]')
 plt.ylabel('Mean Agents Ang Vel [rad/s]')
 #plt.gca().set_xlim([0, 2.5])
@@ -804,10 +823,25 @@ plt.grid()
 plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_mean.pdf'), bbox_inches = 'tight')
 plt.show()
 
+# scatter plot speed variation and ang velocity variation
+fig=plt.figure(figsize=(9,6))
+speed_variation = [np.log10(speeds_smooth[:-1]/np.ma.median(speeds_smooth, axis=0))]
+ang_vel_variation = [np.log10(abs_ang_vel_smooth/np.ma.median(abs_ang_vel_smooth, axis=0))]
+c = np.ma.median(speeds_smooth, axis=0)
+color = [np.tile(c, (len(time_instants)-1,1))]
+scatter_hist(speed_variation, ang_vel_variation, color, n_bins=50, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+plt.xlabel('Speed / Agents median speed [log10]')
+plt.ylabel('Ang Vel / Agents median ang. vel. [log10]')
+# plt.gca().set_xlim([0, 20])
+# plt.gca().set_ylim([0, 20])
+plt.grid()
+plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_variation_all.pdf'), bbox_inches = 'tight')
+plt.show()
+
 # # scatter plot speed and ang velocity - cluster wrt tumbling
 # plt.figure(figsize=(9,6))
 # x=split(np.ma.divide(speeds_smooth[:-1],np.ma.median(speeds_smooth, axis=0)), condition=tumbling2[:-1]<0.5)
-# y=split(np.ma.abs(ang_vel_smooth), condition=tumbling2[:-1]<0.5)
+# y=split(abs_ang_vel_smooth, condition=tumbling2[:-1]<0.5)
 # scatter_hist(x, y, n_bins=20)
 # plt.xlabel('Speed / Agents median speed')
 # plt.ylabel('Ang Vel [rad/s]')
@@ -830,54 +864,54 @@ plt.grid()
 plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_light.pdf'), bbox_inches = 'tight')
 plt.show()
 
-# scatter plot speed and lag1 similarity
-plt.figure(figsize=(9,6))
-x=[np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0))]
-y=[lag1_similarity]
-scatter_hist(x, y, n_bins=20)
-plt.xlabel('Speed / Agents median speed')
-plt.ylabel('Lag 1 similarity')
-plt.gca().set_xlim([0, 2.5])
-plt.grid()
-plt.savefig(os.path.join(plots_dir, 'scatter_speed_lag1.pdf'), bbox_inches = 'tight')
-plt.show()
+# # scatter plot speed and lag1 similarity
+# plt.figure(figsize=(9,6))
+# x=[np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0))]
+# y=[lag1_similarity]
+# scatter_hist(x, y, n_bins=20)
+# plt.xlabel('Speed / Agents median speed')
+# plt.ylabel('Lag 1 similarity')
+# plt.gca().set_xlim([0, 2.5])
+# plt.grid()
+# plt.savefig(os.path.join(plots_dir, 'scatter_speed_lag1.pdf'), bbox_inches = 'tight')
+# plt.show()
 
-# scatter plot speed and lag1 similarity - cluster wrt tumbling
-plt.figure(figsize=(9,6))
-x=split(np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0)), condition=tumbling2<0.5)
-y=split(lag1_similarity, condition=tumbling2<0.5)
-scatter_hist(x, y, n_bins=20)
-plt.xlabel('Speed / Agents median speed')
-plt.ylabel('Lag 1 similarity')
-plt.gca().set_xlim([0, 2.5])
-plt.legend(['running', 'tumbling'])
-plt.grid()
-plt.savefig(os.path.join(plots_dir, 'scatter_speed_lag1_tumbling.pdf'), bbox_inches = 'tight')
-plt.show()
+# # scatter plot speed and lag1 similarity - cluster wrt tumbling
+# plt.figure(figsize=(9,6))
+# x=split(np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0)), condition=tumbling2<0.5)
+# y=split(lag1_similarity, condition=tumbling2<0.5)
+# scatter_hist(x, y, n_bins=20)
+# plt.xlabel('Speed / Agents median speed')
+# plt.ylabel('Lag 1 similarity')
+# plt.gca().set_xlim([0, 2.5])
+# plt.legend(['running', 'tumbling'])
+# plt.grid()
+# plt.savefig(os.path.join(plots_dir, 'scatter_speed_lag1_tumbling.pdf'), bbox_inches = 'tight')
+# plt.show()
 
-# scatter plot speed and lag1 similarity - cluster wrt light input
-plt.figure(figsize=(9,6))
-x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off,np.ma.median(speeds_smooth, axis=0))]
-y=[lag1_similarity_on, lag1_similarity_off]
-scatter_hist(x, y, n_bins=20)
-plt.xlabel('Speed / Agents median speed')
-plt.ylabel('Lag 1 similarity')
-plt.gca().set_xlim([0, 2.5])
-plt.legend(['Light ON', 'Light OFF'])
-plt.grid()
-plt.savefig(os.path.join(plots_dir, 'scatter_speed_lag1_light.pdf'), bbox_inches = 'tight')
-plt.show()
+# # scatter plot speed and lag1 similarity - cluster wrt light input
+# plt.figure(figsize=(9,6))
+# x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off,np.ma.median(speeds_smooth, axis=0))]
+# y=[lag1_similarity_on, lag1_similarity_off]
+# scatter_hist(x, y, n_bins=20)
+# plt.xlabel('Speed / Agents median speed')
+# plt.ylabel('Lag 1 similarity')
+# plt.gca().set_xlim([0, 2.5])
+# plt.legend(['Light ON', 'Light OFF'])
+# plt.grid()
+# plt.savefig(os.path.join(plots_dir, 'scatter_speed_lag1_light.pdf'), bbox_inches = 'tight')
+# plt.show()
 
-# heatmap input - tumbling
-plt.figure(figsize=(4,4))
-x=np.array([[np.ma.sum(tumbling_on),
-    np.ma.sum(tumbling_off)], 
-   [np.ma.sum(-tumbling_on+1), 
-    np.ma.sum(-tumbling_off+1)]])
-x=(x.T/np.ma.sum(x, axis=1)).T
-sns.heatmap(x, xticklabels=['Light ON','Light OFF'], yticklabels=['Tumbling','Running'], 
-            annot=True, cbar=False, vmin=0.25, vmax=0.75, cmap="gray", linewidths=0.2)
-plt.savefig(os.path.join(plots_dir, 'tumbling_light.pdf'), bbox_inches = 'tight')
+# # heatmap input - tumbling
+# plt.figure(figsize=(4,4))
+# x=np.array([[np.ma.sum(tumbling_on),
+#     np.ma.sum(tumbling_off)], 
+#    [np.ma.sum(-tumbling_on+1), 
+#     np.ma.sum(-tumbling_off+1)]])
+# x=(x.T/np.ma.sum(x, axis=1)).T
+# sns.heatmap(x, xticklabels=['Light ON','Light OFF'], yticklabels=['Tumbling','Running'], 
+#             annot=True, cbar=False, vmin=0.25, vmax=0.75, cmap="gray", linewidths=0.2)
+# plt.savefig(os.path.join(plots_dir, 'tumbling_light.pdf'), bbox_inches = 'tight')
 
 
 # Select one agent ---------------------------------------------------------------------------------
