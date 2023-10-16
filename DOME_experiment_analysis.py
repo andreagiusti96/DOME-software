@@ -111,6 +111,12 @@ def remove_agents(agents : [int, List]):
         acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
         velocities[:,a]=np.nan
         interp_positions[:,a,:]= np.nan
+        
+    # Save analysis data
+    current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
+                                  interp_positions=interp_positions, speeds_smooth=speeds_smooth,
+                                  ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
+                                  ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off)
 
 def detect_tumbling(speed, ang_vel, m=2.):
     speed=np.ma.array(speed, mask=np.isnan(speed))
@@ -433,6 +439,128 @@ def add_significance_bar(p_value=None, y=None, data=None, rel_h=0.1, use_stars =
     axis.text((1+2)*.5, y+h*1.4, text, ha='center', va='bottom', color=col)
     axis.set_ylim(top=y+4*h)
 
+def analyse_trajectories():
+    # replace estimated positions with interpolated ones and apply uniform time sampling
+    positions[inactivity!=0]=np.nan
+    interp_positions = DOMEtracker.interpolate_positions(positions, activation_times, time_instants)
+    #interp_positions = DOMEtracker.interpolate_positions(positions)
+    DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="interpolated trajectories", max_inactivity=0)
+
+    # smooth trajectories
+    #interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
+    interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
+    interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
+    # interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
+    # interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
+    DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="smoothed trajectories", max_inactivity=0)
+
+
+    # length of trajectories
+    lengths = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=0) * deltaT
+
+    # discard short trajectories
+    interp_positions[:,lengths<min_traj_length,:]= np.nan
+
+    # velocities
+    #displacements = np.gradient(interp_positions, axis=0)        # [px/frame]
+    velocities = np.gradient(interp_positions, deltaT, axis=0)    # [px/s]
+
+    # speed [px/s]
+    speeds = np.linalg.norm(velocities, axis=2) 
+    speeds = np.ma.array(speeds, mask=np.isnan(speeds))
+
+    speeds_smooth = moving_average(speeds, 3)
+    speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+
+    # accelearation [px/s^2]
+    acc = np.gradient(speeds_smooth, axis=0)                                
+    acc = np.ma.array(acc, mask=np.isnan(acc))
+    acc_smooth = moving_average(acc, 3)
+    acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
+
+    # reject outliers
+    outliers_speed=detect_outliers(speeds_smooth, m=variance_thresh, side='top')
+    outliers_acc=detect_outliers(acc_smooth, m=variance_thresh, side='top')
+    outliers = outliers_speed * outliers_acc
+    for i in range(number_of_agents):
+        if np.ma.max(outliers[:,i]):
+            print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i])*deltaT)+ 
+                  '. Consider removing it with remove_agent(id).')
+
+
+    # directions
+    norm_disp = np.divide(velocities,np.stack([speeds,speeds], axis=2)+0.001)
+    norm_disp = np.ma.array(norm_disp, mask=np.isnan(norm_disp))
+    directions=np.arctan2(norm_disp[:,:,1],norm_disp[:,:,0])
+
+    # compue angular velocity [rad/s]
+    ang_vel = angle_diff(directions[1:,:], directions[:-1,:])
+    ang_vel = np.ma.array(ang_vel, mask=np.isnan(ang_vel))
+
+    # inergrate angular velocity to obtain continous direction
+    starting_dir = np.zeros([1, directions.shape[1]])
+    for i in range(directions.shape[1]):
+        starting_idx = np.ma.flatnotmasked_edges(directions[:,i])
+        try:
+            starting_dir[0,i]= directions[np.ma.flatnotmasked_edges(directions[:,i])[0], i] 
+        except:
+            pass
+    directions_reg = starting_dir + np.cumsum(ang_vel, axis=0)
+    directions_reg[directions_reg.mask==1] = np.nan
+    directions_reg_smooth = moving_average(directions_reg, 3)
+
+    # differentiate continous direction to obtain smooth ang vel [rad/s]
+    ang_vel_smooth = np.gradient(directions_reg_smooth, deltaT, axis=0)
+    #ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
+    ang_vel_smooth = moving_average(ang_vel_smooth, 3)
+    ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
+    abs_ang_vel_smooth = np.ma.abs(ang_vel_smooth)
+
+    # autocorrelation of velocities
+    # disp_acorr=[]
+    # disp_corr=[]
+    lag1_similarity=np.zeros(speeds_smooth.shape)
+    for agent in range(number_of_agents):
+        # disp_acorr.append(vector_autocorrelation(displacements[:,agent,:]))
+        # disp_corr.append(vector_correlation(displacements[:,agent,:], displacements[:,agent,:]))
+        lag1_similarity[:,agent]= lag_auto_similarity(velocities[:,agent,:])
+    lag1_similarity = np.ma.array(lag1_similarity, mask=np.isnan(lag1_similarity))
+
+
+    # detect tumbling
+    var_thresh = 1
+    lag1_similarity_thresh = 0.75
+    tumbling=np.zeros(ang_vel_smooth.shape)
+    tumbling2=np.zeros(speeds_smooth.shape)
+    for agent in range(number_of_agents):
+        tumbling[:,agent] = detect_tumbling(speeds_smooth[:,agent], ang_vel_smooth[:,agent], var_thresh)
+        tumbling2[:,agent] = detect_outliers(lag1_similarity[:,agent], 1.5, 'bottom') * (lag1_similarity[:,agent] < lag1_similarity_thresh)
+    tumbling = np.ma.array(tumbling, mask=np.isnan(ang_vel_smooth))
+    tumbling2 = np.ma.array(tumbling2, mask=np.isnan(speeds_smooth))
+    # tumbling=np.ma.filled(tumbling, np.nan)
+    # tumbling2=np.ma.filled(tumbling2, np.nan)
+
+
+    # inputs
+    inputs = np.mean(np.mean(patterns, axis=1), axis=1)
+
+    # values for different inputs
+    [speeds_on, speeds_off] = split(speeds_smooth, condition=inputs[:,0]>=50)
+    [acc_on, acc_off] = split(acc_smooth, condition=inputs[:,0]>=50)
+    [ang_vel_on, ang_vel_off] = split(np.abs(ang_vel_smooth), condition=inputs[:-1,0]>=50)
+    [tumbling_on, tumbling_off] = split(tumbling2, condition=inputs[:,0]>=50)
+    [lag1_similarity_on, lag1_similarity_off] = split(lag1_similarity, condition=inputs[:,0]>=50)
+
+
+    # T-test
+    #scipy.stats.ttest_ind(np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1))
+    
+    # Save analysis data
+    current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
+                                  interp_positions=interp_positions, speeds_smooth=speeds_smooth,
+                                  ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
+                                  ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off)
+    print(f'Analysis data saved as {os.path.join(current_experiment.path, tracking_folder, "analysed_data.npz")}')
 
 # MAIN -------------------------------------------------------------------------------------
 # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
@@ -448,10 +576,9 @@ tracking_folder ='last'
 min_traj_length = 5    # minimum length of the trajectories [s]
 variance_thresh = 2.5   # variance threshold for outliers detection
 
-## LOAD EXPERIMENT AND TRACKING DATA
+## LOAD EXPERIMENT DATA
 current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)  
 
-# load experiment data
 totalT = current_experiment.get_totalT()  
 deltaT = float(current_experiment.get_deltaT())  
 with current_experiment.get_data('data.npz') as data:
@@ -461,7 +588,10 @@ time_steps = np.diff(activation_times)
 time_instants = np.arange(stop=totalT+deltaT, step=deltaT)
 patterns = [current_experiment.get_pattern_at_time(t) for t in time_instants]
 
-# load tracking data
+# inputs
+inputs = np.mean(np.mean(patterns, axis=1), axis=1)
+
+## LOAD TRACKING DATA
 if tracking_folder=='last':
     tracking_folder = current_experiment.get_last_tracking()
 positions, inactivity, *_ = DOMEtracker.load_tracking(tracking_folder, current_experiment)
@@ -471,123 +601,160 @@ number_of_agents = positions.shape[1]
 img = current_experiment.get_img_at_time(totalT)
 DOMEgraphics.draw_trajectories(positions, inactivity=inactivity, img=img, title="trajectories", max_inactivity=0)
 
-# replace estimated positions with interpolated ones and apply uniform time sampling
-positions[inactivity!=0]=np.nan
-interp_positions = DOMEtracker.interpolate_positions(positions, activation_times, time_instants)
-#interp_positions = DOMEtracker.interpolate_positions(positions)
-DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="interpolated trajectories", max_inactivity=0)
+## PERFORM TRAJECTORIES ANALYSIS (IF NOT EXISTING) AND LOAD DATA
+analysed_data_path = os.path.join(current_experiment.path, tracking_folder, "analysed_data.npz")
 
-# smooth trajectories
-#interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
-interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
-interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
-# interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
-# interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
-DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="smoothed trajectories", max_inactivity=0)
-
-
+if not os.path.isfile(analysed_data_path):
+    print("Analysing trajectories...")
+    analyse_trajectories()
+else:
+    print("Loading existing analysis data...")
+    
+with current_experiment.get_data(analysed_data_path) as analysed_data:
+    time_steps=analysed_data["time_steps"]
+    interp_positions=analysed_data["interp_positions"]
+    interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
+    speeds_smooth=analysed_data["speeds_smooth"]
+    speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+    ang_vel_smooth=analysed_data["ang_vel_smooth"]
+    ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
+    speeds_on=analysed_data["speeds_on"]
+    speeds_on = np.ma.array(speeds_on, mask=np.isnan(speeds_on))
+    speeds_off=analysed_data["speeds_off"]
+    speeds_off = np.ma.array(speeds_off, mask=np.isnan(speeds_off))
+    ang_vel_on=analysed_data["ang_vel_on"]
+    ang_vel_on = np.ma.array(ang_vel_on, mask=np.isnan(ang_vel_on))
+    ang_vel_off=analysed_data["ang_vel_off"]
+    ang_vel_off = np.ma.array(ang_vel_off, mask=np.isnan(ang_vel_off))    
+        
 # length of trajectories
 lengths = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=0) * deltaT
 
-# discard short trajectories
-interp_positions[:,lengths<min_traj_length,:]= np.nan
-
-# velocities
-#displacements = np.gradient(interp_positions, axis=0)        # [px/frame]
-velocities = np.gradient(interp_positions, deltaT, axis=0)    # [px/s]
-
-# speed [px/s]
-speeds = np.linalg.norm(velocities, axis=2) 
-speeds = np.ma.array(speeds, mask=np.isnan(speeds))
-
-speeds_smooth = moving_average(speeds, 3)
-speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
-
-# accelearation [px/s^2]
-acc = np.gradient(speeds_smooth, axis=0)                                
-acc = np.ma.array(acc, mask=np.isnan(acc))
-acc_smooth = moving_average(acc, 3)
-acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
-
-# reject outliers
-outliers_speed=detect_outliers(speeds_smooth, m=variance_thresh, side='top')
-outliers_acc=detect_outliers(acc_smooth, m=variance_thresh, side='top')
-outliers = outliers_speed * outliers_acc
-for i in range(number_of_agents):
-    if np.ma.max(outliers[:,i]):
-        print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i])*deltaT)+ 
-              '. Consider removing it with remove_agent(id).')
-
-
-# directions
-norm_disp = np.divide(velocities,np.stack([speeds,speeds], axis=2)+0.001)
-norm_disp = np.ma.array(norm_disp, mask=np.isnan(norm_disp))
-directions=np.arctan2(norm_disp[:,:,1],norm_disp[:,:,0])
-
-# compue angular velocity [rad/s]
-ang_vel = angle_diff(directions[1:,:], directions[:-1,:])
-ang_vel = np.ma.array(ang_vel, mask=np.isnan(ang_vel))
-
-# inergrate angular velocity to obtain continous direction
-starting_dir = np.zeros([1, directions.shape[1]])
-for i in range(directions.shape[1]):
-    starting_idx = np.ma.flatnotmasked_edges(directions[:,i])
-    try:
-        starting_dir[0,i]= directions[np.ma.flatnotmasked_edges(directions[:,i])[0], i] 
-    except:
-        pass
-directions_reg = starting_dir + np.cumsum(ang_vel, axis=0)
-directions_reg[directions_reg.mask==1] = np.nan
-directions_reg_smooth = moving_average(directions_reg, 3)
-
-# differentiate continous direction to obtain smooth ang vel [rad/s]
-ang_vel_smooth = np.gradient(directions_reg_smooth, deltaT, axis=0)
-#ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
-ang_vel_smooth = moving_average(ang_vel_smooth, 3)
-ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
 abs_ang_vel_smooth = np.ma.abs(ang_vel_smooth)
+        
+# # replace estimated positions with interpolated ones and apply uniform time sampling
+# positions[inactivity!=0]=np.nan
+# interp_positions = DOMEtracker.interpolate_positions(positions, activation_times, time_instants)
+# #interp_positions = DOMEtracker.interpolate_positions(positions)
+# DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="interpolated trajectories", max_inactivity=0)
 
-# autocorrelation of velocities
-# disp_acorr=[]
-# disp_corr=[]
-lag1_similarity=np.zeros(speeds_smooth.shape)
-for agent in range(number_of_agents):
-    # disp_acorr.append(vector_autocorrelation(displacements[:,agent,:]))
-    # disp_corr.append(vector_correlation(displacements[:,agent,:], displacements[:,agent,:]))
-    lag1_similarity[:,agent]= lag_auto_similarity(velocities[:,agent,:])
-lag1_similarity = np.ma.array(lag1_similarity, mask=np.isnan(lag1_similarity))
-
-
-# detect tumbling
-var_thresh = 1
-lag1_similarity_thresh = 0.75
-tumbling=np.zeros(ang_vel_smooth.shape)
-tumbling2=np.zeros(speeds_smooth.shape)
-for agent in range(number_of_agents):
-    tumbling[:,agent] = detect_tumbling(speeds_smooth[:,agent], ang_vel_smooth[:,agent], var_thresh)
-    tumbling2[:,agent] = detect_outliers(lag1_similarity[:,agent], 1.5, 'bottom') * (lag1_similarity[:,agent] < lag1_similarity_thresh)
-tumbling = np.ma.array(tumbling, mask=np.isnan(ang_vel_smooth))
-tumbling2 = np.ma.array(tumbling2, mask=np.isnan(speeds_smooth))
-# tumbling=np.ma.filled(tumbling, np.nan)
-# tumbling2=np.ma.filled(tumbling2, np.nan)
+# # smooth trajectories
+# #interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
+# interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
+# interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
+# # interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
+# # interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
+# DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="smoothed trajectories", max_inactivity=0)
 
 
-# inputs
-inputs = np.mean(np.mean(patterns, axis=1), axis=1)
+# # length of trajectories
+# lengths = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=0) * deltaT
 
-# values for different inputs
-[speeds_on, speeds_off] = split(speeds_smooth, condition=inputs[:,0]>=50)
-[acc_on, acc_off] = split(acc_smooth, condition=inputs[:,0]>=50)
-[ang_vel_on, ang_vel_off] = split(np.abs(ang_vel_smooth), condition=inputs[:-1,0]>=50)
-[tumbling_on, tumbling_off] = split(tumbling2, condition=inputs[:,0]>=50)
-[lag1_similarity_on, lag1_similarity_off] = split(lag1_similarity, condition=inputs[:,0]>=50)
+# # discard short trajectories
+# interp_positions[:,lengths<min_traj_length,:]= np.nan
+
+# # velocities
+# #displacements = np.gradient(interp_positions, axis=0)        # [px/frame]
+# velocities = np.gradient(interp_positions, deltaT, axis=0)    # [px/s]
+
+# # speed [px/s]
+# speeds = np.linalg.norm(velocities, axis=2) 
+# speeds = np.ma.array(speeds, mask=np.isnan(speeds))
+
+# speeds_smooth = moving_average(speeds, 3)
+# speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+
+# # accelearation [px/s^2]
+# acc = np.gradient(speeds_smooth, axis=0)                                
+# acc = np.ma.array(acc, mask=np.isnan(acc))
+# acc_smooth = moving_average(acc, 3)
+# acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
+
+# # reject outliers
+# outliers_speed=detect_outliers(speeds_smooth, m=variance_thresh, side='top')
+# outliers_acc=detect_outliers(acc_smooth, m=variance_thresh, side='top')
+# outliers = outliers_speed * outliers_acc
+# for i in range(number_of_agents):
+#     if np.ma.max(outliers[:,i]):
+#         print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i])*deltaT)+ 
+#               '. Consider removing it with remove_agent(id).')
 
 
-# T-test
-scipy.stats.ttest_ind(np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1))
+# # directions
+# norm_disp = np.divide(velocities,np.stack([speeds,speeds], axis=2)+0.001)
+# norm_disp = np.ma.array(norm_disp, mask=np.isnan(norm_disp))
+# directions=np.arctan2(norm_disp[:,:,1],norm_disp[:,:,0])
+
+# # compue angular velocity [rad/s]
+# ang_vel = angle_diff(directions[1:,:], directions[:-1,:])
+# ang_vel = np.ma.array(ang_vel, mask=np.isnan(ang_vel))
+
+# # inergrate angular velocity to obtain continous direction
+# starting_dir = np.zeros([1, directions.shape[1]])
+# for i in range(directions.shape[1]):
+#     starting_idx = np.ma.flatnotmasked_edges(directions[:,i])
+#     try:
+#         starting_dir[0,i]= directions[np.ma.flatnotmasked_edges(directions[:,i])[0], i] 
+#     except:
+#         pass
+# directions_reg = starting_dir + np.cumsum(ang_vel, axis=0)
+# directions_reg[directions_reg.mask==1] = np.nan
+# directions_reg_smooth = moving_average(directions_reg, 3)
+
+# # differentiate continous direction to obtain smooth ang vel [rad/s]
+# ang_vel_smooth = np.gradient(directions_reg_smooth, deltaT, axis=0)
+# #ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
+# ang_vel_smooth = moving_average(ang_vel_smooth, 3)
+# ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
+# abs_ang_vel_smooth = np.ma.abs(ang_vel_smooth)
+
+# # autocorrelation of velocities
+# # disp_acorr=[]
+# # disp_corr=[]
+# lag1_similarity=np.zeros(speeds_smooth.shape)
+# for agent in range(number_of_agents):
+#     # disp_acorr.append(vector_autocorrelation(displacements[:,agent,:]))
+#     # disp_corr.append(vector_correlation(displacements[:,agent,:], displacements[:,agent,:]))
+#     lag1_similarity[:,agent]= lag_auto_similarity(velocities[:,agent,:])
+# lag1_similarity = np.ma.array(lag1_similarity, mask=np.isnan(lag1_similarity))
 
 
-# PLOTS -------------------------------------------------------------------------------------
+# # detect tumbling
+# var_thresh = 1
+# lag1_similarity_thresh = 0.75
+# tumbling=np.zeros(ang_vel_smooth.shape)
+# tumbling2=np.zeros(speeds_smooth.shape)
+# for agent in range(number_of_agents):
+#     tumbling[:,agent] = detect_tumbling(speeds_smooth[:,agent], ang_vel_smooth[:,agent], var_thresh)
+#     tumbling2[:,agent] = detect_outliers(lag1_similarity[:,agent], 1.5, 'bottom') * (lag1_similarity[:,agent] < lag1_similarity_thresh)
+# tumbling = np.ma.array(tumbling, mask=np.isnan(ang_vel_smooth))
+# tumbling2 = np.ma.array(tumbling2, mask=np.isnan(speeds_smooth))
+# # tumbling=np.ma.filled(tumbling, np.nan)
+# # tumbling2=np.ma.filled(tumbling2, np.nan)
+
+
+# # inputs
+# inputs = np.mean(np.mean(patterns, axis=1), axis=1)
+
+# # values for different inputs
+# [speeds_on, speeds_off] = split(speeds_smooth, condition=inputs[:,0]>=50)
+# [acc_on, acc_off] = split(acc_smooth, condition=inputs[:,0]>=50)
+# [ang_vel_on, ang_vel_off] = split(np.abs(ang_vel_smooth), condition=inputs[:-1,0]>=50)
+# [tumbling_on, tumbling_off] = split(tumbling2, condition=inputs[:,0]>=50)
+# [lag1_similarity_on, lag1_similarity_off] = split(lag1_similarity, condition=inputs[:,0]>=50)
+
+
+# # T-test
+# #scipy.stats.ttest_ind(np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1))
+
+# # Save tracking data
+# current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
+#                              interp_positions=interp_positions, speeds_smooth=speeds_smooth,
+#                              ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
+#                              ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off)
+
+
+# PLOTS ----------------------------------------------------------------------------------------
 
 # make folder for plots
 plots_dir = os.path.join(current_experiment.path, tracking_folder, 'plots')
@@ -875,7 +1042,7 @@ plt.ylabel('Agents')
 plt.grid()
 plt.subplot(3, 1, 2)
 #bins=np.linspace(0, 5, round(10+1))
-my_histogram([np.mean(acc_on, axis=0).compressed(), np.mean(acc_off, axis=0).compressed()], normalize=True)
+# my_histogram([np.mean(acc_on, axis=0).compressed(), np.mean(acc_off, axis=0).compressed()], normalize=True)
 plt.legend(labels=['Light ON', 'Light OFF'])
 plt.xlabel('Acc [px/s^2]')
 #plt.gca().set_ylim([0, 0.25])
@@ -938,9 +1105,9 @@ plt.show()
 plt.figure(figsize=(9,6))
 agents_motion = pd.DataFrame(np.ma.array([np.ma.mean(speeds_smooth, axis=0), np.ma.mean(abs_ang_vel_smooth, axis=0), np.ma.std(speeds_smooth, axis=0), np.ma.std(abs_ang_vel_smooth, axis=0)]).T)
 agents_motion.columns = ['mean speed','mean ang vel','std speed','std ang vel']
-sns.pairplot(agents_motion)
-plt.savefig(os.path.join(plots_dir, 'corrplot_speed_angv.pdf'), bbox_inches = 'tight')
-plt.show()
+sns.pairplot(agents_motion);
+plt.savefig(os.path.join(plots_dir, 'corrplot_speed_angv.pdf'), bbox_inches = 'tight');
+plt.show();
 
 # scatter plot MEAN speed and MEAN ang velocity (per agent)
 plt.figure(figsize=(9,6))
@@ -1060,90 +1227,90 @@ agent=np.argmax(lengths)
 agent=random.choice(np.arange(len(lengths))[lengths >= min_traj_length])
 #agent= 102 #145 #127 #40 #109
 
-# Speed and Acceleration of one agent
-plt.figure(figsize=(9,6))
-plt.subplot(2, 1, 1)
-plt.plot(time_instants,speeds_smooth[:,agent])
-#plt.plot(time_instants,speeds[:,agent], '--')
-plt.title('Movement of agent '+str(agent))
-plt.gca().set_xlim([0, totalT])
-plt.ylabel('Speed [px/s]')
-plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-#DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
-
-
-plt.subplot(2, 1, 2)
-plt.plot(time_instants,acc_smooth[:,agent])
-#plt.plot(time_instants,np.abs(acc[:,agent]),'--')
-plt.gca().set_xlim([0, totalT])
-plt.ylabel('Abs Acc [px/s^2]')
-plt.xlabel('Time [s]')
-plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-#DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
-plt.show()
-
-# Direction and Angular Velocity of one agent
-plt.figure(figsize=(9,6))
-plt.subplot(2, 1, 1)
-#plt.plot(time_instants[1:],directions[:,agent])
-plt.plot(time_instants[1:],directions_reg_smooth[:,agent])
-#plt.plot(time_instants[1:],directions_reg[:,agent],'--')
-plt.title('Movement of agent '+str(agent))
-plt.gca().set_xlim([0, totalT])
-plt.ylabel('Direction [rad]')
-plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-#DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
-
-# plt.subplot(3, 1, 2)
-# plt.plot(time_instants[:-1],directions[:,agent])
-# plt.plot(time_instants[:-1],directions_smooth[:,agent])
+# # Speed and Acceleration of one agent
+# plt.figure(figsize=(9,6))
+# plt.subplot(2, 1, 1)
+# plt.plot(time_instants,speeds_smooth[:,agent])
+# #plt.plot(time_instants,speeds[:,agent], '--')
 # plt.title('Movement of agent '+str(agent))
 # plt.gca().set_xlim([0, totalT])
-# plt.gca().set_ylim([-np.pi, np.pi])
-# plt.ylabel('Direction [rad]')
-# plt.yticks(np.linspace(-np.pi, np.pi, 5))
+# plt.ylabel('Speed [px/s]')
 # plt.grid()
 # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+# #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
+# DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
 
-plt.subplot(2, 1, 2)
-plt.plot(time_instants[1:],np.abs(ang_vel_smooth[:,agent]))
-#plt.plot(time_instants[1:],np.abs(ang_vel[:,agent]),'--')
-plt.gca().set_xlim([0, totalT])
-plt.ylabel('Abs Angular Vel [rad/s]')
-plt.xlabel('Time [s]')
-plt.grid()
-DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-#DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
-plt.show()
 
-# Barplots of one agent
-plt.figure(figsize=(4,8))
-plt.subplot(4, 1, 1)
-data_to_plot = list(map(lambda X: [x for x in X if x], [speeds_on[:,agent], speeds_off[:,agent]]))
-plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-plt.ylabel('Speed [px/s]')
-plt.title('Average values of agent '+ str(agent))
-plt.subplot(4, 1, 2)
-data_to_plot = list(map(lambda X: [x for x in X if x], [acc_on[:,agent], acc_off[:,agent]]))
-plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-plt.ylabel('Acc [px/s^2]')
-plt.subplot(4, 1, 3)
-data_to_plot = list(map(lambda X: [x for x in X if x], [ang_vel_on[:,agent], ang_vel_off[:,agent]]))
-plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-plt.ylabel('Ang Vel [rad/s]')
-plt.subplot(4, 1, 4)
-data_to_plot =  [np.mean(tumbling_on[:,agent])*100, np.mean(tumbling_off[:,agent])*100]
-plt.bar([1, 2], data_to_plot)
-plt.xticks([1, 2],labels=['Light ON', 'Light OFF'])
-plt.ylabel('Tumbling [% of frames]')
-plt.show()
+# plt.subplot(2, 1, 2)
+# plt.plot(time_instants,acc_smooth[:,agent])
+# #plt.plot(time_instants,np.abs(acc[:,agent]),'--')
+# plt.gca().set_xlim([0, totalT])
+# plt.ylabel('Abs Acc [px/s^2]')
+# plt.xlabel('Time [s]')
+# plt.grid()
+# DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+# #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
+# DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+# plt.show()
+
+# # Direction and Angular Velocity of one agent
+# plt.figure(figsize=(9,6))
+# plt.subplot(2, 1, 1)
+# #plt.plot(time_instants[1:],directions[:,agent])
+# plt.plot(time_instants[1:],directions_reg_smooth[:,agent])
+# #plt.plot(time_instants[1:],directions_reg[:,agent],'--')
+# plt.title('Movement of agent '+str(agent))
+# plt.gca().set_xlim([0, totalT])
+# plt.ylabel('Direction [rad]')
+# plt.grid()
+# DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+# #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
+# DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+
+# # plt.subplot(3, 1, 2)
+# # plt.plot(time_instants[:-1],directions[:,agent])
+# # plt.plot(time_instants[:-1],directions_smooth[:,agent])
+# # plt.title('Movement of agent '+str(agent))
+# # plt.gca().set_xlim([0, totalT])
+# # plt.gca().set_ylim([-np.pi, np.pi])
+# # plt.ylabel('Direction [rad]')
+# # plt.yticks(np.linspace(-np.pi, np.pi, 5))
+# # plt.grid()
+# # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+
+# plt.subplot(2, 1, 2)
+# plt.plot(time_instants[1:],np.abs(ang_vel_smooth[:,agent]))
+# #plt.plot(time_instants[1:],np.abs(ang_vel[:,agent]),'--')
+# plt.gca().set_xlim([0, totalT])
+# plt.ylabel('Abs Angular Vel [rad/s]')
+# plt.xlabel('Time [s]')
+# plt.grid()
+# DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+# #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
+# DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+# plt.show()
+
+# # Barplots of one agent
+# plt.figure(figsize=(4,8))
+# plt.subplot(4, 1, 1)
+# data_to_plot = list(map(lambda X: [x for x in X if x], [speeds_on[:,agent], speeds_off[:,agent]]))
+# plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+# plt.ylabel('Speed [px/s]')
+# plt.title('Average values of agent '+ str(agent))
+# plt.subplot(4, 1, 2)
+# data_to_plot = list(map(lambda X: [x for x in X if x], [acc_on[:,agent], acc_off[:,agent]]))
+# plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+# plt.ylabel('Acc [px/s^2]')
+# plt.subplot(4, 1, 3)
+# data_to_plot = list(map(lambda X: [x for x in X if x], [ang_vel_on[:,agent], ang_vel_off[:,agent]]))
+# plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+# plt.ylabel('Ang Vel [rad/s]')
+# plt.subplot(4, 1, 4)
+# data_to_plot =  [np.mean(tumbling_on[:,agent])*100, np.mean(tumbling_off[:,agent])*100]
+# plt.bar([1, 2], data_to_plot)
+# plt.xticks([1, 2],labels=['Light ON', 'Light OFF'])
+# plt.ylabel('Tumbling [% of frames]')
+# plt.show()
 
 
 # disp_acorr=vector_autocorrelation(displacements[:,agent,:])
