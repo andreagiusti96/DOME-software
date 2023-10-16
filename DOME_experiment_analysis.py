@@ -346,7 +346,7 @@ def angle_diff(unit1, unit2):
                 angles[i,j]=np.nan
             
     return angles
-
+    
 def my_histogram(data : np.array, bins=10, normalize=False):
     #data=np.array(data)
     
@@ -412,6 +412,24 @@ def scatter_hist(x : np.ndarray, y : np.ndarray, c : np.ndarray = None, n_bins :
         ax_histy.barh(y_bins[:-1], y_val, height=1.0*np.diff(y_bins), align='edge', alpha=0.5)
 
     return ax
+
+def my_boxplot(data : List):
+    #data=np.array(data)
+    
+    if not type(data[0]) is list:
+        data=[data]
+    
+    number_of_series=len(data)
+    
+    for i in range(number_of_series):
+        data_to_plot = list(map(lambda X: [x for x in X if x], data[i]))
+        
+        positions=i+np.linspace(0, len(data_to_plot)+2, len(data_to_plot))
+        plt.boxplot(data_to_plot, positions=positions, patch_artist=True, 
+                    boxprops=dict(facecolor=DOMEgraphics.std_color_for_index(i)),
+                    medianprops=dict(color="black",linewidth=1))
+    
+    plt.xticks(np.linspace(0, len(data_to_plot)+2, len(data_to_plot))+number_of_series/2-0.5)
 
 def add_significance_bar(p_value=None, y=None, data=None, rel_h=0.1, use_stars = False, axis=None):
     if not axis:
@@ -557,10 +575,65 @@ def analyse_trajectories():
     
     # Save analysis data
     current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
-                                  interp_positions=interp_positions, speeds_smooth=speeds_smooth,
+                                  interp_positions=interp_positions, speeds_smooth=speeds_smooth, acc_smooth=acc_smooth,
                                   ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
                                   ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off)
     print(f'Analysis data saved as {os.path.join(current_experiment.path, tracking_folder, "analysed_data.npz")}')
+
+def experiments_comparison(experiment_names : List, tracking_folders : [str, List] ='last' ):
+    number_of_exp = len(experiment_names)
+    
+    if type(tracking_folders) is str:
+        tracking_folders = [tracking_folders] * number_of_exp
+    
+    speeds_on=[]
+    speeds_off=[]
+    ang_vel_on=[]
+    ang_vel_off=[]
+    
+    speeds_means=[]
+    ang_vel_means=[]
+    
+    #load data from the experiments
+    for (experiment_name, tracking_folder) in zip(experiment_names,tracking_folders):
+        current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)  
+        if tracking_folder=='last':
+            tracking_folder = current_experiment.get_last_tracking()
+        print(f'{experiment_name} - {tracking_folder}')
+        
+        analysed_data_path = os.path.join(current_experiment.path, tracking_folder, "analysed_data.npz")
+        with current_experiment.get_data(analysed_data_path) as analysed_data:
+            #time_steps=analysed_data["time_steps"]
+            #speeds_smooth=analysed_data["speeds_smooth"]
+            #speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+            #ang_vel_smooth=analysed_data["ang_vel_smooth"]
+            #ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
+            speeds_on.append(analysed_data["speeds_on"])
+            speeds_on[-1] = np.ma.array(speeds_on[-1], mask=np.isnan(speeds_on[-1]))
+            speeds_off.append(analysed_data["speeds_off"])
+            speeds_off[-1] = np.ma.array(speeds_off[-1], mask=np.isnan(speeds_off[-1]))
+            ang_vel_on.append(analysed_data["ang_vel_on"])
+            ang_vel_on[-1] = np.ma.array(ang_vel_on[-1], mask=np.isnan(ang_vel_on[-1]))
+            ang_vel_off.append(analysed_data["ang_vel_off"])
+            ang_vel_off[-1] = np.ma.array(ang_vel_off[-1], mask=np.isnan(ang_vel_off[-1]))    
+    
+    for i in range(number_of_exp):
+        speeds_means.append([np.mean(speeds_on[i], axis=1), np.mean(speeds_off[i], axis=1)])
+        ang_vel_means.append([np.mean(ang_vel_on[i], axis=1), np.mean(ang_vel_off[i], axis=1)])
+    
+    # all boxplots speed and ang vel of averages over agents
+    plt.figure(figsize=(3,4))
+    plt.subplot(2, 1, 1)
+    my_boxplot(speeds_means)
+    plt.ylabel('Speed [px/s]')
+    plt.gca().set_xticklabels(labels=['Light ON', 'Light OFF'])
+    #plt.title('Boxplots of averages over time instants')
+    plt.subplot(2, 1, 2)
+    my_boxplot(ang_vel_means)
+    plt.ylabel('Ang Vel [rad/s]')
+    plt.gca().set_xticklabels(labels=['Light ON', 'Light OFF'])
+    #plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
+    plt.show()
 
 # MAIN -------------------------------------------------------------------------------------
 # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
@@ -568,7 +641,7 @@ def analyse_trajectories():
 experiments_directory = '/Volumes/DOMEPEN/Experiments'
 # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
-experiment_name = "2023_07_10_Euglena_10" #"2023_07_10_Euglena_18" #"2023_06_15_Euglena_1"
+experiment_name = "2023_07_10_Euglena_12" #"2023_07_10_Euglena_18" #"2023_06_15_Euglena_1"
 #tracking_folder ='tracking_2023_10_09'
 tracking_folder ='last'
 
@@ -616,6 +689,8 @@ with current_experiment.get_data(analysed_data_path) as analysed_data:
     interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
     speeds_smooth=analysed_data["speeds_smooth"]
     speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+    acc_smooth=analysed_data["acc_smooth"]
+    acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
     ang_vel_smooth=analysed_data["ang_vel_smooth"]
     ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
     speeds_on=analysed_data["speeds_on"]
@@ -631,127 +706,6 @@ with current_experiment.get_data(analysed_data_path) as analysed_data:
 lengths = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=0) * deltaT
 
 abs_ang_vel_smooth = np.ma.abs(ang_vel_smooth)
-        
-# # replace estimated positions with interpolated ones and apply uniform time sampling
-# positions[inactivity!=0]=np.nan
-# interp_positions = DOMEtracker.interpolate_positions(positions, activation_times, time_instants)
-# #interp_positions = DOMEtracker.interpolate_positions(positions)
-# DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="interpolated trajectories", max_inactivity=0)
-
-# # smooth trajectories
-# #interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
-# interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
-# interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
-# # interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
-# # interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
-# DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="smoothed trajectories", max_inactivity=0)
-
-
-# # length of trajectories
-# lengths = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=0) * deltaT
-
-# # discard short trajectories
-# interp_positions[:,lengths<min_traj_length,:]= np.nan
-
-# # velocities
-# #displacements = np.gradient(interp_positions, axis=0)        # [px/frame]
-# velocities = np.gradient(interp_positions, deltaT, axis=0)    # [px/s]
-
-# # speed [px/s]
-# speeds = np.linalg.norm(velocities, axis=2) 
-# speeds = np.ma.array(speeds, mask=np.isnan(speeds))
-
-# speeds_smooth = moving_average(speeds, 3)
-# speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
-
-# # accelearation [px/s^2]
-# acc = np.gradient(speeds_smooth, axis=0)                                
-# acc = np.ma.array(acc, mask=np.isnan(acc))
-# acc_smooth = moving_average(acc, 3)
-# acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
-
-# # reject outliers
-# outliers_speed=detect_outliers(speeds_smooth, m=variance_thresh, side='top')
-# outliers_acc=detect_outliers(acc_smooth, m=variance_thresh, side='top')
-# outliers = outliers_speed * outliers_acc
-# for i in range(number_of_agents):
-#     if np.ma.max(outliers[:,i]):
-#         print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i])*deltaT)+ 
-#               '. Consider removing it with remove_agent(id).')
-
-
-# # directions
-# norm_disp = np.divide(velocities,np.stack([speeds,speeds], axis=2)+0.001)
-# norm_disp = np.ma.array(norm_disp, mask=np.isnan(norm_disp))
-# directions=np.arctan2(norm_disp[:,:,1],norm_disp[:,:,0])
-
-# # compue angular velocity [rad/s]
-# ang_vel = angle_diff(directions[1:,:], directions[:-1,:])
-# ang_vel = np.ma.array(ang_vel, mask=np.isnan(ang_vel))
-
-# # inergrate angular velocity to obtain continous direction
-# starting_dir = np.zeros([1, directions.shape[1]])
-# for i in range(directions.shape[1]):
-#     starting_idx = np.ma.flatnotmasked_edges(directions[:,i])
-#     try:
-#         starting_dir[0,i]= directions[np.ma.flatnotmasked_edges(directions[:,i])[0], i] 
-#     except:
-#         pass
-# directions_reg = starting_dir + np.cumsum(ang_vel, axis=0)
-# directions_reg[directions_reg.mask==1] = np.nan
-# directions_reg_smooth = moving_average(directions_reg, 3)
-
-# # differentiate continous direction to obtain smooth ang vel [rad/s]
-# ang_vel_smooth = np.gradient(directions_reg_smooth, deltaT, axis=0)
-# #ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
-# ang_vel_smooth = moving_average(ang_vel_smooth, 3)
-# ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
-# abs_ang_vel_smooth = np.ma.abs(ang_vel_smooth)
-
-# # autocorrelation of velocities
-# # disp_acorr=[]
-# # disp_corr=[]
-# lag1_similarity=np.zeros(speeds_smooth.shape)
-# for agent in range(number_of_agents):
-#     # disp_acorr.append(vector_autocorrelation(displacements[:,agent,:]))
-#     # disp_corr.append(vector_correlation(displacements[:,agent,:], displacements[:,agent,:]))
-#     lag1_similarity[:,agent]= lag_auto_similarity(velocities[:,agent,:])
-# lag1_similarity = np.ma.array(lag1_similarity, mask=np.isnan(lag1_similarity))
-
-
-# # detect tumbling
-# var_thresh = 1
-# lag1_similarity_thresh = 0.75
-# tumbling=np.zeros(ang_vel_smooth.shape)
-# tumbling2=np.zeros(speeds_smooth.shape)
-# for agent in range(number_of_agents):
-#     tumbling[:,agent] = detect_tumbling(speeds_smooth[:,agent], ang_vel_smooth[:,agent], var_thresh)
-#     tumbling2[:,agent] = detect_outliers(lag1_similarity[:,agent], 1.5, 'bottom') * (lag1_similarity[:,agent] < lag1_similarity_thresh)
-# tumbling = np.ma.array(tumbling, mask=np.isnan(ang_vel_smooth))
-# tumbling2 = np.ma.array(tumbling2, mask=np.isnan(speeds_smooth))
-# # tumbling=np.ma.filled(tumbling, np.nan)
-# # tumbling2=np.ma.filled(tumbling2, np.nan)
-
-
-# # inputs
-# inputs = np.mean(np.mean(patterns, axis=1), axis=1)
-
-# # values for different inputs
-# [speeds_on, speeds_off] = split(speeds_smooth, condition=inputs[:,0]>=50)
-# [acc_on, acc_off] = split(acc_smooth, condition=inputs[:,0]>=50)
-# [ang_vel_on, ang_vel_off] = split(np.abs(ang_vel_smooth), condition=inputs[:-1,0]>=50)
-# [tumbling_on, tumbling_off] = split(tumbling2, condition=inputs[:,0]>=50)
-# [lag1_similarity_on, lag1_similarity_off] = split(lag1_similarity, condition=inputs[:,0]>=50)
-
-
-# # T-test
-# #scipy.stats.ttest_ind(np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1))
-
-# # Save tracking data
-# current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
-#                              interp_positions=interp_positions, speeds_smooth=speeds_smooth,
-#                              ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
-#                              ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off)
 
 
 # PLOTS ----------------------------------------------------------------------------------------
@@ -991,22 +945,6 @@ plt.show()
 # plt.ylabel('Ang Vel [rad/s]')
 # plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
 # plt.show()
-
-# boxplots speed and ang vel of averages over the agents
-plt.figure(figsize=(3,4))
-plt.subplot(2, 1, 1)
-data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
-plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-plt.axhline(0, color='gray')
-plt.ylabel('Speed [px/s]')
-plt.title('Boxplots of averages over the agents')
-plt.subplot(2, 1, 2)
-data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
-plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-plt.axhline(0, color='gray')
-plt.ylabel('Ang Vel [rad/s]')
-plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
-plt.show()
 
 # # focused boxplots
 # plt.figure(figsize=(4,6))
