@@ -184,12 +184,12 @@ def estimate_positions(old_pos: np.array, velocity: np.array, deltaT:float):
     assert old_pos.shape[1] == 2
     assert deltaT > 0
 
-    inertia = PARAMETERS["INERTIA"]
+    INERTIA = PARAMETERS["INERTIA"]
 
-    estimated_pos = old_pos + velocity * inertia * deltaT 
+    estimated_pos = old_pos + velocity * INERTIA * deltaT 
 
     non_valid_pos_idx = ~ valid_positions(estimated_pos)
-    estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx] - velocity[non_valid_pos_idx] * inertia * deltaT 
+    estimated_pos[non_valid_pos_idx] = estimated_pos[non_valid_pos_idx] - velocity[non_valid_pos_idx] * INERTIA * deltaT 
 
     return estimated_pos
 
@@ -610,9 +610,9 @@ def extract_data_from_images(fileLocation, background: np.ndarray, parameters : 
     time = 0.0
     counter = 0
 
-    bright_thresh = parameters["BRIGHT_THRESH"]
-    area_r = parameters["AREA_RANGE"]
-    compactness_r = parameters["COMPAC_RANGE"]
+    bright_thresh = parameters["BRIGHT_THRESH"].copy()
+    area_r = parameters["AREA_RANGE"].copy()
+    compactness_r = parameters["COMPAC_RANGE"].copy()
 
     print("Performing detection and tracking...")
     while time < terminal_time and counter < len(files):
@@ -785,7 +785,7 @@ if __name__ == '__main__':
 
     # Euglena
     PARAMETERS = {
-        "AREA_RANGE" : [175, 1200],
+        "AREA_RANGE" : [175, 1500],
         "COMPAC_RANGE" : [0.55, 0.90],
         "BRIGHT_THRESH" : [85],
         "TYPICAL_VEL" : 70,             # [px/s]
@@ -832,12 +832,12 @@ if __name__ == '__main__':
     #                     "2023_07_10_Euglena_8","2023_07_10_Euglena_10","2023_07_10_Euglena_12",
     #                     "2023_07_10_Euglena_15"]
 
-    experiment_names = ["2023_07_10_Euglena_11"]
+    experiment_names = ["2023_07_10_Euglena_15"]
 
     #output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
     output_folder = 'tracking_prova'
 
-    terminal_time = 10   #set negative to analyse the whole experiment
+    terminal_time = 3   #set negative to analyse the whole experiment
     verbose = False      #print info during tracking
     show_tracking_images = os.name == 'posix'
 

@@ -295,6 +295,22 @@ class ExperimentManager:
             if ', ' in timestamp:
                 timestamp=timestamp.split(', ')[1]
             file.write('\n' + timestamp + ', ' + message)    
+    
+    def get_trackings(self):
+        paths = glob.glob1(self.path, 'tracking_*')
+        if len(paths)==0:
+            print(f'No tracking found for experiment {self.name}! Use DOME_tracker to generate one.')
+        else:
+            print(paths)
+        return paths
+    
+    def get_last_tracking(self):
+        paths = glob.glob1(self.path, 'tracking_2*')
+        assert len(paths)>0, f'No tracking found for experiment {self.name}! Use DOME_tracker to generate one.'
+        last_tracking = paths[-1]
+        return last_tracking
+        
+
 
 # other functions
 def open_experiment(experiment_name : str, output_directory:str ='/home/pi/Documents/experiments'):

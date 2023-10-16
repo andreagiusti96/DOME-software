@@ -98,15 +98,19 @@ def detect_outliers(data, m = 2., side='both'):
     
     return outliers
 
-def remove_agent(agent : int):
+def remove_agents(agents : [int, List]):
     global speeds_smooth, acc_smooth, velocities, interp_positions
     
-    speeds_smooth[:,agent]=np.nan
-    speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
-    acc_smooth[:,agent]=np.nan
-    acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
-    velocities[:,agent]=np.nan
-    interp_positions[:,agent,:]= np.nan
+    if type(agents) is int:
+        agents = [agents]
+        
+    for a in agents:
+        speeds_smooth[:,a]=np.nan
+        speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+        acc_smooth[:,a]=np.nan
+        acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
+        velocities[:,a]=np.nan
+        interp_positions[:,a,:]= np.nan
 
 def detect_tumbling(speed, ang_vel, m=2.):
     speed=np.ma.array(speed, mask=np.isnan(speed))
@@ -363,7 +367,6 @@ def my_histogram(data : np.array, bins=10, normalize=False):
     plt.xticks(bins, np.round(bins,1))
     plt.xlim([min(bins), max(bins)])
 
-
 def scatter_hist(x : np.ndarray, y : np.ndarray, c : np.ndarray = None, n_bins : int = 10, cmap = "viridis"):
     
     fig = plt.gcf()
@@ -404,6 +407,32 @@ def scatter_hist(x : np.ndarray, y : np.ndarray, c : np.ndarray = None, n_bins :
 
     return ax
 
+def add_significance_bar(p_value=None, y=None, data=None, rel_h=0.1, use_stars = False, axis=None):
+    if not axis:
+        axis=plt.gca()
+    
+    if not p_value:
+        y = max(map(max, data))
+        #res = scipy.stats.ttest_ind(data[0], data[1], equal_var = False)
+        #res = scipy.stats.ranksums(data[0], data[1])
+        res = scipy.stats.mannwhitneyu(data[0], data[1])
+        p_value = res.pvalue
+    
+    y = y * (1+rel_h)
+    h = y * rel_h
+    col ='k'
+    
+    if use_stars:
+        text = '*' * int(-np.ceil(np.log10(p_value)))
+    else:
+        text = 'p=' + str(np.round(p_value,3))
+        if   p_value > 0.05:   text = 'ns' 
+        elif p_value <  0.001: text = 'p<0.001' 
+    
+    axis.plot([1, 1, 2, 2], [y, y+h, y+h, y], lw=1.5, c=col)
+    axis.text((1+2)*.5, y+h*1.4, text, ha='center', va='bottom', color=col)
+    axis.set_ylim(top=y+4*h)
+
 
 # MAIN -------------------------------------------------------------------------------------
 # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
@@ -411,11 +440,12 @@ def scatter_hist(x : np.ndarray, y : np.ndarray, c : np.ndarray = None, n_bins :
 experiments_directory = '/Volumes/DOMEPEN/Experiments'
 # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
-experiment_name = "2023_06_15_Euglena_1"
-tracking_folder ='tracking_2023_09_14'
+experiment_name = "2023_07_10_Euglena_10" #"2023_07_10_Euglena_18" #"2023_06_15_Euglena_1"
+#tracking_folder ='tracking_2023_10_09'
+tracking_folder ='last'
 
 # parameters
-min_traj_length = 10    # minimum length of the trajectories [s]
+min_traj_length = 5    # minimum length of the trajectories [s]
 variance_thresh = 2.5   # variance threshold for outliers detection
 
 ## LOAD EXPERIMENT AND TRACKING DATA
@@ -432,6 +462,8 @@ time_instants = np.arange(stop=totalT+deltaT, step=deltaT)
 patterns = [current_experiment.get_pattern_at_time(t) for t in time_instants]
 
 # load tracking data
+if tracking_folder=='last':
+    tracking_folder = current_experiment.get_last_tracking()
 positions, inactivity, *_ = DOMEtracker.load_tracking(tracking_folder, current_experiment)
 number_of_agents = positions.shape[1]
 
@@ -544,12 +576,15 @@ tumbling2 = np.ma.array(tumbling2, mask=np.isnan(speeds_smooth))
 inputs = np.mean(np.mean(patterns, axis=1), axis=1)
 
 # values for different inputs
-[speeds_on, speeds_off] = split(speeds_smooth, condition=inputs[:,0]>=100)
-[acc_on, acc_off] = split(acc_smooth, condition=inputs[:,0]>=100)
-[ang_vel_on, ang_vel_off] = split(np.abs(ang_vel_smooth), condition=inputs[:-1,0]>=100)
-[tumbling_on, tumbling_off] = split(tumbling2, condition=inputs[:,0]>=100)
-[lag1_similarity_on, lag1_similarity_off] = split(lag1_similarity, condition=inputs[:,0]>=100)
+[speeds_on, speeds_off] = split(speeds_smooth, condition=inputs[:,0]>=50)
+[acc_on, acc_off] = split(acc_smooth, condition=inputs[:,0]>=50)
+[ang_vel_on, ang_vel_off] = split(np.abs(ang_vel_smooth), condition=inputs[:-1,0]>=50)
+[tumbling_on, tumbling_off] = split(tumbling2, condition=inputs[:,0]>=50)
+[lag1_similarity_on, lag1_similarity_off] = split(lag1_similarity, condition=inputs[:,0]>=50)
 
+
+# T-test
+scipy.stats.ttest_ind(np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1))
 
 
 # PLOTS -------------------------------------------------------------------------------------
@@ -577,7 +612,7 @@ plt.show()
 plt.figure(figsize=(9,3))
 agents_number = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=1)
 plt.plot(time_instants,agents_number)
-plt.title(f'Number of detected agents over time (total={number_of_agents})')
+plt.title(f'Number of detected agents over time (total={sum(lengths>min_traj_length)})')
 plt.xlabel('Time [s]')
 plt.gca().set_xlim([0, totalT])
 plt.gca().set_ylim(0)
@@ -588,7 +623,7 @@ plt.savefig(os.path.join(plots_dir, 'number_of_agents.pdf'), bbox_inches = 'tigh
 plt.show()
 
 # length of trajectories histogram
-plt.title('Trajectories duration')
+plt.title(f'Trajectories duration. Total={len(lengths)}, rejected={sum(lengths<min_traj_length)}')
 bins = [0,5,10,20,40,60,80,100, 120]
 plt.hist(lengths, bins)
 plt.axvline(min_traj_length, color='red')
@@ -600,17 +635,6 @@ plt.grid()
 plt.savefig(os.path.join(plots_dir, 'trajectories_length.pdf'), bbox_inches = 'tight')
 plt.show()
 
-# # directions histogram
-# plt.title('directions')
-# bins = np.linspace(-np.pi, np.pi, 9)
-# plt.hist(directions.flatten(), bins)
-# plt.xlabel('Direction [rad]')
-# plt.xticks(bins)
-# plt.gca().set_xlim([-np.pi, np.pi])
-# plt.ylabel('Count')
-# plt.grid()
-# plt.savefig(os.path.join(plots_dir, 'directions.pdf'), bbox_inches = 'tight')
-# plt.show()
 
 # Inputs
 plt.figure(figsize=(9,6))
@@ -625,6 +649,18 @@ plt.ylabel('Brightness')
 plt.grid()
 plt.savefig(os.path.join(plots_dir, 'inputs.pdf'), bbox_inches = 'tight')
 plt.show()
+
+# # directions histogram
+# plt.title('directions')
+# bins = np.linspace(-np.pi, np.pi, 9)
+# plt.hist(directions.flatten(), bins)
+# plt.xlabel('Direction [rad]')
+# plt.xticks(bins)
+# plt.gca().set_xlim([-np.pi, np.pi])
+# plt.ylabel('Count')
+# plt.grid()
+# plt.savefig(os.path.join(plots_dir, 'directions.pdf'), bbox_inches = 'tight')
+# plt.show()
 
 # # Average Speed, Acc, Angular Velocity, and Tumbling
 # plt.figure(figsize=(9,8))
@@ -666,7 +702,7 @@ plt.show()
 # plt.savefig(os.path.join(plots_dir, 'time_evolution.pdf'), bbox_inches = 'tight')
 # plt.show()
 
-# Average Speed and Angular Velocity
+# Time evolution of Average Speed and Angular Velocity
 plt.figure(figsize=(9,4))
 plt.subplot(2, 1, 1)
 #plt.plot(time_instants[:-1],np.ma.median(speeds,axis=1))
@@ -690,33 +726,118 @@ DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 plt.savefig(os.path.join(plots_dir, 'time_evolution.pdf'), bbox_inches = 'tight')
 plt.show()
 
+# Time evolution and boxplots of Average Speed and Angular Velocity
+fig = plt.figure(figsize=(9,4))
+ax_sp = fig.add_gridspec(bottom=0.55, right=0.75).subplots()
+ax_angv = fig.add_gridspec(top=0.45, right=0.75).subplots()
+ax_sp_box = ax_sp.inset_axes([1.05, 0, 0.25, 1], sharey=ax_sp)
+ax_sp_box.tick_params(axis="y", labelleft=False)
+ax_angv_box = ax_angv.inset_axes([1.05, 0, 0.25, 1], sharey=ax_angv)
+ax_angv_box.tick_params(axis="y", labelleft=False)
+#
+ax_sp.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
+ax_sp.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
+ax_sp.set_ylabel('Speed [px/s]')
+ax_sp.set_xlim([0, totalT])
+ax_sp.set_ylim([0, np.max(speeds_smooth)*0.9])
+ax_sp.grid()
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_sp)
+data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
+ax_sp_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+add_significance_bar(data=data_to_plot, axis=ax_sp_box)
+#
+ax_angv.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
+ax_angv.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
+ax_angv.set_xlim([0, totalT])
+ax_angv.set_ylim([0, 2])
+ax_angv.set_ylabel('Ang. Vel. [rad/s]')
+plt.xlabel('Time [s]')
+ax_angv.grid()
+DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_angv)
+data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
+ax_angv_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+add_significance_bar(data=data_to_plot, axis=ax_angv_box)
+#
+plt.savefig(os.path.join(plots_dir, 'time_evolution_boxplots.pdf'), bbox_inches = 'tight')
+plt.show()
 
 
-# boxplots
-plt.figure(figsize=(4,8))
-plt.subplot(4, 1, 1)
-data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=0), np.mean(speeds_off, axis=0), (np.mean(speeds_on, axis=0) - np.mean(speeds_off, axis=0))]))
-plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+# boxplots speed and ang vel of averages over the agents
+plt.figure(figsize=(3,4))
+plt.subplot(2, 1, 1)
+data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
+plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+add_significance_bar(data=data_to_plot)
 plt.axhline(0, color='gray')
 plt.ylabel('Speed [px/s]')
-plt.title('Boxplots')
-plt.subplot(4, 1, 2)
-data_to_plot = list(map(lambda X: [x for x in X if x],[np.mean(acc_on, axis=0), np.mean(acc_off, axis=0), (np.mean(acc_on, axis=0) - np.mean(acc_off, axis=0))]))
-plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
-plt.axhline(0, color='gray')
-plt.ylabel('Acc [px/s^2]')
-plt.subplot(4, 1, 3)
-data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=0), np.mean(ang_vel_off, axis=0), (np.mean(ang_vel_on, axis=0) - np.mean(ang_vel_off, axis=0))]))
-plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+plt.title('Boxplots of averages over the agents')
+plt.subplot(2, 1, 2)
+data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
+plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+add_significance_bar(data=data_to_plot)
 plt.axhline(0, color='gray')
 plt.ylabel('Ang Vel [rad/s]')
-plt.subplot(4, 1, 4)
-#data_to_plot =  [np.ma.mean(tumbling_on)*100, np.ma.mean(tumbling_off)*100, np.ma.mean(np.ma.mean(tumbling_on, axis=0) - np.ma.mean(tumbling_off, axis=0))*100]
-#plt.bar([1, 2, 3], data_to_plot)
-data_to_plot = list(map(lambda X: [x for x in X if x], [np.ma.mean(tumbling_on, axis=0)*100, np.ma.mean(tumbling_off, axis=0)*100, (np.ma.mean(tumbling_on, axis=0) - np.ma.mean(tumbling_off, axis=0))*100]))
-plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
+plt.show()
+
+
+# # boxplots of averages over time instants
+# plt.figure(figsize=(4,8))
+# plt.subplot(4, 1, 1)
+# data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=0), np.mean(speeds_off, axis=0), (np.mean(speeds_on, axis=0) - np.mean(speeds_off, axis=0))]))
+# plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+# plt.axhline(0, color='gray')
+# plt.ylabel('Speed [px/s]')
+# plt.title('Boxplots')
+# plt.subplot(4, 1, 2)
+# data_to_plot = list(map(lambda X: [x for x in X if x],[np.mean(acc_on, axis=0), np.mean(acc_off, axis=0), (np.mean(acc_on, axis=0) - np.mean(acc_off, axis=0))]))
+# plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+# plt.axhline(0, color='gray')
+# plt.ylabel('Acc [px/s^2]')
+# plt.subplot(4, 1, 3)
+# data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=0), np.mean(ang_vel_off, axis=0), (np.mean(ang_vel_on, axis=0) - np.mean(ang_vel_off, axis=0))]))
+# plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+# plt.axhline(0, color='gray')
+# plt.ylabel('Ang Vel [rad/s]')
+# plt.subplot(4, 1, 4)
+# #data_to_plot =  [np.ma.mean(tumbling_on)*100, np.ma.mean(tumbling_off)*100, np.ma.mean(np.ma.mean(tumbling_on, axis=0) - np.ma.mean(tumbling_off, axis=0))*100]
+# #plt.bar([1, 2, 3], data_to_plot)
+# data_to_plot = list(map(lambda X: [x for x in X if x], [np.ma.mean(tumbling_on, axis=0)*100, np.ma.mean(tumbling_off, axis=0)*100, (np.ma.mean(tumbling_on, axis=0) - np.ma.mean(tumbling_off, axis=0))*100]))
+# plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+# plt.axhline(0, color='gray')
+# plt.ylabel('Tumbling [% of frames]')
+# plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
+# plt.show()
+
+# # boxplots speed and ang vel of averages over time instants
+# plt.figure(figsize=(3,4))
+# plt.subplot(2, 1, 1)
+# data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=0), np.mean(speeds_off, axis=0)]))
+# plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+# plt.axhline(0, color='gray')
+# plt.ylabel('Speed [px/s]')
+# plt.title('Boxplots of averages over time instants')
+# plt.subplot(2, 1, 2)
+# data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=0), np.mean(ang_vel_off, axis=0)]))
+# plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+# plt.axhline(0, color='gray')
+# plt.ylabel('Ang Vel [rad/s]')
+# plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
+# plt.show()
+
+# boxplots speed and ang vel of averages over the agents
+plt.figure(figsize=(3,4))
+plt.subplot(2, 1, 1)
+data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
+plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
 plt.axhline(0, color='gray')
-plt.ylabel('Tumbling [% of frames]')
+plt.ylabel('Speed [px/s]')
+plt.title('Boxplots of averages over the agents')
+plt.subplot(2, 1, 2)
+data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
+plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+plt.axhline(0, color='gray')
+plt.ylabel('Ang Vel [rad/s]')
 plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
 plt.show()
 
@@ -813,25 +934,45 @@ plt.show()
 # plt.xlim([0, 20])
 # plt.show()
 
-# scatter plot MEAN speed and MEAN ang velocity
+# corrplot spped and ang vel (per agent)
 plt.figure(figsize=(9,6))
-scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(abs_ang_vel_smooth, axis=0)], n_bins=10)
-plt.xlabel('Mean Agents Speed [px/s]')
-plt.ylabel('Mean Agents Ang Vel [rad/s]')
+agents_motion = pd.DataFrame(np.ma.array([np.ma.mean(speeds_smooth, axis=0), np.ma.mean(abs_ang_vel_smooth, axis=0), np.ma.std(speeds_smooth, axis=0), np.ma.std(abs_ang_vel_smooth, axis=0)]).T)
+agents_motion.columns = ['mean speed','mean ang vel','std speed','std ang vel']
+sns.pairplot(agents_motion)
+plt.savefig(os.path.join(plots_dir, 'corrplot_speed_angv.pdf'), bbox_inches = 'tight')
+plt.show()
+
+# scatter plot MEAN speed and MEAN ang velocity (per agent)
+plt.figure(figsize=(9,6))
+c = [np.ma.mean(speeds_smooth, axis=0)]
+scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+plt.xlabel('Mean Agent Speed [px/s]')
+plt.ylabel('Mean Agent Ang Vel [rad/s]')
 #plt.gca().set_xlim([0, 2.5])
 plt.grid()
 plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_mean.pdf'), bbox_inches = 'tight')
 plt.show()
 
+# scatter plot STD speed and STD ang velocity (per agent)
+plt.figure(figsize=(9,6))
+c = [np.ma.mean(speeds_smooth, axis=0)]
+scatter_hist([np.ma.std(speeds_smooth, axis=0)], [np.ma.std(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+plt.xlabel('Std Agents Speed [px/s]')
+plt.ylabel('Std Agents Ang Vel [rad/s]')
+#plt.gca().set_xlim([0, 2.5])
+plt.grid()
+plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_std.pdf'), bbox_inches = 'tight')
+plt.show()
+
 # scatter plot speed variation and ang velocity variation
 fig=plt.figure(figsize=(9,6))
-speed_variation = [np.log10(speeds_smooth[:-1]/np.ma.median(speeds_smooth, axis=0))]
-ang_vel_variation = [np.log10(abs_ang_vel_smooth/np.ma.median(abs_ang_vel_smooth, axis=0))]
-c = np.ma.median(speeds_smooth, axis=0)
+speed_variation = [np.log10(speeds_smooth[:-1]/np.ma.mean(speeds_smooth, axis=0))]
+ang_vel_variation = [np.log10(abs_ang_vel_smooth/np.ma.mean(abs_ang_vel_smooth, axis=0))]
+c = np.ma.mean(speeds_smooth, axis=0)
 color = [np.tile(c, (len(time_instants)-1,1))]
 scatter_hist(speed_variation, ang_vel_variation, color, n_bins=50, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-plt.xlabel('Speed / Agents median speed [log10]')
-plt.ylabel('Ang Vel / Agents median ang. vel. [log10]')
+plt.xlabel('Speed / Agent mean speed [log10]')
+plt.ylabel('Ang Vel / Agent mean ang vel [log10]')
 # plt.gca().set_xlim([0, 20])
 # plt.gca().set_ylim([0, 20])
 plt.grid()
