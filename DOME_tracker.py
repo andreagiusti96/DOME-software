@@ -830,14 +830,14 @@ if __name__ == '__main__':
     #                     "2023_06_26_Euglena_13", "2023_06_26_Euglena_23", 
     #                     "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6", 
     #                     "2023_07_10_Euglena_8","2023_07_10_Euglena_10","2023_07_10_Euglena_12",
-    #                     "2023_07_10_Euglena_15"]
+    #                     "2023_07_10_Euglena_15","2023_06_15_Euglena_10"]
 
-    experiment_names = ["2023_07_10_Euglena_15"]
+    experiment_names = ["2023_06_15_Euglena_8"]
 
-    #output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
-    output_folder = 'tracking_prova'
+    output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
+    #output_folder = 'tracking_prova'
 
-    terminal_time = 3   #set negative to analyse the whole experiment
+    terminal_time = -1   #set negative to analyse the whole experiment
     verbose = False      #print info during tracking
     show_tracking_images = os.name == 'posix'
 
