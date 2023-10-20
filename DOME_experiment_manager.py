@@ -121,6 +121,45 @@ class ExperimentManager:
         
         np.savez(file_path, *args, **kwds)
         
+    def save_data_txt(self, title : str, data, labels = [], force:bool=False):
+        '''
+        Save data in an .txt file in the experiment folder.
+        This function can be called as:
+            current_experiment.save_data(title="data",
+                                 activation_times=activation_times,
+                                 totalT = totalT)
+        ---
+        Parameters:
+            title : str
+                Name of the npz file.
+            *args
+                Data to be saved.
+            **kwds
+                Keywords to assign to the data.
+        ---
+        See also get_data.
+        '''
+        
+        file_path = os.path.join(self.path, title + ".txt")
+        
+        if os.path.isfile(file_path):
+            if force: 
+                print(f'File {file_path} was overwritten\n')
+            else:
+                print(f'File {file_path} already exists!\n')
+                return
+        
+        if self.name=='default':
+            print('First create an experiment with new_experiment().\n')
+            return
+        
+        if type(data) is list:
+            data = np.array(data).T
+        
+        preamble=' '
+        preamble = preamble.join(labels)
+        np.savetxt(file_path, data, header=preamble, comments='', fmt = '%6.4f')
+    
     def get_data(self, title : str = 'data.npz', allow_pickle:bool = False):
         '''
         Read data from an .npz or .npy file in the experiment folder.
@@ -160,7 +199,7 @@ class ExperimentManager:
             paths = glob.glob(dirr +  '/*.jpeg')
             #paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
             totalT = max([get_time_from_title(f) for f in paths])
-        return totalT
+        return float(totalT)
     
     def get_deltaT(self):
         '''
@@ -178,7 +217,7 @@ class ExperimentManager:
             paths = glob.glob(dirr +  '/*.jpeg')
             paths = sorted(paths, key=lambda x:float(re.findall("(\d+.\d+)",x)[-1]))
             deltaT = get_time_from_title(paths[1]) - get_time_from_title(paths[0])
-        return deltaT
+        return float(deltaT)
     
     def get_img_at_time(self, image_time : float):
         '''

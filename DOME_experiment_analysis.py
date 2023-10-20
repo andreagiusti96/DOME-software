@@ -73,6 +73,35 @@ def MLE_SDE_parameters(x : np.array, deltaT : float):
     
     return mu, theta, sigma
     
+def identify_agents_parameters(experiment : DOMEexp.ExperimentManager, agents:list=[]):
+    deltaT = experiment.get_deltaT()
+    analysed_data_path = os.path.join(experiment.path, experiment.get_last_tracking(), "analysed_data.npz")
+    with experiment.get_data(analysed_data_path) as analysed_data:
+        speeds_smooth=analysed_data["speeds_smooth"]
+        speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+        ang_vel_smooth=analysed_data["ang_vel_smooth"]
+        ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
+    
+    if len(agents)==0:
+        agents = list(range(speeds_smooth.shape[1]))
+    
+    number_of_agents = len(agents)
+    
+    mu_s    = [np.nan] * number_of_agents
+    theta_s = [np.nan] * number_of_agents
+    sigma_s = [np.nan] * number_of_agents
+    mu_w    = [np.nan] * number_of_agents
+    theta_w = [np.nan] * number_of_agents
+    sigma_w = [np.nan] * number_of_agents
+    
+    for agent in range(number_of_agents):
+        mu_s[agent], theta_s[agent], sigma_s[agent] = MLE_SDE_parameters(speeds_smooth[:,agents[agent]], deltaT)
+        mu_w[agent], theta_w[agent], sigma_w[agent] = MLE_SDE_parameters(ang_vel_smooth[:,agents[agent]], deltaT)
+        
+    experiment.save_data_txt(title='identification', data=[agents, mu_s, theta_s, sigma_s, mu_w, theta_w, sigma_w], 
+                             force=True, labels=['ids', 'mu_s', 'theta_s', 'sigma_s', 'mu_w', 'theta_w', 'sigma_w'])
+        
+    #return mu_s, theta_s, sigma_s, mu_w, theta_w, sigma_w
     
 def split(data : np.array, condition : np.array):
     out_data=[]
@@ -1184,7 +1213,11 @@ def analyse_experiment(experiment_name : str, tracking_folder : str ='last' ):
     global ang_vel_smooth, speeds_on, speeds_off, ang_vel_on, ang_vel_off, lengths, abs_ang_vel_smooth
     
     ## LOAD EXPERIMENT DATA
-    current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)  
+    if type(experiment_name) is str:
+        current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)  
+    else:
+        current_experiment = experiment_name
+    
     totalT = current_experiment.get_totalT()  
     deltaT = float(current_experiment.get_deltaT())  
     with current_experiment.get_data('data.npz') as data:
