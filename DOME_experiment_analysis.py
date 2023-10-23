@@ -55,7 +55,7 @@ def MLE_SDE_parameters(x : np.array, deltaT : float):
     x=np.ma.filled(x, fill_value=np.nan)
     x = x[~np.isnan(x)]
     
-    n=len(x)
+    n=len(x)-1
     
     # compute moments
     s_x = np.sum(x[:-1])
@@ -458,7 +458,7 @@ def my_boxplot(data : List, compare : str = 'no', whis=1.5):
         plt.boxplot(data_to_plot, positions=positions, patch_artist=True, 
                     boxprops=dict(facecolor=DOMEgraphics.std_color_for_index(i)),
                     medianprops=dict(color="black",linewidth=1), whis=whis)
-        if compare == 'within': 
+        if compare == 'within' and len(data_to_plot)>1: 
             add_significance_bar(data=data_to_plot,positions=positions,y_base=y, delta_y=i*5+1, 
                                  rel_h=0.03, median_distance=True)
     
@@ -483,6 +483,7 @@ def add_significance_bar(p_value=None, y_base=None, delta_y=1, data=None, median
         #res = scipy.stats.ttest_ind(data[0], data[1], equal_var = False)
         #res = scipy.stats.ranksums(data[0], data[1])
         res = scipy.stats.mannwhitneyu(data[0], data[1])
+        #res = scipy.stats.kstest(data[0], data[1])
         p_value = res.pvalue
 
     if not y_base:
@@ -1416,6 +1417,14 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
                                   interp_positions=interp_positions, speeds_smooth=speeds_smooth, acc_smooth=acc_smooth,
                                   ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
                                   ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off)
+    
+    current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_smooth'), force=True, data=speeds_smooth)
+    current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_smooth'), force=True, data=ang_vel_smooth)
+    current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_on'), force=True, data=speeds_on)
+    current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_off'), force=True, data=speeds_off)
+    current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_on'), force=True, data=ang_vel_on)
+    current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_off'), force=True, data=ang_vel_off)
+    
     print(f'Analysis data saved as {os.path.join(current_experiment.path, tracking_folder, "analysed_data.npz")}')
 
 def experiments_comparison(experiment_names : List, tracking_folders : [str, List] ='last' ):
@@ -1464,18 +1473,29 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
             ang_vel_on[-1] = np.ma.array(ang_vel_on[-1], mask=np.isnan(ang_vel_on[-1]))
             ang_vel_off.append(analysed_data["ang_vel_off"])
             ang_vel_off[-1] = np.ma.array(ang_vel_off[-1], mask=np.isnan(ang_vel_off[-1]))    
-    
+       
     for i in range(number_of_exp):
-        speeds_all.append([speeds_off[i].flatten(), speeds_on[i].flatten()])
-        ang_vel_all.append([ang_vel_off[i].flatten(), ang_vel_on[i].flatten()])
-        speeds_all_norm.append([speeds_all[i][0]/np.ma.median(speeds_all[i][0]), speeds_all[i][1]/np.ma.median(speeds_all[i][0])])
-        ang_vel_all_norm.append([ang_vel_all[i][0]/np.ma.median(ang_vel_all[i][0]), ang_vel_all[i][1]/np.ma.median(ang_vel_all[i][0])])
-    
-        speeds_means.append([np.mean(speeds_off[i], axis=1), np.mean(speeds_on[i], axis=1)])
-        ang_vel_means.append([np.mean(ang_vel_off[i], axis=1) ,np.mean(ang_vel_on[i], axis=1)])
-        speeds_means_norm.append([speeds_means[i][0]/np.ma.median(speeds_means[i][0]), speeds_means[i][1]/np.ma.median(speeds_means[i][0])])
-        ang_vel_means_norm.append([ang_vel_means[i][0]/np.ma.median(ang_vel_means[i][0]), ang_vel_means[i][1]/np.ma.median(ang_vel_means[i][0])])
-    
+        if len(speeds_on[i]) > 0:
+            speeds_all.append([speeds_off[i].flatten(), speeds_on[i].flatten()])
+            ang_vel_all.append([ang_vel_off[i].flatten(), ang_vel_on[i].flatten()])
+            speeds_all_norm.append([speeds_all[i][0]/np.ma.median(speeds_all[i][0]), speeds_all[i][1]/np.ma.median(speeds_all[i][0])])
+            ang_vel_all_norm.append([ang_vel_all[i][0]/np.ma.median(ang_vel_all[i][0]), ang_vel_all[i][1]/np.ma.median(ang_vel_all[i][0])])
+        
+            speeds_means.append([np.mean(speeds_off[i], axis=1), np.mean(speeds_on[i], axis=1)])
+            ang_vel_means.append([np.mean(ang_vel_off[i], axis=1) ,np.mean(ang_vel_on[i], axis=1)])
+            speeds_means_norm.append([speeds_means[i][0]/np.ma.median(speeds_means[i][0]), speeds_means[i][1]/np.ma.median(speeds_means[i][0])])
+            ang_vel_means_norm.append([ang_vel_means[i][0]/np.ma.median(ang_vel_means[i][0]), ang_vel_means[i][1]/np.ma.median(ang_vel_means[i][0])])
+        else:
+            speeds_all.append([speeds_off[i].flatten()])
+            ang_vel_all.append([ang_vel_off[i].flatten()])
+            speeds_all_norm.append([speeds_all[i][0]/np.ma.median(speeds_all[i][0])])
+            ang_vel_all_norm.append([ang_vel_all[i][0]/np.ma.median(ang_vel_all[i][0])])
+        
+            speeds_means.append([np.mean(speeds_off[i], axis=1)])
+            ang_vel_means.append([np.mean(ang_vel_off[i], axis=1)])
+            speeds_means_norm.append([speeds_means[i][0]/np.ma.median(speeds_means[i][0])])
+            ang_vel_means_norm.append([ang_vel_means[i][0]/np.ma.median(ang_vel_means[i][0])])
+        
     # PLOTS
     plots_dir = '/Volumes/DOMEPEN/Experiments/comparisons'
     with open(os.path.join(plots_dir, 'comparison_info.txt'), 'w') as file:
@@ -1486,12 +1506,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_all, compare='across', whis = 3)
     plt.ylabel('Speed [px/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('All values')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_all, compare='across', whis = 3)
     plt.ylabel('Ang Vel [rad/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_all_values_across.pdf'), bbox_inches = 'tight')
     plt.show()
     
@@ -1500,12 +1520,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_all, compare='within', whis = 3)
     plt.ylabel('Speed [px/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('All values')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_all, compare='within', whis = 3)
     plt.ylabel('Ang Vel [rad/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_all_values_within.pdf'), bbox_inches = 'tight')
     plt.show()
     
@@ -1514,12 +1534,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_all_norm, compare='within', whis = 3)
     #plt.ylabel('Speed [px/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('All values normalized on OFF median value')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_all_norm, compare='within', whis = 3)
     #plt.ylabel('Ang Vel [rad/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_all_values_norm.pdf'), bbox_inches = 'tight')
     plt.show()
     
@@ -1528,12 +1548,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.subplot(2, 1, 1)
     my_boxplot([np.ma.concatenate([d[0] for d in speeds_all]), np.ma.concatenate([d[1] for d in speeds_all])], compare='within', whis = 3)
     plt.ylabel('Speed [px/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Aggregate all values')
     plt.subplot(2, 1, 2)
     my_boxplot([np.ma.concatenate([d[0] for d in ang_vel_all]), np.ma.concatenate([d[1] for d in ang_vel_all])], compare='within', whis = 3)
     plt.ylabel('Ang Vel [rad/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_all_values_aggregate.pdf'), bbox_inches = 'tight')
     plt.show()
     
@@ -1542,12 +1562,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_means, compare='across', whis = 3)
     plt.ylabel('Speed [px/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Averages over agents')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_means, compare='across', whis = 3)
     plt.ylabel('Ang Vel [rad/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_mean_values_across.pdf'), bbox_inches = 'tight')
     plt.show()
     
@@ -1556,12 +1576,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_means, compare='within', whis = 3)
     plt.ylabel('Speed [px/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Averages over agents')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_means, compare='within', whis = 3)
     plt.ylabel('Ang Vel [rad/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_mean_values_within.pdf'), bbox_inches = 'tight')
     plt.show()
     
@@ -1570,12 +1590,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_means_norm, compare='within', whis = 3)
     #plt.ylabel('Speed [px/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Averages over agents normalized on median OFF value')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_means_norm, compare='within', whis = 3)
     #plt.ylabel('Ang Vel [rad/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_mean_values_norm.pdf'), bbox_inches = 'tight')
     plt.show()
     
@@ -1584,12 +1604,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.subplot(2, 1, 1)
     my_boxplot([np.ma.concatenate([d[0] for d in speeds_means]), np.ma.concatenate([d[1] for d in speeds_means])], compare='within', whis = 3)
     plt.ylabel('Speed [px/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Aggregate averages over agents')
     plt.subplot(2, 1, 2)
     my_boxplot([np.ma.concatenate([d[0] for d in ang_vel_means]), np.ma.concatenate([d[1] for d in ang_vel_means])], compare='within', whis = 3)
     plt.ylabel('Ang Vel [rad/s]')
-    plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
+    #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_mean_values_aggregate.pdf'), bbox_inches = 'tight')
     plt.show()
     
@@ -1768,7 +1788,7 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
 experiments_directory = '/Volumes/DOMEPEN/Experiments'
 # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
-experiment_name = "2023_06_15_Euglena_8"
+experiment_name = "2023_06_15_Euglena_1"
 
 off_experiments=['2023_06_15_Euglena_1','2023_06_26_Euglena_13', '2023_07_10_Euglena_6']
 
