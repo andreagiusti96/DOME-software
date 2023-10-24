@@ -1866,64 +1866,8 @@ print('Now use one of the following commands:'
        '\n\texperiments_comparison(experiment_names)'
        '\n\tscenarios_comparison(experiment_names)')
 
-# ## LOAD EXPERIMENT DATA
-# current_experiment= DOMEexp.open_experiment(experiment_name, experiments_directory)  
-
-# totalT = current_experiment.get_totalT()  
-# deltaT = float(current_experiment.get_deltaT())  
-# with current_experiment.get_data('data.npz') as data:
-#     activation_times = data['activation_times']
-
-# time_steps = np.diff(activation_times)
-# time_instants = np.arange(stop=totalT+deltaT, step=deltaT)
-# patterns = [current_experiment.get_pattern_at_time(t) for t in time_instants]
-
-# # inputs
-# inputs = np.mean(np.mean(patterns, axis=1), axis=1)
-
-# ## LOAD TRACKING DATA
-# if tracking_folder=='last':
-#     tracking_folder = current_experiment.get_last_tracking()
-# positions, inactivity, *_ = DOMEtracker.load_tracking(tracking_folder, current_experiment)
-# number_of_agents = positions.shape[1]
-
-# # plot trajectories
-# img = current_experiment.get_img_at_time(totalT)
-# DOMEgraphics.draw_trajectories(positions, inactivity=inactivity, img=img, title="trajectories", max_inactivity=0)
-
-# ## PERFORM TRAJECTORIES ANALYSIS (IF NOT EXISTING) AND LOAD DATA
-# analysed_data_path = os.path.join(current_experiment.path, tracking_folder, "analysed_data.npz")
-
-# if not os.path.isfile(analysed_data_path):
-#     print("Analysing trajectories...")
-#     analyse_trajectories()
-# else:
-#     print("Loading existing analysis data...")
-    
-# with current_experiment.get_data(analysed_data_path) as analysed_data:
-#     time_steps=analysed_data["time_steps"]
-#     interp_positions=analysed_data["interp_positions"]
-#     interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
-#     speeds_smooth=analysed_data["speeds_smooth"]
-#     speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
-#     acc_smooth=analysed_data["acc_smooth"]
-#     acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
-#     ang_vel_smooth=analysed_data["ang_vel_smooth"]
-#     ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
-#     speeds_on=analysed_data["speeds_on"]
-#     speeds_on = np.ma.array(speeds_on, mask=np.isnan(speeds_on))
-#     speeds_off=analysed_data["speeds_off"]
-#     speeds_off = np.ma.array(speeds_off, mask=np.isnan(speeds_off))
-#     ang_vel_on=analysed_data["ang_vel_on"]
-#     ang_vel_on = np.ma.array(ang_vel_on, mask=np.isnan(ang_vel_on))
-#     ang_vel_off=analysed_data["ang_vel_off"]
-#     ang_vel_off = np.ma.array(ang_vel_off, mask=np.isnan(ang_vel_off))    
-        
-# # length of trajectories
-# lengths = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=0) * deltaT
-
-# abs_ang_vel_smooth = np.ma.abs(ang_vel_smooth)
-
+# scenarios_comparison([on255_experiments, switch10_experiments, switch5_experiments],['60s','10s','5s'], [ 100/60,100/10,100/5])
+# scenarios_comparison([on75_experiments,on150_experiments,on255_experiments],['30%','60%','100%'], [30,60,100])
 
 
 
