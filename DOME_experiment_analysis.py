@@ -518,14 +518,14 @@ def add_significance_bar(p_value=None, y_base=None, delta_y=1, data=None, median
     if adjust_y:
         axis.set_ylim(top=y+4*h)
         
-def plot_with_shade(x, data, quantile = [0,1], color=None):
+def plot_with_shade(x, data, quantile = [0,1], color=None, marker = None):
     if not color:
-        p = plt.plot(x,[np.ma.median(d) for d in data])
+        p = plt.plot(x,[np.ma.median(d) for d in data], marker=marker)
         plt.fill_between(x,[np.nanquantile(np.ma.filled(d, fill_value=np.nan),quantile[0])for d in data], 
                            [np.nanquantile(np.ma.filled(d, fill_value=np.nan),quantile[1]) for d in data],
                            alpha=0.5, color = p[0].get_color(), linewidth=0)       
     else:
-        p = plt.plot(x,[np.ma.median(d) for d in data],color=color)
+        p = plt.plot(x,[np.ma.median(d) for d in data],color=color, marker=marker)
         plt.fill_between(x,[np.nanquantile(np.ma.filled(d, fill_value=np.nan),quantile[0])for d in data], 
                            [np.nanquantile(np.ma.filled(d, fill_value=np.nan),quantile[1]) for d in data],
                            alpha=0.5, color=color, linewidth=0)  
@@ -671,125 +671,126 @@ def make_experiment_plots(tracking_folder : str):
     plt.savefig(os.path.join(plots_dir, 'time_evolution.pdf'), bbox_inches = 'tight')
     plt.show()
 
-    # Time evolution and boxplots of Average Speed and Angular Velocity
-    fig = plt.figure(figsize=(9,4))
-    ax_sp = fig.add_gridspec(bottom=0.55, right=0.75).subplots()
-    ax_angv = fig.add_gridspec(top=0.45, right=0.75).subplots()
-    ax_sp_box = ax_sp.inset_axes([1.05, 0, 0.25, 1], sharey=ax_sp)
-    ax_sp_box.tick_params(axis="y", labelleft=False)
-    ax_angv_box = ax_angv.inset_axes([1.05, 0, 0.25, 1], sharey=ax_angv)
-    ax_angv_box.tick_params(axis="y", labelleft=False)
-    #
-    ax_sp.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
-    ax_sp.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
-    ax_sp.set_ylabel('Speed [px/s]')
-    ax_sp.set_xlim([0, totalT])
-    ax_sp.set_ylim([0, np.max(speeds_smooth)*0.9])
-    ax_sp.grid()
-    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_sp)
-    data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
-    ax_sp_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    add_significance_bar(data=data_to_plot, axis=ax_sp_box)
-    #
-    ax_angv.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
-    ax_angv.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
-    ax_angv.set_xlim([0, totalT])
-    ax_angv.set_ylim([0, 2])
-    ax_angv.set_ylabel('Ang. Vel. [rad/s]')
-    plt.xlabel('Time [s]')
-    ax_angv.grid()
-    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_angv)
-    data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
-    ax_angv_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    add_significance_bar(data=data_to_plot, axis=ax_angv_box)
-    #
-    plt.savefig(os.path.join(plots_dir, 'time_evolution_boxplots.pdf'), bbox_inches = 'tight')
-    plt.show()
+    if len(speeds_on) >0:
+        # Time evolution and boxplots of Average Speed and Angular Velocity
+        fig = plt.figure(figsize=(9,4))
+        ax_sp = fig.add_gridspec(bottom=0.55, right=0.75).subplots()
+        ax_angv = fig.add_gridspec(top=0.45, right=0.75).subplots()
+        ax_sp_box = ax_sp.inset_axes([1.05, 0, 0.25, 1], sharey=ax_sp)
+        ax_sp_box.tick_params(axis="y", labelleft=False)
+        ax_angv_box = ax_angv.inset_axes([1.05, 0, 0.25, 1], sharey=ax_angv)
+        ax_angv_box.tick_params(axis="y", labelleft=False)
+        #
+        ax_sp.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
+        ax_sp.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
+        ax_sp.set_ylabel('Speed [px/s]')
+        ax_sp.set_xlim([0, totalT])
+        ax_sp.set_ylim([0, np.max(speeds_smooth)*0.9])
+        ax_sp.grid()
+        DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_sp)
+        data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
+        ax_sp_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+        add_significance_bar(data=data_to_plot, axis=ax_sp_box)
+        #
+        ax_angv.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
+        ax_angv.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
+        ax_angv.set_xlim([0, totalT])
+        ax_angv.set_ylim([0, 2])
+        ax_angv.set_ylabel('Ang. Vel. [rad/s]')
+        plt.xlabel('Time [s]')
+        ax_angv.grid()
+        DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_angv)
+        data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
+        ax_angv_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+        add_significance_bar(data=data_to_plot, axis=ax_angv_box)
+        #
+        plt.savefig(os.path.join(plots_dir, 'time_evolution_boxplots.pdf'), bbox_inches = 'tight')
+        plt.show()
 
 
-    # boxplots speed and ang vel of averages over the agents
-    plt.figure(figsize=(3,4))
-    plt.subplot(2, 1, 1)
-    data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
-    plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    add_significance_bar(data=data_to_plot)
-    plt.axhline(0, color='gray')
-    plt.ylabel('Speed [px/s]')
-    plt.title('Boxplots of averages over the agents')
-    plt.subplot(2, 1, 2)
-    data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
-    plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    add_significance_bar(data=data_to_plot)
-    plt.axhline(0, color='gray')
-    plt.ylabel('Ang Vel [rad/s]')
-    plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
-    plt.show()
+        # boxplots speed and ang vel of averages over the agents
+        plt.figure(figsize=(3,4))
+        plt.subplot(2, 1, 1)
+        data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
+        plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+        add_significance_bar(data=data_to_plot)
+        plt.axhline(0, color='gray')
+        plt.ylabel('Speed [px/s]')
+        plt.title('Boxplots of averages over the agents')
+        plt.subplot(2, 1, 2)
+        data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
+        plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+        add_significance_bar(data=data_to_plot)
+        plt.axhline(0, color='gray')
+        plt.ylabel('Ang Vel [rad/s]')
+        plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
+        plt.show()
 
 
-    # # boxplots of averages over time instants
-    # plt.figure(figsize=(4,8))
-    # plt.subplot(4, 1, 1)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=0), np.mean(speeds_off, axis=0), (np.mean(speeds_on, axis=0) - np.mean(speeds_off, axis=0))]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
-    # plt.axhline(0, color='gray')
-    # plt.ylabel('Speed [px/s]')
-    # plt.title('Boxplots')
-    # plt.subplot(4, 1, 2)
-    # data_to_plot = list(map(lambda X: [x for x in X if x],[np.mean(acc_on, axis=0), np.mean(acc_off, axis=0), (np.mean(acc_on, axis=0) - np.mean(acc_off, axis=0))]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
-    # plt.axhline(0, color='gray')
-    # plt.ylabel('Acc [px/s^2]')
-    # plt.subplot(4, 1, 3)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=0), np.mean(ang_vel_off, axis=0), (np.mean(ang_vel_on, axis=0) - np.mean(ang_vel_off, axis=0))]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
-    # plt.axhline(0, color='gray')
-    # plt.ylabel('Ang Vel [rad/s]')
-    # plt.subplot(4, 1, 4)
-    # #data_to_plot =  [np.ma.mean(tumbling_on)*100, np.ma.mean(tumbling_off)*100, np.ma.mean(np.ma.mean(tumbling_on, axis=0) - np.ma.mean(tumbling_off, axis=0))*100]
-    # #plt.bar([1, 2, 3], data_to_plot)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [np.ma.mean(tumbling_on, axis=0)*100, np.ma.mean(tumbling_off, axis=0)*100, (np.ma.mean(tumbling_on, axis=0) - np.ma.mean(tumbling_off, axis=0))*100]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
-    # plt.axhline(0, color='gray')
-    # plt.ylabel('Tumbling [% of frames]')
-    # plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
-    # plt.show()
-
-    # # boxplots speed and ang vel of averages over time instants
-    # plt.figure(figsize=(3,4))
-    # plt.subplot(2, 1, 1)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=0), np.mean(speeds_off, axis=0)]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    # plt.axhline(0, color='gray')
-    # plt.ylabel('Speed [px/s]')
-    # plt.title('Boxplots of averages over time instants')
-    # plt.subplot(2, 1, 2)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=0), np.mean(ang_vel_off, axis=0)]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    # plt.axhline(0, color='gray')
-    # plt.ylabel('Ang Vel [rad/s]')
-    # plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
-    # plt.show()
-
-    # # focused boxplots
-    # plt.figure(figsize=(4,6))
-    # plt.subplot(3, 1, 1)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on[:5,:], axis=0), np.mean(speeds_off[-5:,:], axis=0), (np.mean(speeds_on[:5,:], axis=0) - np.mean(speeds_off[-5:,:], axis=0))]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
-    # plt.axhline(0, color='gray')
-    # plt.ylabel('Speed [px/s]')
-    # plt.title('Boxplots: just before and after the switch')
-    # plt.subplot(3, 1, 2)
-    # data_to_plot = list(map(lambda X: [x for x in X if x],[np.mean(acc_on[:5,:], axis=0), np.mean(acc_off[-5:,:], axis=0), (np.mean(acc_on[:5,:], axis=0) - np.mean(acc_off[-5:,:], axis=0))]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
-    # plt.axhline(0, color='gray')
-    # plt.ylabel('Acc [px/s^2]')
-    # plt.subplot(3, 1, 3)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on[:5,:], axis=0), np.mean(ang_vel_off[-5:,:], axis=0), (np.mean(ang_vel_on[:5,:], axis=0) - np.mean(ang_vel_off[-5:,:], axis=0))]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
-    # plt.axhline(0, color='gray')
-    # plt.ylabel('Ang Vel [rad/s]')
-    # plt.savefig(os.path.join(plots_dir, 'focused_boxplots.pdf'), bbox_inches = 'tight')
-    # plt.show()
+        # # boxplots of averages over time instants
+        # plt.figure(figsize=(4,8))
+        # plt.subplot(4, 1, 1)
+        # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=0), np.mean(speeds_off, axis=0), (np.mean(speeds_on, axis=0) - np.mean(speeds_off, axis=0))]))
+        # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+        # plt.axhline(0, color='gray')
+        # plt.ylabel('Speed [px/s]')
+        # plt.title('Boxplots')
+        # plt.subplot(4, 1, 2)
+        # data_to_plot = list(map(lambda X: [x for x in X if x],[np.mean(acc_on, axis=0), np.mean(acc_off, axis=0), (np.mean(acc_on, axis=0) - np.mean(acc_off, axis=0))]))
+        # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+        # plt.axhline(0, color='gray')
+        # plt.ylabel('Acc [px/s^2]')
+        # plt.subplot(4, 1, 3)
+        # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=0), np.mean(ang_vel_off, axis=0), (np.mean(ang_vel_on, axis=0) - np.mean(ang_vel_off, axis=0))]))
+        # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+        # plt.axhline(0, color='gray')
+        # plt.ylabel('Ang Vel [rad/s]')
+        # plt.subplot(4, 1, 4)
+        # #data_to_plot =  [np.ma.mean(tumbling_on)*100, np.ma.mean(tumbling_off)*100, np.ma.mean(np.ma.mean(tumbling_on, axis=0) - np.ma.mean(tumbling_off, axis=0))*100]
+        # #plt.bar([1, 2, 3], data_to_plot)
+        # data_to_plot = list(map(lambda X: [x for x in X if x], [np.ma.mean(tumbling_on, axis=0)*100, np.ma.mean(tumbling_off, axis=0)*100, (np.ma.mean(tumbling_on, axis=0) - np.ma.mean(tumbling_off, axis=0))*100]))
+        # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+        # plt.axhline(0, color='gray')
+        # plt.ylabel('Tumbling [% of frames]')
+        # plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
+        # plt.show()
+    
+        # # boxplots speed and ang vel of averages over time instants
+        # plt.figure(figsize=(3,4))
+        # plt.subplot(2, 1, 1)
+        # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=0), np.mean(speeds_off, axis=0)]))
+        # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+        # plt.axhline(0, color='gray')
+        # plt.ylabel('Speed [px/s]')
+        # plt.title('Boxplots of averages over time instants')
+        # plt.subplot(2, 1, 2)
+        # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=0), np.mean(ang_vel_off, axis=0)]))
+        # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+        # plt.axhline(0, color='gray')
+        # plt.ylabel('Ang Vel [rad/s]')
+        # plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
+        # plt.show()
+    
+        # # focused boxplots
+        # plt.figure(figsize=(4,6))
+        # plt.subplot(3, 1, 1)
+        # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on[:5,:], axis=0), np.mean(speeds_off[-5:,:], axis=0), (np.mean(speeds_on[:5,:], axis=0) - np.mean(speeds_off[-5:,:], axis=0))]))
+        # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+        # plt.axhline(0, color='gray')
+        # plt.ylabel('Speed [px/s]')
+        # plt.title('Boxplots: just before and after the switch')
+        # plt.subplot(3, 1, 2)
+        # data_to_plot = list(map(lambda X: [x for x in X if x],[np.mean(acc_on[:5,:], axis=0), np.mean(acc_off[-5:,:], axis=0), (np.mean(acc_on[:5,:], axis=0) - np.mean(acc_off[-5:,:], axis=0))]))
+        # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+        # plt.axhline(0, color='gray')
+        # plt.ylabel('Acc [px/s^2]')
+        # plt.subplot(3, 1, 3)
+        # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on[:5,:], axis=0), np.mean(ang_vel_off[-5:,:], axis=0), (np.mean(ang_vel_on[:5,:], axis=0) - np.mean(ang_vel_off[-5:,:], axis=0))]))
+        # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
+        # plt.axhline(0, color='gray')
+        # plt.ylabel('Ang Vel [rad/s]')
+        # plt.savefig(os.path.join(plots_dir, 'focused_boxplots.pdf'), bbox_inches = 'tight')
+        # plt.show()
 
     # histograms
     plt.figure(figsize=(4,6))
@@ -863,7 +864,7 @@ def make_experiment_plots(tracking_folder : str):
     # plt.xlim([0, 20])
     # plt.show()
 
-    # corrplot spped and ang vel (per agent)
+    # corrplot speed and ang vel (per agent)
     plt.figure(figsize=(9,6))
     agents_motion = pd.DataFrame(np.ma.array([np.ma.mean(speeds_smooth, axis=0), np.ma.mean(abs_ang_vel_smooth, axis=0), np.ma.std(speeds_smooth, axis=0), np.ma.std(abs_ang_vel_smooth, axis=0)]).T)
     agents_motion.columns = ['mean speed','mean ang vel','std speed','std ang vel']
@@ -873,13 +874,36 @@ def make_experiment_plots(tracking_folder : str):
 
     # scatter plot MEAN speed and MEAN ang velocity (per agent)
     plt.figure(figsize=(9,6))
-    c = [np.ma.mean(speeds_smooth, axis=0)]
+    c = [np.ma.mean(speeds_smooth, axis=0)]                     #colored by speed
+    #c = [np.array([i for i in range(speeds_smooth.shape[1])])] #colored by index
     scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
     plt.xlabel('Mean Agent Speed [px/s]')
     plt.ylabel('Mean Agent Ang Vel [rad/s]')
     #plt.gca().set_xlim([0, 2.5])
     plt.grid()
     plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_mean.pdf'), bbox_inches = 'tight')
+    plt.show()
+    
+    # scatter plot MEAN speed and STD speed (per agent)
+    plt.figure(figsize=(9,6))
+    c = [np.ma.mean(speeds_smooth, axis=0)]
+    scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.std(speeds_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+    plt.xlabel('Mean Agent Speed [px/s]')
+    plt.ylabel('Std Agent Speed [px/s]')
+    #plt.gca().set_xlim([0, 2.5])
+    plt.grid()
+    plt.savefig(os.path.join(plots_dir, 'scatter_speed_mean_std.pdf'), bbox_inches = 'tight')
+    plt.show()
+    
+    # scatter plot MEAN ang velocity and STD ang velocity (per agent)
+    plt.figure(figsize=(9,6))
+    c = [np.ma.mean(speeds_smooth, axis=0)]
+    scatter_hist([np.ma.mean(abs_ang_vel_smooth, axis=0)], [np.ma.std(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+    plt.xlabel('Mean Agent Ang Vel [rad/s]')
+    plt.ylabel('Std Agent Ang Vel [rad/s]')
+    #plt.gca().set_xlim([0, 2.5])
+    plt.grid()
+    plt.savefig(os.path.join(plots_dir, 'scatter_angv_mean_std.pdf'), bbox_inches = 'tight')
     plt.show()
 
     # scatter plot STD speed and STD ang velocity (per agent)
@@ -1640,6 +1664,10 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
     speeds_mean_off_norm=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     ang_vel_mean_on_norm=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     ang_vel_mean_off_norm=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
+    speeds_mean_on_norm2=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
+    speeds_mean_off_norm2=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
+    ang_vel_mean_on_norm2=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
+    ang_vel_mean_off_norm2=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     
     
     #load data from all the experiments
@@ -1698,6 +1726,8 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
                 speeds_mean_on_norm[scen][exp] = speeds_mean_on_norm[scen][exp] / np.ma.median(speeds_mean_ref[scen][exp])
                 speeds_mean_off_norm[scen][exp] = np.ma.mean(speeds_off, axis=1)
                 speeds_mean_off_norm[scen][exp] = speeds_mean_off_norm[scen][exp] / np.ma.median(speeds_mean_ref[scen][exp])
+                speeds_mean_on_norm2[scen][exp] = np.ma.mean(speeds_on, axis=1) / np.median(np.ma.mean(speeds_off, axis=1))
+                speeds_mean_off_norm2[scen][exp] = np.ma.mean(speeds_off, axis=1) / np.median(np.ma.mean(speeds_off, axis=1))
                 
                 ang_vel_mean_ref[scen][exp] = np.ma.mean(ang_vel[0:20], axis=1)
                 ang_vel_mean_norm[scen][exp] = np.ma.mean(ang_vel[20:], axis=1)
@@ -1707,8 +1737,10 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
                 ang_vel_mean_on_norm[scen][exp] = ang_vel_mean_on_norm[scen][exp] / np.ma.median(ang_vel_mean_ref[scen][exp])
                 ang_vel_mean_off_norm[scen][exp] = np.ma.mean(ang_vel_off, axis=1)
                 ang_vel_mean_off_norm[scen][exp] = ang_vel_mean_off_norm[scen][exp] / np.ma.median(ang_vel_mean_ref[scen][exp])
+                ang_vel_mean_on_norm2[scen][exp] = np.ma.mean(ang_vel_on, axis=1) / np.median(np.ma.mean(ang_vel_off, axis=1))
+                ang_vel_mean_off_norm2[scen][exp] = np.ma.mean(ang_vel_off, axis=1) / np.median(np.ma.mean(ang_vel_off, axis=1))
                 
-    #aggegate data from the same scenario
+    #aggregate data from the same scenario
     speeds_all_norm_aggregate =         [np.ma.concatenate(d) for d in speeds_norm]
     speeds_all_on_norm_aggregate =      [np.ma.concatenate(d) for d in speeds_on_norm]
     speeds_all_off_norm_aggregate =     [np.ma.concatenate(d) for d in speeds_off_norm]
@@ -1722,7 +1754,11 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
     speeds_mean_off_norm_aggregate =    [np.ma.concatenate(d) for d in speeds_mean_off_norm]
     ang_vel_mean_on_norm_aggregate =    [np.ma.concatenate(d) for d in ang_vel_mean_on_norm]
     ang_vel_mean_off_norm_aggregate =   [np.ma.concatenate(d) for d in ang_vel_mean_off_norm]
-        
+    speeds_mean_on_norm2_aggregate =    [np.ma.concatenate(d) for d in speeds_mean_on_norm2]
+    speeds_mean_off_norm2_aggregate =   [np.ma.concatenate(d) for d in speeds_mean_off_norm2]
+    ang_vel_mean_on_norm2_aggregate =   [np.ma.concatenate(d) for d in ang_vel_mean_on_norm2]
+    ang_vel_mean_off_norm2_aggregate =  [np.ma.concatenate(d) for d in ang_vel_mean_off_norm2]
+     
     # PLOTS
     plots_dir = '/Volumes/DOMEPEN/Experiments/comparisons'
     with open(os.path.join(plots_dir, 'scenario_info.txt'), 'w') as file:
@@ -1733,17 +1769,17 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
     plt.subplot(2, 1, 1)
     #my_boxplot([speeds_all_norm_aggregate, speeds_all_on_norm_aggregate, speeds_all_off_norm_aggregate], whis = 3)
     #plot_with_shade(xvalues, speeds_all_norm_aggregate, quantile=[0.25, 0.75])
-    p_on = plot_with_shade(xvalues, speeds_all_on_norm_aggregate, quantile=[0.25, 0.75])
-    p_off = plot_with_shade(xvalues, speeds_all_off_norm_aggregate, quantile=[0.25, 0.75])
-    plt.ylabel('Speed/Median OFF speed')
+    p_on = plot_with_shade(xvalues, speeds_all_on_norm_aggregate, quantile=[0.25, 0.75], marker='o')
+    p_off = plot_with_shade(xvalues, speeds_all_off_norm_aggregate, quantile=[0.25, 0.75], marker='o')
+    plt.ylabel('Speed/Median speed first 10s')
     plt.legend([p_on,p_off],['Light ON','Light OFF'])
     plt.title('All values')
     plt.xticks(xvalues,labels)
     plt.subplot(2, 1, 2)
     #plot_with_shade(xvalues, ang_vel_all_norm_aggregate, quantile=[0.25, 0.75])
-    p_on = plot_with_shade(xvalues, ang_vel_all_on_norm_aggregate, quantile=[0.25, 0.75])
-    p_off = plot_with_shade(xvalues, ang_vel_all_off_norm_aggregate, quantile=[0.25, 0.75])
-    plt.ylabel('Ang Vel/Median OFF ang vel')
+    p_on = plot_with_shade(xvalues, ang_vel_all_on_norm_aggregate, quantile=[0.25, 0.75], marker='o')
+    p_off = plot_with_shade(xvalues, ang_vel_all_off_norm_aggregate, quantile=[0.25, 0.75], marker='o')
+    plt.ylabel('Ang Vel/Median ang vel first 10s')
     plt.legend([p_on,p_off],['Light ON','Light OFF'])
     plt.xticks(xvalues,labels)
     plt.savefig(os.path.join(plots_dir, 'scenario_all_normalized.pdf'), bbox_inches = 'tight')
@@ -1752,33 +1788,51 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
     # comparison speed and ang vel of averages over agents, mean
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
-    plot_with_shade(xvalues, speeds_mean_norm_aggregate, quantile=[0.25, 0.75])
+    plot_with_shade(xvalues, speeds_mean_norm_aggregate, quantile=[0.25, 0.75], marker='o')
     plt.xticks(xvalues,labels)
-    plt.ylabel('Speed/Median OFF speed')
+    plt.ylabel('Speed/Median speed first 10s')
     plt.title('Averages over agents')
     plt.subplot(2, 1, 2)
-    plot_with_shade(xvalues, ang_vel_mean_norm_aggregate, quantile=[0.25, 0.75])
+    plot_with_shade(xvalues, ang_vel_mean_norm_aggregate, quantile=[0.25, 0.75], marker='o')
     plt.xticks(xvalues,labels)
-    plt.ylabel('Ang Vel/Median OFF ang vel')
+    plt.ylabel('Ang Vel/Median ang vel first 10s')
     plt.savefig(os.path.join(plots_dir, 'scenario_mean_normalized_mean.pdf'), bbox_inches = 'tight')
     plt.show()
     
     # comparison speed and ang vel of averages over agents, on vs off
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
-    p_on = plot_with_shade(xvalues, speeds_mean_on_norm_aggregate, quantile=[0.25, 0.75])
-    p_off = plot_with_shade(xvalues, speeds_mean_off_norm_aggregate, quantile=[0.25, 0.75])
+    p_on = plot_with_shade(xvalues, speeds_mean_on_norm_aggregate, quantile=[0.25, 0.75], marker='o')
+    p_off = plot_with_shade(xvalues, speeds_mean_off_norm_aggregate, quantile=[0.25, 0.75], marker='o')
+    plt.legend([p_on,p_off],['Light ON','Light OFF'])
+    plt.ylabel('Speed/Median speed first 10s')
+    plt.title('Averages over agents')
+    plt.xticks(xvalues,labels)
+    plt.subplot(2, 1, 2)
+    p_on = plot_with_shade(xvalues, ang_vel_mean_on_norm_aggregate, quantile=[0.25, 0.75], marker='o')
+    p_off = plot_with_shade(xvalues, ang_vel_mean_off_norm_aggregate, quantile=[0.25, 0.75], marker='o')
+    plt.legend([p_on,p_off],['Light ON','Light OFF'])
+    plt.ylabel('Ang Vel/Median ang vel first 10s')
+    plt.xticks(xvalues,labels)
+    plt.savefig(os.path.join(plots_dir, 'scenario_mean_normalized_on_off.pdf'), bbox_inches = 'tight')
+    plt.show()
+    
+    # comparison speed and ang vel of averages over agents, on vs off
+    plt.figure(figsize=(6,8))
+    plt.subplot(2, 1, 1)
+    p_on = plot_with_shade(xvalues, speeds_mean_on_norm2_aggregate, quantile=[0.25, 0.75], marker='o')
+    p_off = plot_with_shade(xvalues, speeds_mean_off_norm2_aggregate, quantile=[0.25, 0.75], marker='o')
     plt.legend([p_on,p_off],['Light ON','Light OFF'])
     plt.ylabel('Speed/Median OFF speed')
     plt.title('Averages over agents')
     plt.xticks(xvalues,labels)
     plt.subplot(2, 1, 2)
-    p_on = plot_with_shade(xvalues, ang_vel_mean_on_norm_aggregate, quantile=[0.25, 0.75])
-    p_off = plot_with_shade(xvalues, ang_vel_mean_off_norm_aggregate, quantile=[0.25, 0.75])
+    p_on = plot_with_shade(xvalues, ang_vel_mean_on_norm2_aggregate, quantile=[0.25, 0.75], marker='o')
+    p_off = plot_with_shade(xvalues, ang_vel_mean_off_norm2_aggregate, quantile=[0.25, 0.75], marker='o')
     plt.legend([p_on,p_off],['Light ON','Light OFF'])
     plt.ylabel('Ang Vel/Median OFF ang vel')
     plt.xticks(xvalues,labels)
-    plt.savefig(os.path.join(plots_dir, 'scenario_mean_normalized_on_off.pdf'), bbox_inches = 'tight')
+    plt.savefig(os.path.join(plots_dir, 'scenario_mean_normalized2_on_off.pdf'), bbox_inches = 'tight')
     plt.show()
     
 
