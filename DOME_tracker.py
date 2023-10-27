@@ -827,12 +827,13 @@ if __name__ == '__main__':
 
 
     # tracked_experiments = ["2023_06_15_Euglena_1","2023_06_15_Euglena_2",
-    #                     "2023_06_26_Euglena_13", "2023_06_26_Euglena_23", 
-    #                     "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6", 
-    #                     "2023_07_10_Euglena_8","2023_07_10_Euglena_10","2023_07_10_Euglena_12",
-    #                     "2023_07_10_Euglena_15","2023_06_15_Euglena_10"]
+    #                       "2023_06_26_Euglena_13", "2023_06_26_Euglena_23", 
+    #                       "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6", 
+    #                       "2023_07_10_Euglena_8","2023_07_10_Euglena_10","2023_07_10_Euglena_12",
+    #                       "2023_07_10_Euglena_15","2023_06_15_Euglena_10",
+    #                       "2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"]
 
-    experiment_names = ["2023_06_15_Euglena_8"]
+    experiment_names = ["2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"]
 
     output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
     #output_folder = 'tracking_prova'

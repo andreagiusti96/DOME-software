@@ -1642,7 +1642,7 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
     number_of_scenarios = len(experiment_names)
     number_of_exp = len(experiment_names[0])
     
-    if not xvalues: xvalues=np.arange(number_of_scenarios)
+    if not any(xvalues): xvalues=np.arange(number_of_scenarios)
     
     if type(tracking_folders) is str:
         tracking_folders = [[tracking_folders] * number_of_exp] * number_of_scenarios
@@ -1651,8 +1651,12 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
     speeds_ref=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     ang_vel_norm=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     ang_vel_ref=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
+    speeds_on_all=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
+    speeds_off_all=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     speeds_on_norm=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     speeds_off_norm=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
+    ang_vel_on_all=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
+    ang_vel_off_all=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     ang_vel_on_norm=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     ang_vel_off_norm=[list(range(number_of_exp)) for i in range(number_of_scenarios)]
     
@@ -1699,23 +1703,23 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
                 ang_vel_off = np.ma.array(ang_vel_off, mask=np.isnan(ang_vel_off))
                 
                 # all values
-                speeds_ref[scen][exp] = speeds[0:20].flatten()
-                speeds_norm[scen][exp] = speeds[20:].flatten()
-                speeds_norm[scen][exp] = speeds_norm[scen][exp] / np.ma.median(speeds_ref[scen][exp])
+                speeds_ref[scen][exp]   = speeds[0:20].flatten()
+                speeds_norm[scen][exp]  = speeds[20:].flatten()
+                speeds_norm[scen][exp]  = speeds_norm[scen][exp] / np.ma.median(speeds_ref[scen][exp])
         
-                speeds_on_norm[scen][exp] = speeds_on.flatten()
-                speeds_on_norm[scen][exp] = speeds_on_norm[scen][exp] / np.ma.median(speeds_ref[scen][exp])
-                speeds_off_norm[scen][exp] = speeds_off.flatten()
-                speeds_off_norm[scen][exp] = speeds_off_norm[scen][exp] / np.ma.median(speeds_ref[scen][exp])
+                speeds_on_all[scen][exp]        = speeds_on.flatten()
+                speeds_on_norm[scen][exp]   = speeds_on_all[scen][exp] / np.ma.median(speeds_ref[scen][exp])
+                speeds_off_all[scen][exp]       = speeds_off.flatten()
+                speeds_off_norm[scen][exp]  = speeds_off_all[scen][exp] / np.ma.median(speeds_ref[scen][exp])
                 
-                ang_vel_ref[scen][exp] = ang_vel[0:20].flatten()
+                ang_vel_ref[scen][exp]  = ang_vel[0:20].flatten()
                 ang_vel_norm[scen][exp] = ang_vel[20:].flatten()
                 ang_vel_norm[scen][exp] = ang_vel_norm[scen][exp] / np.ma.median(ang_vel_ref[scen][exp])
                 
-                ang_vel_on_norm[scen][exp] = ang_vel_on.flatten()
-                ang_vel_on_norm[scen][exp] = ang_vel_on_norm[scen][exp] / np.ma.median(ang_vel_ref[scen][exp])
-                ang_vel_off_norm[scen][exp] = ang_vel_off.flatten()
-                ang_vel_off_norm[scen][exp] = ang_vel_off_norm[scen][exp] / np.ma.median(ang_vel_ref[scen][exp])
+                ang_vel_on_all[scen][exp]       = ang_vel_on.flatten()
+                ang_vel_on_norm[scen][exp]  = ang_vel_on_all[scen][exp] / np.ma.median(ang_vel_ref[scen][exp])
+                ang_vel_off_all[scen][exp]      = ang_vel_off.flatten()
+                ang_vel_off_norm[scen][exp] = ang_vel_off_all[scen][exp] / np.ma.median(ang_vel_ref[scen][exp])
                 
                 # averages over the agents
                 speeds_mean_ref[scen][exp] = np.ma.mean(speeds[0:20], axis=1)
@@ -1742,10 +1746,14 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
                 
     #aggregate data from the same scenario
     speeds_all_norm_aggregate =         [np.ma.concatenate(d) for d in speeds_norm]
+    speeds_all_on_aggregate =           [np.ma.concatenate(d) for d in speeds_on_all]
     speeds_all_on_norm_aggregate =      [np.ma.concatenate(d) for d in speeds_on_norm]
+    speeds_all_off_aggregate =          [np.ma.concatenate(d) for d in speeds_off_all]
     speeds_all_off_norm_aggregate =     [np.ma.concatenate(d) for d in speeds_off_norm]
     ang_vel_all_norm_aggregate =        [np.ma.concatenate(d) for d in ang_vel_norm]
+    ang_vel_all_on_aggregate =          [np.ma.concatenate(d) for d in ang_vel_on_all]
     ang_vel_all_on_norm_aggregate =     [np.ma.concatenate(d) for d in ang_vel_on_norm]
+    ang_vel_all_off_aggregate =         [np.ma.concatenate(d) for d in ang_vel_off_all]
     ang_vel_all_off_norm_aggregate =    [np.ma.concatenate(d) for d in ang_vel_off_norm]
     
     speeds_mean_norm_aggregate =        [np.ma.concatenate(d) for d in speeds_mean_norm]
@@ -1758,7 +1766,29 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = None,
     speeds_mean_off_norm2_aggregate =   [np.ma.concatenate(d) for d in speeds_mean_off_norm2]
     ang_vel_mean_on_norm2_aggregate =   [np.ma.concatenate(d) for d in ang_vel_mean_on_norm2]
     ang_vel_mean_off_norm2_aggregate =  [np.ma.concatenate(d) for d in ang_vel_mean_off_norm2]
-     
+    
+    print('scen\tspeed OFF\tspeed ON\t\tang.v. OFF\tang.v.ON')
+    for scen in range(number_of_scenarios):
+        if labels: 
+            print(labels[scen],end='\t')
+        else: 
+            print(f'{scen}',end='\t\t')
+        mean_off = np.mean(speeds_all_off_aggregate[scen])
+        std_off  = np.std(speeds_all_off_aggregate[scen])
+        mean_on = np.mean(speeds_all_on_aggregate[scen])
+        std_on  = np.std(speeds_all_on_aggregate[scen])
+        print(f'{mean_off:.2f}±{std_off:.2f}',end='\t')
+        print(f'{mean_on:.2f}±{std_on:.2f}',end='\t')
+        print(f'{((mean_on-mean_off)/mean_off*100):+.0f}%',end='\t')
+        mean_off = np.mean(ang_vel_all_off_aggregate[scen])
+        std_off  = np.std(ang_vel_all_off_aggregate[scen])
+        mean_on = np.mean(ang_vel_all_on_aggregate[scen])
+        std_on  = np.std(ang_vel_all_on_aggregate[scen])
+        print(f'{mean_off:.2f}±{std_off:.2f}',end='\t')
+        print(f'{mean_on:.2f}±{std_on:.2f}',end='\t')
+        print(f'{((mean_on-mean_off)/mean_off*100):+.0f}%',end='\t')
+        print('')
+    
     # PLOTS
     plots_dir = '/Volumes/DOMEPEN/Experiments/comparisons'
     with open(os.path.join(plots_dir, 'scenario_info.txt'), 'w') as file:
