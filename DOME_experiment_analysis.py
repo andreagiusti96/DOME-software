@@ -138,7 +138,7 @@ def remove_agents(agents : [int, List]):
         speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
         acc_smooth[:,a]=np.nan
         acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
-        velocities[:,a]=np.nan
+        velocities[:,a,:]=np.nan
         interp_positions[:,a,:]= np.nan
         
     # # Save analysis data
@@ -532,6 +532,7 @@ def plot_with_shade(x, data, quantile = [0,1], color=None, marker = None):
     return p[0]
 
 def make_experiment_plots(tracking_folder : str):
+    global min_traj_length
     # PLOTS ----------------------------------------------------------------------------------------
 
     # make folder for plots
@@ -1367,10 +1368,18 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     outliers_speed=detect_outliers(speeds_smooth, m=variance_thresh, side='top')
     outliers_acc=detect_outliers(acc_smooth, m=variance_thresh, side='top')
     outliers = outliers_speed * outliers_acc
-    for i in range(number_of_agents):
-        if np.ma.max(outliers[:,i]):
-            print('Agent '+str(i)+' is an outlier at time ' + str(np.argmax(outliers[:,i])*deltaT)+ 
-                  '. Consider removing it with remove_agent(id).')
+    for a in range(number_of_agents):
+        if np.ma.max(outliers[:,a]):
+            #remove_agents(i)
+            speeds_smooth[:,a]=np.nan
+            speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
+            acc_smooth[:,a]=np.nan
+            acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
+            velocities[:,a,:]=np.nan
+            interp_positions[:,a,:]= np.nan
+            print('Agent '+str(a)+' is an outlier at time(s) ' + str(time_instants[outliers[:,a]])+ 
+                  's and has been removed.')
+    print(f'{np.sum(np.ma.max(outliers,axis=1))} outliers removed.')
 
     # directions
     norm_disp = np.divide(velocities,np.stack([speeds,speeds], axis=2)+0.001)
@@ -1638,11 +1647,11 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.show()
     
 
-def scenarios_comparison(experiment_names : List, labels = None, xvalues = None, tracking_folders : [str, List] ='last' ):
+def scenarios_comparison(experiment_names : List, labels = None, xvalues = [], tracking_folders : [str, List] ='last' ):
     number_of_scenarios = len(experiment_names)
     number_of_exp = len(experiment_names[0])
     
-    if not any(xvalues): xvalues=np.arange(number_of_scenarios)
+    if len(xvalues)==0: xvalues=np.arange(number_of_scenarios)
     
     if type(tracking_folders) is str:
         tracking_folders = [[tracking_folders] * number_of_exp] * number_of_scenarios
@@ -1882,6 +1891,7 @@ on75_experiments=['2023_06_15_Euglena_2','2023_06_26_Euglena_15', '2023_07_10_Eu
 
 switch10_experiments=['2023_06_15_Euglena_7','2023_06_26_Euglena_23', '2023_07_10_Euglena_15']
 switch5_experiments=['2023_06_15_Euglena_8','2023_06_26_Euglena_25', '2023_07_10_Euglena_18']
+switch1_experiments = ["2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"]
 
 #tracking_folder ='tracking_2023_10_09'
 tracking_folder ='last'
