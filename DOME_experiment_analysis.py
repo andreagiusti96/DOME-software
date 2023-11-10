@@ -1449,7 +1449,7 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
                                   interp_positions=interp_positions, speeds_smooth=speeds_smooth, acc_smooth=acc_smooth,
                                   ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
-                                  ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off)
+                                  ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off, inputs=inputs)
     
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_smooth'), force=True, data=speeds_smooth)
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_smooth'), force=True, data=ang_vel_smooth)
@@ -1457,6 +1457,7 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_off'), force=True, data=speeds_off)
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_on'), force=True, data=ang_vel_on)
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_off'), force=True, data=ang_vel_off)
+    current_experiment.save_data_txt(os.path.join(tracking_folder, 'inputs'), force=True, data=inputs)
     
     print(f'Analysis data saved as {os.path.join(current_experiment.path, tracking_folder, "analysed_data.npz")}')
 
