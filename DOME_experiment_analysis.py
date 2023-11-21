@@ -138,8 +138,8 @@ def remove_agents(agents : [int, List]):
         speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
         acc_smooth[:,a]=np.nan
         acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
-        velocities[:,a,:]=np.nan
         interp_positions[:,a,:]= np.nan
+        velocities[:,a,:]=np.nan
         
     # # Save analysis data
     # current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
@@ -376,10 +376,13 @@ def angle_diff(unit1, unit2):
             
     return angles
     
-def my_histogram(data : np.array, bins=10, normalize=False):
+def my_histogram(data : np.array, bins=10, normalize=False, axis = plt.gca()):
     #data=np.array(data)
-    
-    number_of_series=len(data)
+    if type(data[0]) == list:
+        number_of_series=len(data)
+    else:
+        number_of_series=1
+        data = [data]
     
     if type(bins)==int:
         n_bins=bins
@@ -399,8 +402,8 @@ def my_histogram(data : np.array, bins=10, normalize=False):
         positions=bins[:-1] + (bins[1:]-bins[:-1])/(number_of_series+1)*(i+1)
         plt.bar(positions, val, width=0.8*np.diff(bins)/number_of_series)
     
-    plt.xticks(bins, np.round(bins,1))
-    plt.xlim([min(bins), max(bins)])
+    #axis.xticks(bins, np.round(bins,1))
+    #axis.xlim([min(bins), max(bins)])
 
 def scatter_hist(x : np.ndarray, y : np.ndarray, c : np.ndarray = None, n_bins : int = 10, cmap = "viridis"):
     
@@ -649,26 +652,43 @@ def make_experiment_plots(tracking_folder : str):
     # plt.show()
 
     # Time evolution of Average Speed and Angular Velocity
-    plt.figure(figsize=(9,4))
-    plt.subplot(2, 1, 1)
-    #plt.plot(time_instants[:-1],np.ma.median(speeds,axis=1))
-    plt.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
-    plt.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
-    #plt.xlabel('Time [s]')
-    plt.ylabel('Speed [px/s]')
-    plt.gca().set_xlim([0, totalT])
-    plt.gca().set_ylim(0)
-    plt.grid()
-    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-
-    plt.subplot(2, 1, 2)
-    plt.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
-    plt.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
-    plt.gca().set_xlim([0, totalT])
-    plt.ylabel('Ang. Vel. [rad/s]')
+    fig = plt.figure(figsize=(9, 4))
+    ax_sp = fig.add_gridspec(bottom=0.55, right=0.75).subplots()
+    ax_angv = fig.add_gridspec(top=0.45, right=0.75).subplots()
+    ax_sp_box = ax_sp.inset_axes([1.05, 0, 0.25, 1], sharey=ax_sp)
+    ax_sp_box.tick_params(axis="y", labelleft=False)
+    ax_sp_box.tick_params(axis="x", bottom=False)
+    ax_sp_box.tick_params(axis="x", labelbottom=False)
+    ax_angv_box = ax_angv.inset_axes([1.05, 0, 0.25, 1], sharey=ax_angv)
+    ax_angv_box.tick_params(axis="y", labelleft=False)
+    ax_angv_box.tick_params(axis="x", bottom=False)
+    ax_angv_box.tick_params(axis="x", labelbottom=False)
+    #
+    ax_sp.plot(time_instants, np.ma.median(speeds_smooth, axis=1))
+    ax_sp.fill_between(time_instants, np.min(
+        speeds_smooth, axis=1), np.max(speeds_smooth, axis=1), alpha=0.5)
+    ax_sp.set_ylabel('Speed [px/s]')
+    ax_sp.set_xlim([0, totalT])
+    ax_sp.set_ylim([0, np.max(speeds_smooth)])
+    ax_sp.grid()
+    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_sp)
+    data_to_plot = [x for x in speeds_smooth.flatten() if x]
+    x_val, x_bins = np.histogram(data_to_plot, 20)    
+    x_val = x_val/sum(x_val)/(x_bins[1]-x_bins[0])
+    ax_sp_box.barh(x_bins[:-1], x_val, height=1.0*np.diff(x_bins), align='edge', alpha=0.5)
+    #
+    ax_angv.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
+    ax_angv.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
+    ax_angv.set_xlim([0, totalT])
+    ax_angv.set_ylim([0, 3])
+    ax_angv.set_ylabel('Ang. Vel. [rad/s]')
     plt.xlabel('Time [s]')
-    plt.grid()
-    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+    ax_angv.grid()
+    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_angv)
+    data_to_plot = [x for x in ang_vel_smooth.flatten() if x]
+    x_val, x_bins = np.histogram(data_to_plot, 20)    
+    x_val = x_val/sum(x_val)/(x_bins[1]-x_bins[0])
+    ax_angv_box.barh(x_bins[:-1], x_val, height=1.0*np.diff(x_bins), align='edge', alpha=0.5)
     plt.savefig(os.path.join(plots_dir, 'time_evolution.pdf'), bbox_inches = 'tight')
     plt.show()
 

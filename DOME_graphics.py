@@ -61,7 +61,10 @@ def highligth_inputs(inputs : np.array, time_instants = None, color='red', alpha
     for i in range(len(ons)):
         axis.axvspan(time_instants[ons[i]], time_instants[offs[i]], color=color, alpha=alpha, zorder=0)
 
-def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = -1, time_window : int = -1, show:bool = True):
+def draw_trajectories(positions : np.array, contours : List = [], inactivity : np.array = np.zeros(0), 
+                      img : np.array = np.zeros([1080, 1920]), title : str ="", max_inactivity : int = -1, 
+                      time_window : int = -1, show:bool = True):
+    
     fig = plt.figure(1,figsize=(19.20,10.80),dpi=100)
     fig.subplots_adjust(top=1.0-0.05, bottom=0.05, right=1.0-0.05, left=0.05, hspace=0, wspace=0) 
     plt.title(title); 
@@ -98,13 +101,11 @@ def draw_trajectories(positions : np.array, contours : List = [], inactivity : n
     # Plot trajectories
     plt.plot(pos[:,:,0],pos[:,:,1],'o-', markersize=3)
     
-    # mark estimated or interpolated positions
-    #est_positions = pos.copy().astype(float)
-    #est_positions[inactivity==0] = np.nan
+
     plt.gca().set_prop_cycle(None)
-    #plt.plot(pos[inactivity>0,0], pos[inactivity>0,1], 'x', markersize=10)
     
     for obj in range(pos.shape[1]):
+        # mark estimated or interpolated positions
         plt.plot(pos[inac[:,obj]>0,obj,0], pos[inac[:,obj]>0,obj,1], 'x', markersize=10)
         last_index = pos.shape[0] - (~np.isnan(pos[:,obj,0]))[::-1].argmax(0) -1
         if not np.isnan(pos[last_index,obj,0]):
@@ -134,6 +135,11 @@ def draw_image(img : np.array = np.zeros([1080, 1920]), title : str =""):
     else:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         plt.imshow(img)
+    
+    plt.xlim([0, 1920])
+    plt.ylim([1080, 0])
+    plt.xticks(range(0,1921,480))
+    plt.yticks(range(0,1081,270))
     
     plt.show(block=False)
 
