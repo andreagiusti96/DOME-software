@@ -39,7 +39,22 @@ DISTANCE_COST_FACTORS = [0, 1]
 INACTIVITY_COST_FACTORS = [0, 1]
 
 
-def matchingCost(distance, inactivity):
+def matchingCost(distance : np.array, inactivity : int):
+    """
+    Compute the matching cost(s) of one object. Given the distances from the expected positions and its inactivity. 
+
+    Parameters
+    ----------
+    distance : np.array
+        Vector of distances from possible expected positions.
+    inactivity : int
+        Currente inactivity indicator of the object..
+
+    Returns
+    -------
+    cost : np.array
+        Matching costs.
+    """
     cost = (distance * DISTANCE_COST_FACTORS[0] + distance ** 2 * DISTANCE_COST_FACTORS[1]) / (
                 inactivity ** 2 * 0.25 + 1)
     cost += inactivity * INACTIVITY_COST_FACTORS[0] + inactivity ** 2 * INACTIVITY_COST_FACTORS[1]
@@ -47,6 +62,13 @@ def matchingCost(distance, inactivity):
 
 
 def plotCosts():
+    """
+    Plot the matching costs as a function of the distance and for different inactivity values.
+
+    Returns
+    -------
+    None.
+    """
     fig = plt.figure(1, figsize=(19.20, 10.80), dpi=100)
     fig.subplots_adjust(top=1.0 - 0.05, bottom=0.05, right=1.0 - 0.05, left=0.05, hspace=0, wspace=0)
     plt.title('Matching cost')
@@ -73,25 +95,32 @@ def plotCosts():
 
 def agentMatching(new_positions: np.array, positions: np.array, inactivity: List, deltaT : float, verbose:bool=False):
     """
-    Track the objects in subsequent time instants assigning IDs.
+    Track the objects in subsequent time instants assigning existent IDs or allocating new ones.
     The IDs assignment is formulated as a linear optimization problem and solved with the Hungarian method.
     New IDs can be allocated.
 
     Parameters
     ----------
-    new_positions : np.array (Shape=Nx2)
+    new_positions : np.array Shape=(Nx2)
         Positions of detected objects.
     positions : np.array
-        Positions of previously detected objects. (Shape=Mx2)
+        Positions of previously detected objects. Shape=(Mx2)
     inactivity : List
-        Inactivity counters of the objects. (Shape=M)
-
+        Inactivity counters of the objects. Shape=(M)
+    deltaT : float
+        Time interval from last sampling [seconds].
+    verbose : bool = False
+        If True print matching costs.
+    
     Returns
     -------
     new_ids : List
-        IDs assigned to the detected positions. (Shape=N)
+        IDs assigned to the detected positions. Shape=(N)
+    cost : float
+        Total matching cost.
 
     """
+    # allocate vars
     new_positions = np.array(new_positions)
     number_of_objects = sum(valid_positions(positions))
     costs_matching = np.ndarray([len(new_positions), number_of_objects])
@@ -99,13 +128,16 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
 
     TYPICAL_VEL = PARAMETERS["TYPICAL_VEL"]
 
+    # compute distances between all possible pairs (estimated positions, detected positions)
     distances = np.squeeze(scipy.spatial.distance.cdist(new_positions, positions))
     distances = distances / (TYPICAL_VEL*deltaT)
 
     # build the matrix of costs
+    # compute matching costs
     for i in range(positions.shape[0]):
         costs_matching[:, i] = matchingCost(distances[:, i], inactivity[i])
-
+    
+    # compute costs for the allocation of new IDs
     for i in range(new_positions.shape[0]):
         cost_newid = np.min(
             [distance_from_edges(new_positions[i]) / (TYPICAL_VEL*deltaT), NEW_ID_COST_DIST_CAP]) ** 2 + NEW_ID_COST_MIN
@@ -113,11 +145,11 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
 
     costs = np.concatenate((costs_matching, costs_newid), axis=1)
 
-    # Hungarian optimization algorithm
+    # use Hungarian optimization algorithm to minimize the total matching cost
     row_ind, col_ind = scipy.optimize.linear_sum_assignment(costs)
     cost = costs[row_ind, col_ind].sum()*TYPICAL_VEL
 
-    # update ids
+    # update list of IDs
     new_ids = [i for i in col_ind]
     avg_cost = cost / (len(new_ids) + 0.001)
 
@@ -137,6 +169,9 @@ def estimate_velocities(positions: np.array, deltaT : float):
         Past positions of the objects. Shape=(MxNx2)
         If M<2 all velocities are [0, 0].
         Non valid position are discarded.
+    deltaT : float
+        Time interval from last sampling [seconds].
+    
     Returns
     -------
     velocities : np.array
@@ -172,11 +207,13 @@ def estimate_positions(old_pos: np.array, velocity: np.array, deltaT:float):
         Last positions of the objects. Shape=(Nx2)
     velocity : np.array
         Velocities of the objects. Shape=(Nx2)
+    deltaT : float
+        Time interval from last sampling [seconds].
 
     Returns
     -------
     estimated_pos : np.array
-        Next positions of the objects. Shape=(Nx2).
+        Estimated positions of the objects at the next time instant. Shape=(Nx2).
 
     """
     assert len(old_pos.shape) == 2
@@ -194,26 +231,64 @@ def estimate_positions(old_pos: np.array, velocity: np.array, deltaT:float):
     return estimated_pos
 
 
-def interpolate_positions(positions: np.array, original_times = [], new_times = []):
+def interpolate_positions(positions: np.array, original_times : List = [], new_times : List = []):
+    """
+    Interpolate positions at given time instants, and eventually replace internal nan values.
+    If original_times and new_times are empty datapoints are assumed to be equispaced.
+    Otherwise, values at new_times are computed using the given values at original_times.
+    
+    Parameters
+    ----------
+    positions : np.array
+        Array of 2D positions, possibly containing some nans. Shape=(MxNx2).
+    original_times : List = []
+        List of original sampling times. Optional.
+    new_times : List = []
+        List of new (equally spaced) time instants at which positions must be computed. Optional. Shape=(M_new)
+
+    Returns
+    -------
+    interpolated_pos_new : np.array
+        Array of 2D interpoleted positions.
+        Internal nans have been replaced by linear interpolation.
+        Shape=(M_newxNx2) if new_times was given, Shape=(MxNx2) otherwise.
+
+    Example
+    -------
+    Simplyfied case with 1D positions, original_times = [] and new_times = []:
+    Input:
+        positions = [nan, nan, 1, 2, nan, 4, nan]
+        original_times = []
+        new_times = []
+    Output:
+        interpolated_pos_new = [nan, nan, 1, 2, 3, 4, nan]
+    
+    """
+    # allocate vars
     interpolated_pos = positions.copy()
     number_objects = positions.shape[1]
     interpolated_pos_new = np.ndarray([len(new_times), number_objects, 2]) * np.nan
 
+    # for each object in positions
     for obj in range(positions.shape[1]):
+        # ignore leading and trailing nans and select internal points
         first_index = (~np.isnan(positions[:, obj, 0])).argmax(0)
         last_index = positions.shape[0] - (~np.isnan(positions[:, obj, 0]))[::-1].argmax(0) - 1
         active_points = slice(first_index,last_index+1)
         
+        # select nans within internal points
         nans = np.isnan(positions[active_points, obj, 0])
         missing_points = np.where(nans)[0] + first_index
         valid_points = np.where(~nans)[0] + first_index
 
+        # replace internal nans
         if len(missing_points) and len(valid_points)> 0:
             trajectory_x = positions[valid_points, obj, 0]
             trajectory_y = positions[valid_points, obj, 1]
             interpolated_pos[missing_points, obj, 0] = np.interp(missing_points, valid_points, trajectory_x)
             interpolated_pos[missing_points, obj, 1] = np.interp(missing_points, valid_points, trajectory_y)
         
+        # if original_times is given use it to compute values at new_times
         if len(original_times)>0:
             interpolated_pos_new[active_points, obj, 0] = np.interp(new_times[active_points], original_times[active_points], interpolated_pos[active_points,obj,0])
             interpolated_pos_new[active_points, obj, 1] = np.interp(new_times[active_points], original_times[active_points], interpolated_pos[active_points,obj,1])
@@ -464,12 +539,12 @@ def get_positions(contours):
     Parameters
     ----------
     contours : List
-        Contours of the detected objects. (Shape=Nx2)
+        Contours of the detected objects. Shape=(Nx2)
 
     Returns
     -------
     positions : List
-        Position of the center of each object. (Shape=Nx2)
+        Position of the center of each object. Shape=(Nx2)
 
     """
     positions = []
@@ -747,7 +822,8 @@ def start_tracking(experiment_names : [List, str]):
 
 
 
-def load_tracking(tracking_name : str = None, experiment : [str, DOMEexp.ExperimentManager] = None):
+def load_tracking(tracking_name : str = None, experiment : [str, DOMEexp.ExperimentManager] = None):    
+    
     global positions, inactivity, total_cost, parameters, current_experiment
 
     # set current experiment
@@ -776,13 +852,27 @@ def load_tracking(tracking_name : str = None, experiment : [str, DOMEexp.Experim
 
     return positions, inactivity, total_cost, PARAMETERS, current_experiment
 
-# MAIN
+# MAIN -----------------------------------------------------------------------
 if __name__ == '__main__':
     # CONSTANTS
-    DEFAULT_COLOR = "red"
-    DEFAULT_BLUR = 9
-    AUTO_SCALING = -1
+    AUTO_SCALING = -1       # value for automatic brightness adjustment
 
+    
+    # IMAGE POROCESSING PARAMETERS
+    DEFAULT_COLOR = "red"   # color channel used for gray-scale conversion "gray", "blue", "green" or "red"
+    DEFAULT_BLUR = 9        # size of the blurring window [in pixels]
+
+
+    # OBJECT DETECTION AND TRACKING PARAMETERS
+    # PARAMETERS = {
+    #     "AREA_RANGE"      : [a_min, a_max],   # range of area for obj detection, positive values [pixels]
+    #     "COMPAC_RANGE"    : [c_min, c_max],   # range of compactness for obj detection, values in [0,1]
+    #     "BRIGHT_THRESH"   : [brightness_min], # brightness threshold used for object detection, values in [0, 255]
+    #     "TYPICAL_VEL"     : typical_velocity, # coeff used to scale the id assignment costs, positive values[px/s]
+    #     "INERTIA"         : inertia_coeff     # coeff used for position estimation, values in [0,1]
+    # }
+    
+    
     # Euglena
     PARAMETERS = {
         "AREA_RANGE" : [175, 1500],
@@ -819,9 +909,8 @@ if __name__ == '__main__':
     #     "INERTIA" : 0.9
     # }
 
-
+    # Directory where DOME experiments folders are saved
     # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
-    # experiments_directory = '\\\\tsclient\DOMEPEN\Experiments'
     experiments_directory = '/Volumes/DOMEPEN/Experiments'
     # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
@@ -833,19 +922,25 @@ if __name__ == '__main__':
     #                       "2023_07_10_Euglena_15","2023_06_15_Euglena_10",
     #                       "2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"]
 
-    experiment_names = ["2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"]
+    # Name of the experiment(s) to be tracked
+    experiment_names = ["2023_06_15_Euglena_1"]
+    
+    # Name of the folder to save tracking results
+    #output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
+    output_folder = 'tracking_test'
 
-    output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
-    #output_folder = 'tracking_prova'
+    # Tracking options
+    terminal_time = -1          # time to stop tracking [s], set negative to track the whole experiment
+    verbose = False             # print info during tracking
+    show_tracking_images = True # print images during tracking
+    #show_tracking_images = os.name == 'posix' # print images during tracking
 
-    terminal_time = -1   #set negative to analyse the whole experiment
-    verbose = False      #print info during tracking
-    show_tracking_images = os.name == 'posix'
-
+    # Useful commands
     print('Now use one of the following commands:'
-          '\n\ttest_detection_parameters'
-          '\n\tstart_tracking(experiment_names)'
-          '\n\tpositions, inactivity, total_cost, PARAMETERS, current_experiment=load_tracking(output_folder,experiment_name)')
+          '\n\tstart_tracking(experiment_names)\t\t\t\t\t\t\t\t\t\t\t\t\tStart tracking of the given experiment(s).'
+          '\n\ttest_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)\tTest obj detection on a random image in images_folder.'
+          '\n\ttest_detection_parameters(image_name, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)\t\tTest obj detection on the selected image.'
+          '\n\tpositions, inactivity, total_cost, PARAMETERS, current_experiment=load_tracking(output_folder,experiment_name)\tLoad data from an existing tracking.')
 
     # test thresholds for object detection
     # test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
