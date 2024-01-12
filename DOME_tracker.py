@@ -199,6 +199,7 @@ def estimate_velocities(positions: np.array, deltaT : float):
 def estimate_positions(old_pos: np.array, velocity: np.array, deltaT:float):
     """
     Given the current positions and velocities returns the future estimated positions of objects.
+    The INERTIA coefficent multiplies the velocity. 
     Positions are validated to be in the range [0, 1920][0, 1080]
 
     Parameters
@@ -299,7 +300,29 @@ def interpolate_positions(positions: np.array, original_times : List = [], new_t
     return interpolated_pos_new
 
 
-def test_detection_parameters(fileLocation, bright_thresh, area_r: List, compactness_r: List):
+def test_detection_parameters(fileLocation : str, bright_thresh : int, area_r: List, compactness_r: List):
+    """
+    Test the objects detection algorithm and parameters, showing step by step images.
+    First the background model is built, then the object detection is tested on an image.
+    
+    Parameters
+    ----------
+    fileLocation : str
+        Path to a folder containg a set of images or to a specific image in that folder.
+        If the path of an image is given that image is used to test the algorithm.
+        Otherwise, a random image from the folder is used.
+    bright_thresh : int
+        Minimum brightness used for thresholding.
+    area_r : List
+        Two positive values defining the range of area for obj detection [pixels].
+    compactness_r : List
+        Two values in [0,1] defining the range of compactness for obj detection.
+
+    Returns
+    -------
+    None.
+
+    """
     if os.path.isdir(fileLocation):
         files = glob.glob(fileLocation + '/*.jpeg')
         files = sorted(files, key=lambda x: float(re.findall("(\d+.\d+)", x)[-1]))
@@ -309,11 +332,14 @@ def test_detection_parameters(fileLocation, bright_thresh, area_r: List, compact
         fileLocation = os.path.dirname(fileLocation)
     else:
         raise (Exception(f'Not a file or a directory: {fileLocation}'))
-
+    
+    # get the image to test object detection
     img = cv2.imread(filename)
 
+    # build the model of the background using images in the folder
     background = build_background(fileLocation, 25)
 
+    # test objects detection showing step by step images
     new_contours = get_contours(img, bright_thresh, area_r, compactness_r, background, 0, True)
 
 
@@ -362,23 +388,26 @@ def process_img(img: np.array, color: str = "", blur: int = 0, gain: float = 1.,
     return img
 
 
-def build_background(fileLocation: str, images_number: int, gain: float = 1.0):
+def build_background(fileLocation: str, images_number : int = 10, gain: float = 1.0):
     """
-    Extract the background from a set of images excluding moving objects.
-    Background is computed as the median pixel-wise of the images.
-    Camera has to be static.
+    Extract the background from a set of images by excluding moving objects.
+    First images are preprocessed as during the object detection.
+    Then, the background is computed as the pixel-wise median of the images.
+    The camera is assumed to be static.
 
     Parameters
     ----------
     fileLocation : str
-        Path of the folder containing the images.
-    images_number : int
-        Number of images to use to build the background.
-
+        Path of the folder containing a set of images.
+    images_number : int = 10
+        Number of images to be used to build the background.
+    gain : float = 1.0
+        Brightness gain. Set to -1 to use automatic adjustment.
+    
     Returns
     -------
     background : np.array
-        Gray scale image of the background.
+        Gray scale image representing the background.
 
     """
     paths = glob.glob(fileLocation + '/fig_*.jpeg')
