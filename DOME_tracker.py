@@ -343,8 +343,38 @@ def test_detection_parameters(fileLocation : str, bright_thresh : int, area_r: L
     new_contours = get_contours(img, bright_thresh, area_r, compactness_r, background, 0, True)
 
 
-def process_img(img: np.array, color: str = "", blur: int = 0, gain: float = 1., contrast: bool = False,
-                equalize: bool = False, plot: bool = False):
+def process_img(img: np.array, color: str = "", blur: int = 0, gain: float = 1., 
+                contrast: bool = False, equalize: bool = False, plot: bool = False):
+    """
+    Process an image based on the provided parameters.
+    Possible eleborations include color channel extraction, blurring, gain adjustment, 
+    histogram equalization, and contrast enhancement. 
+    The eleborated image can be ploted at each step if requested.
+
+    Parameters
+    ----------
+    img : np.array
+        The input image to be processed.
+    color : str = ""
+        The color channel to extract from the image. Options are "gray", "blue" or "b", "green" or "g", and "red" or "r". Default is "" (no color extraction).
+    blur : int = 0
+        The kernel size for the median blur. If 0, no blurring is applied.
+    gain : float = 1
+        The grightness gain. 
+        If less than 0, the brightness is automatically scaled so that the maximum pixel value is 255, and the minimum is 0. 
+        Default is 1.0 (no gain adjustment).
+    contrast : bool = False
+        If True, applies Contrast Limited Adaptive Histogram Equalization (CLAHE) to the image. 
+    equalize : bool = False
+        If True, equalizes the histogram of the image.
+    plot : bool = False
+        If True, plots the image at each processing step.
+
+    Returns
+    -------
+    img : np.array
+        The processed image.
+    """
     if color == "gray":
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     elif color == "blue" or color == "b":
@@ -443,31 +473,57 @@ def build_background(fileLocation: str, images_number : int = 10, gain: float = 
 
 
 def get_contours(img: np.array, bright_thresh: List, area_r: List, compactness_r: List, background_model=None,
-                 expected_obj_number: int = 0, plot: bool = False, verbose : bool = False):
+                 expected_obj_number: int = 0, margin_factor : float = 0.25, adjustment_factor : float = 0.02,
+                 plot: bool = False, verbose : bool = False ):
     """
-    Thresholding based object detection.
+    Perform thresholding-based object detection on an image.
+    1) Image preprocessing: the image is elebaorated using DEFAULT_COLOR, DEFAULT_BLUR and AUTO_SCALING parameters.
+    2) Background subtraction: the foreground is obtained by pixel-wise subtraction of the background.
+        The foreground should represent only moving objects.
+    3) Objects detection: objects are detected applying the given thresholds for brightness, area, and compactenss. 
+    4) Compare the number of detected objects with the expected one. 
+        If the number of detected objects is close to expected one the function terminates.
+        If it is less than expected_obj_number (by more than margin_factor), 
+        the thresholds are relaxed by adjustment_factor and the detection repeated.
+        If it is greater than expected_obj_number (by more than twice margin_factor), 
+        the thresholds are tightned by adjustment_factor and the detection repeated.
 
     Parameters
     ----------
     img : np.array
-        Image to analyse.
-    min_area : float
-        Minimum area of objects in pixels.
-    min_compactness : float
-        Minimum compactness of objects [0, 1].
-    background_model : np.array, optional
-        Image of the background to perform background subtraction.
-        The default is None.
+        The input image to be analyzed.
+    bright_thresh : List 
+        Brightness threshold for object detection. Shape=(1)
+    area_r : List
+        Range of acceptable area (in pixels) for object detection. Shape=(2)
+    compactness_r : List
+        Range of acceptable compactness values for object detection. Values in [0, 1]. Shape=(2)
+    background_model : np.array = None
+        An image of the background used for background subtraction. 
+        If None, background subtraction is not performed.
+    expected_obj_number : int = 0
+        The expected number of objects in the image. 
+        If the number of detected objects is not close to the expected one the thresholds are adjusted and the process repeated.
+        If 0, the function will not attempt to match a specific number of objects.
+    margin_factor : float = 0.25
+        Margin on the difference between the number of detected and expected objects.
+    adjustment_factor : float = 0.02
+        Factor for adjusting the thresholds.
+    plot : bool = False
+        If True, the function will plot the image at each step of the processing.
+    verbose : bool = False
+        If True, the function will print additional details during processing.
 
     Returns
     -------
     contoursFiltered : List
-        Contours of the detected objects.
-
+        A list of contours for the detected objects in the image.
+    
     """
     contoursFiltered = []
     if plot: DOMEgraphics.draw_image(img, "img")
-
+    
+    # Image preprocessing
     elaborated_img = process_img(img, color=DEFAULT_COLOR, blur=DEFAULT_BLUR, gain=AUTO_SCALING)
     if plot: DOMEgraphics.draw_image(elaborated_img, "elaborated img from color " + DEFAULT_COLOR)
 
@@ -485,9 +541,7 @@ def get_contours(img: np.array, bright_thresh: List, area_r: List, compactness_r
     c_r = compactness_r  # .copy()
 
     first_time = True
-    margin_factor = 0.25
-    adjustment_factor = 0.02
-
+    
     too_few_obgs = False
     too_many_obgs = False
 
@@ -561,7 +615,7 @@ def get_contours(img: np.array, bright_thresh: List, area_r: List, compactness_r
     return contoursFiltered
 
 
-def get_positions(contours):
+def get_positions(contours : List):
     """
     Get the centers of contours resulting from image analysis
 
@@ -631,6 +685,35 @@ def valid_positions(positions: np.array):
     return validity
 
 def save_tracking(experiment : DOMEexp.ExperimentManager = None):
+    """
+    Saves tracking data, generates tracking images, and creates a video from the images.
+
+    Parameters
+    ----------
+    experiment : DOMEexp.ExperimentManager = None
+        The experiment whose tracking data is to be saved. 
+        If None uses current_experiment.
+    
+    Global vars
+    -----------
+    current_experiment : DOMEexp.ExperimentManager
+        The current experiment, used if the experiment input parameter is not given.
+    positions : np.array
+        Array of positions generated by the tracking algorithm. Shape=(MxNx2)
+    inactivity : np.array
+        Array of inactivity counters generated by the tracking algorithm. Shape=(MxN)
+    total_cost : float
+        Total cost resulting from the tracking procedure.
+    PARAMETERS : dict
+        Parameters used for the tracking.
+    output_folder : str
+        Name of the folder where tracking data must be saved.
+    
+    Returns
+    -------
+    None
+
+    """
     if not experiment:
         experiment = current_experiment
     
@@ -648,6 +731,31 @@ def save_tracking(experiment : DOMEexp.ExperimentManager = None):
     print(output_folder + ": Data, images and video updated.")
 
 def overlap_trajectories(experiment : DOMEexp.ExperimentManager = None):
+    """
+    Generates tracking images by overlapping the tracked positions to the images from the experiment.
+    The images are automatically saved in the experiment folder.
+    
+    Parameters
+    ----------
+    experiment : DOMEexp.ExperimentManager = None
+        The experiment whose tracking images must be generated.
+        If None uses current_experiment.
+    
+    Global vars
+    -----------
+    current_experiment : DOMEexp.ExperimentManager
+        The current experiment, used if the experiment input parameter is not given.
+    positions : np.array
+        Array of positions generated by the tracking algorithm. Shape=(MxNx2)
+    inactivity : np.array
+        Array of inactivity counters generated by the tracking algorithm. Shape=(MxN)
+    output_folder : str
+        Name of the folder where tracking data must be saved.
+    
+    Returns
+    -------
+    None
+    """
     if not experiment:
         experiment = current_experiment
     files = glob.glob(os.path.join(experiment.path, 'images', '*.jpeg'))
@@ -668,6 +776,30 @@ def overlap_trajectories(experiment : DOMEexp.ExperimentManager = None):
     print("\nNow you can use DOMEgraphics.make_video to generate the video.")
 
 def merge_trajectories(id1 : int, id2 : int):
+    """
+    Merge two trajectories into a single one.
+    This function can be used by the user to manually correct errors in the tracking.
+
+    Parameters
+    ----------
+    id1 : int
+        Index of the trajectory to be updated.
+    id2 : int
+        Index of the trajectory to be merged into the first one.
+        Must be greater than id1.
+    
+    Global vars
+    -----------
+    positions : np.array
+        Array of positions generated by the tracking algorithm. Shape=(MxNx2)
+    inactivity : np.array
+        Array of inactivity counters generated by the tracking algorithm. Shape=(MxN)
+    
+    Returns
+    -------
+    None.
+
+    """
     assert id1 < id2, "id2 must be greater than id1!"
     assert id1 < positions.shape[1], "id1 cannot be greater than the number of agents!"
     assert id2 < positions.shape[1], "id2 cannot be greater than the number of agents!"
@@ -883,11 +1015,8 @@ def load_tracking(tracking_name : str = None, experiment : [str, DOMEexp.Experim
 
 # MAIN -----------------------------------------------------------------------
 if __name__ == '__main__':
-    # CONSTANTS
-    AUTO_SCALING = -1       # value for automatic brightness adjustment
-
-    
     # IMAGE POROCESSING PARAMETERS
+    AUTO_SCALING = -1       # value for automatic brightness adjustment
     DEFAULT_COLOR = "red"   # color channel used for gray-scale conversion "gray", "blue", "green" or "red"
     DEFAULT_BLUR = 9        # size of the blurring window [in pixels]
 
