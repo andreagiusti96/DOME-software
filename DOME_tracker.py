@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-This code reads in figures from a folder and for each frame, performs basic image analysis to try and detect agents using contour detection.
-The "agents" detected are then run though an agent matching algorithm to try and figure out if they correspond with an agent in a previous frame
-Displacement is then calculated by comaparing the position of the agent in the new frame to the previous frame.
-Time between frames is also calcuated by reading the filename, which is timestamped.
-A csv file is output with a list of agents with unique agent numbers, and for each frame where they are detected a data point is stored with (displacement, time, frame)
+This code reads data collected during a DOME experiment and performs objects detection and tracking.
+When you launch the tracking of an experiment the algorithm:
+1) Builds the background model representing static elements in the camera frame
+2) For each frame perfoms thresholding based objects detection and tracking.
+3) Generates tracking images and video.
+4) Saves the resulting tracking data.
 
-Created by Andrea
+Run this script, then follow instructions in the console.
 
-@author: andrea
+Author:     Andrea Giusti
+Created:    2023
 """
 
 import cv2
@@ -26,12 +28,6 @@ from typing import List
 
 import DOME_graphics as DOMEgraphics
 import DOME_experiment_manager as DOMEexp
-
-# old parameters without scaling on Typical_D
-# NEW_ID_COST_MIN = 1000
-# NEW_ID_COST_DIST_CAP = 100
-# DISTANCE_COST_FACTORS = [0, 2]
-# INACTIVITY_COST_FACTORS = [0, 1000]
 
 NEW_ID_COST_MIN = 1
 NEW_ID_COST_DIST_CAP = 3
@@ -101,9 +97,9 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
 
     Parameters
     ----------
-    new_positions : np.array Shape=(Nx2)
+    new_positions : np.array of float Shape=(Nx2)
         Positions of detected objects.
-    positions : np.array
+    positions : np.array of float
         Positions of previously detected objects. Shape=(Mx2)
     inactivity : List
         Inactivity counters of the objects. Shape=(M)
@@ -120,12 +116,18 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
         Total matching cost.
 
     """
+
     # allocate vars
     new_positions = np.array(new_positions)
     number_of_objects = sum(valid_positions(positions))
     costs_matching = np.ndarray([len(new_positions), number_of_objects])
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
 
+    assert len(new_positions.shape) == 2
+    assert len(positions.shape) == 2
+    assert new_positions.shape[1] == 2
+    assert positions.shape[1] == 2
+    
     TYPICAL_VEL = PARAMETERS["TYPICAL_VEL"]
 
     # compute distances between all possible pairs (estimated positions, detected positions)
@@ -165,7 +167,7 @@ def estimate_velocities(positions: np.array, deltaT : float):
 
     Parameters
     ----------
-    positions : np.array
+    positions : np.array of float
         Past positions of the objects. Shape=(MxNx2)
         If M<2 all velocities are [0, 0].
         Non valid position are discarded.
@@ -240,7 +242,7 @@ def interpolate_positions(positions: np.array, original_times : List = [], new_t
     
     Parameters
     ----------
-    positions : np.array
+    positions : np.array of float
         Array of 2D positions, possibly containing some nans. Shape=(MxNx2).
     original_times : List = []
         List of original sampling times. Optional.
@@ -340,7 +342,7 @@ def test_detection_parameters(fileLocation : str, bright_thresh : int, area_r: L
     background = build_background(fileLocation, 25)
 
     # test objects detection showing step by step images
-    new_contours = get_contours(img, bright_thresh, area_r, compactness_r, background, 0, True)
+    new_contours = get_contours(img, bright_thresh, area_r, compactness_r, background, 0, plot=True)
 
 
 def process_img(img: np.array, color: str = "", blur: int = 0, gain: float = 1., 
@@ -583,9 +585,11 @@ def get_contours(img: np.array, bright_thresh: List, area_r: List, compactness_r
 
         if plot: DOMEgraphics.draw_image(contours_img, "contours with thresh=" + str(threshold))
 
-        contoursFiltered_img = cv2.cvtColor(foreground, cv2.COLOR_GRAY2RGB)
-        cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0, 255, 0), 3)
-        if plot: DOMEgraphics.draw_image(contoursFiltered_img, "contoursFiltered with thresh=" + str(threshold))
+
+        if plot: 
+            contoursFiltered_img = cv2.cvtColor(foreground, cv2.COLOR_GRAY2RGB)
+            cv2.drawContours(contoursFiltered_img, contoursFiltered, -1, (0, 255, 0), 3)
+            DOMEgraphics.draw_image(contoursFiltered_img, "contoursFiltered with thresh=" + str(threshold))
 
         # If the number of detected objects is not close to the expected one adjust the thresholds and iterate
         if verbose:
@@ -667,7 +671,7 @@ def valid_positions(positions: np.array):
 
     Parameters
     ----------
-    positions : np.array
+    positions : np.array of float
         Array of positions. Shape=(Nx2)
 
     Returns
@@ -698,9 +702,9 @@ def save_tracking(experiment : DOMEexp.ExperimentManager = None):
     -----------
     current_experiment : DOMEexp.ExperimentManager
         The current experiment, used if the experiment input parameter is not given.
-    positions : np.array
+    positions : np.array of float
         Array of positions generated by the tracking algorithm. Shape=(MxNx2)
-    inactivity : np.array
+    inactivity : np.array of int
         Array of inactivity counters generated by the tracking algorithm. Shape=(MxN)
     total_cost : float
         Total cost resulting from the tracking procedure.
@@ -745,9 +749,9 @@ def overlap_trajectories(experiment : DOMEexp.ExperimentManager = None):
     -----------
     current_experiment : DOMEexp.ExperimentManager
         The current experiment, used if the experiment input parameter is not given.
-    positions : np.array
+    positions : np.array of float
         Array of positions generated by the tracking algorithm. Shape=(MxNx2)
-    inactivity : np.array
+    inactivity : np.array of int
         Array of inactivity counters generated by the tracking algorithm. Shape=(MxN)
     output_folder : str
         Name of the folder where tracking data must be saved.
@@ -790,9 +794,9 @@ def merge_trajectories(id1 : int, id2 : int):
     
     Global vars
     -----------
-    positions : np.array
+    positions : np.array of float
         Array of positions generated by the tracking algorithm. Shape=(MxNx2)
-    inactivity : np.array
+    inactivity : np.array of int
         Array of inactivity counters generated by the tracking algorithm. Shape=(MxN)
     
     Returns
@@ -821,9 +825,58 @@ def merge_trajectories(id1 : int, id2 : int):
     print("When you are done use save_tracking() to save updated tracking images and data.")
 
 
-def extract_data_from_images(fileLocation, background: np.ndarray, parameters : dict,
-                             output_folder: str, activation_times : List = [],
-                             terminal_time : float = -1, verbose:bool = False, show:bool = True):
+def extract_data_from_images(fileLocation : str, output_folder: str, parameters : dict, background : np.ndarray = None, 
+                             activation_times : List = [], terminal_time : float = -1, verbose:bool = False, show:bool = True):
+    """
+    Performs objects detection and tracking using images saved in a given folder.
+    Images are sorted according to the file name and analysed sequentially.
+    For each image objects detection and IDs matching are performed.
+    Then the objects' positions at the next time step are estimated.
+
+    Parameters
+    ----------
+    fileLocation : str
+        Path of the folder containing the images.
+    output_folder : str
+        Name of the folder where the tracking output will be stored.
+    parameters : dict
+        The parameters for objects detection and tracking.
+        parameters = {
+            "AREA_RANGE"      : [a_min, a_max],   # range of area for obj detection, positive values [pixels]
+            "COMPAC_RANGE"    : [c_min, c_max],   # range of compactness for obj detection, values in [0,1]
+            "BRIGHT_THRESH"   : [brightness_min], # brightness threshold used for object detection, values in [0, 255]
+            "TYPICAL_VEL"     : typical_velocity, # coeff used to scale the id assignment costs, positive values[px/s]
+            "INERTIA"         : inertia_coeff     # coeff used for position estimation, values in [0,1]
+        }
+    background : np.ndarray = None
+        The background image generated using the build_background function.
+        If None background subtraction is not performed.
+    activation_times : List = []
+        The sampling time instants. 
+        If empty uniform sampling step is assumed.
+    terminal_time : float = -1
+        Time to terminate the tracking. If negative, tracking is performed on the whole experiment.
+    verbose : bool = False
+        If True, prints additional information during execution.
+    show : bool = True
+        If True, shows the tracking image at each time step.
+    
+    Returns
+    -------
+    positions : np.array of float
+        Array of positions generated by the tracking algorithm. 
+        Nans will appear when the corresponding agent is not detected.
+        Shape=(MxNx2) where M is number of time instants and N the number of detected objects.
+    inactivity : np.array of int
+        Array of inactivity counters generated by the tracking algorithm. 
+        The inactivity counter indicates the number of time steps from last time the object was detected.
+        Currently detected objects have 0 inactivity.
+        Objects before their first detection have negative inactivity.
+        Objects that have been detected and then lost have positive inactivity.
+        Shape=(MxN) where M is number of time instants and N the number of detected objects.
+    total_cost : float
+        Total cumulative cost of the tracking procedure.
+    """
     files = glob.glob(fileLocation + '/*.jpeg')
     files = sorted(files, key=lambda x: float(re.findall("(\d+.\d+)", x)[-1]))
 
@@ -849,6 +902,9 @@ def extract_data_from_images(fileLocation, background: np.ndarray, parameters : 
     bright_thresh = parameters["BRIGHT_THRESH"].copy()
     area_r = parameters["AREA_RANGE"].copy()
     compactness_r = parameters["COMPAC_RANGE"].copy()
+    
+    if len(activation_times) == 0:
+        activation_times = np.linspace(0, terminal_time, len(files))
 
     print("Performing detection and tracking...")
     while time < terminal_time and counter < len(files):
@@ -857,13 +913,13 @@ def extract_data_from_images(fileLocation, background: np.ndarray, parameters : 
         img = cv2.imread(filename)
         time = DOMEexp.get_time_from_title(filename)
 
-        print('\rTracking: t = ' + str(time) + f' (total time = {terminal_time})', end='\r')
+        print('\rTracking: t = ' + str(time) + f's (total time = {terminal_time}s)', end='\r')
         if verbose: print()
 
         # collect contours and positions from new image
         plot_detection_steps = counter == 0
         new_contours = get_contours(img, bright_thresh, area_r, compactness_r, background, n_detected_objects,
-                                    plot_detection_steps, verbose)
+                                    plot=plot_detection_steps, verbose=verbose)
         new_positions = get_positions(new_contours)
         n_detected_objects = len(new_positions)
 
@@ -925,7 +981,7 @@ def extract_data_from_images(fileLocation, background: np.ndarray, parameters : 
                                              title='time=' + str(time), max_inactivity=3, time_window=5, show=show)
         fig.savefig(os.path.join(fileLocation, output_folder, 'trk_' + '%04.1f' % time + '.jpeg'), dpi=100)
 
-        # print info
+        # if verbose print info
         if verbose:
             print('deltaT = ' + str(round(deltaT,3)) + 's')
             print('total number of objects = ' + str(number_of_objects))
@@ -941,7 +997,106 @@ def extract_data_from_images(fileLocation, background: np.ndarray, parameters : 
 
     return positions, inactivity, total_cost
 
+def load_tracking(tracking_name : str = None, experiment : [str, DOMEexp.ExperimentManager] = None):    
+    """
+    Load data from an existing tracking file ('analysis_data.npz').
+    Use this function if you need to analyze or correct the tracking data.
+    
+    Parameters
+    ----------
+    tracking_name : str = None
+        Name of the tracking folder where tracking data are saved.
+        If None the global var output_folder is used.
+    experiment : [str, DOMEexp.ExperimentManager] = None
+        Name or ExperimentManager of the experiment whose tracking will be loaded.
+        
+    Returns
+    -------
+    positions : np.array of float
+        Array of positions generated by the tracking algorithm. 
+        Nans will appear when the corresponding agent is not detected.
+        Shape=(MxNx2) where M is number of time instants and N the number of detected objects.
+    inactivity : np.array of int
+        Array of inactivity counters generated by the tracking algorithm. 
+        The inactivity counter indicates the number of time steps from last time the object was detected.
+        Currently detected objects have 0 inactivity.
+        Objects before their first detection have negative inactivity.
+        Objects that have been detected and then lost have positive inactivity.
+        Shape=(MxN) where M is number of time instants and N the number of detected objects.
+    total_cost : float
+        Total cumulative cost of the tracking procedure.
+    PARAMETERS : dict
+        The parameters used in the given tracking.
+        parameters = {
+            "AREA_RANGE"      : [a_min, a_max],   # range of area for obj detection, positive values [pixels]
+            "COMPAC_RANGE"    : [c_min, c_max],   # range of compactness for obj detection, values in [0,1]
+            "BRIGHT_THRESH"   : [brightness_min], # brightness threshold used for object detection, values in [0, 255]
+            "TYPICAL_VEL"     : typical_velocity, # coeff used to scale the id assignment costs, positive values[px/s]
+            "INERTIA"         : inertia_coeff     # coeff used for position estimation, values in [0,1]
+        }
+    current_experiment : DOMEexp.ExperimentManager
+        ExperimentManager of the loaded experiment.
+    
+    See also
+    --------
+    start_tracking 
+        Function to execute the tracking.
+    """
+    global positions, inactivity, total_cost, parameters, current_experiment
+
+    # set current experiment
+    if isinstance(experiment, str):
+        current_experiment = DOMEexp.open_experiment(experiment, experiments_directory)
+    elif isinstance(experiment, DOMEexp.ExperimentManager):
+        current_experiment = experiment
+
+    # get tracking name
+    if not tracking_name:
+        tracking_name = output_folder
+
+    with current_experiment.get_data(os.path.join(tracking_name, 'analysis_data.npz'), allow_pickle=True) as data:
+        positions = data['positions']
+        inactivity = data['inactivity']
+
+        if 'total_cost' in data.files:
+            total_cost = data['total_cost'].item()
+
+        if 'parameters' in data.files:
+            PARAMETERS = data['parameters'].item()
+
+    assert inactivity.shape[0] == positions.shape[0]
+    assert inactivity.shape[1] == positions.shape[1]
+    print(f'{tracking_name} loaded.\nTotal cost = {np.round(total_cost,2)}, total objects = {inactivity.shape[1]}, time frames = {inactivity.shape[0]}')
+
+    return positions, inactivity, total_cost, PARAMETERS, current_experiment
+
 def start_tracking(experiment_names : [List, str]):
+    """
+    Perform tracking of the given experiment(s).
+    For each experiment:
+    1) Builds the background model
+    2) Perform tracking and generates tracking images
+    3) Makes a video from the tracking images
+    4) Saves the resulting tracking data in the analysis_data.npz file.
+    
+    The images must be saved in the folder "EXPERIMENTS_DIRECTORY/EXPERIMENT_NAME/images"
+    
+    Parameters
+    ----------
+    experiment_names : List or str
+        The name(s) of the experiment(s) to be tracked.
+    
+    Returns
+    -------
+    None
+    
+    See also
+    --------
+    build_background 
+        Function to generate the model of the background.
+    extract_data_from_images
+        Function to perform the tracking.
+    """
     if isinstance(experiment_names, str):
         experiment_names=[experiment_names]
 
@@ -970,48 +1125,15 @@ def start_tracking(experiment_names : [List, str]):
         cv2.imwrite(os.path.join(experiments_directory, experiment_name, output_folder, 'background.jpeg'), background)
 
         # extract data and generate tracking images
-        positions, inactivity, total_cost = extract_data_from_images(images_folder, background, PARAMETERS,
-                                        output_dir, activation_times, terminal_time, verbose, show_tracking_images)
+        positions, inactivity, total_cost = extract_data_from_images(images_folder, output_dir, PARAMETERS,
+                                        background, activation_times, terminal_time, verbose, show_tracking_images)
 
         # make video from images
         DOMEgraphics.make_video(output_dir, title='tracking.mp4', fps=2, key='/trk_*.jpeg')
 
         # Save tracking data
-        analised_data_path = os.path.join(output_dir, 'analysis_data.npz')
         current_experiment.save_data(os.path.join(output_folder, 'analysis_data'), force=True, positions=positions,
                                          inactivity=inactivity, total_cost=total_cost, parameters=PARAMETERS)
-
-
-
-def load_tracking(tracking_name : str = None, experiment : [str, DOMEexp.ExperimentManager] = None):    
-    
-    global positions, inactivity, total_cost, parameters, current_experiment
-
-    # set current experiment
-    if isinstance(experiment, str):
-        current_experiment = DOMEexp.open_experiment(experiment, experiments_directory)
-    elif isinstance(experiment, DOMEexp.ExperimentManager):
-        current_experiment = experiment
-
-    # get tracking name
-    if not tracking_name:
-        tracking_name = output_folder
-
-    with current_experiment.get_data(os.path.join(tracking_name, 'analysis_data.npz'), allow_pickle=True) as data:
-        positions = data['positions']
-        inactivity = data['inactivity']
-
-        if 'total_cost' in data.files:
-            total_cost = data['total_cost'].item()
-
-        if 'parameters' in data.files:
-            PARAMETERS = data['parameters'].item()
-
-    assert inactivity.shape[0] == positions.shape[0]
-    assert inactivity.shape[1] == positions.shape[1]
-    print(f'{tracking_name} loaded.\nTotal cost = {np.round(total_cost,2)}, total objects = {inactivity.shape[1]}, time frames = {inactivity.shape[0]}')
-
-    return positions, inactivity, total_cost, PARAMETERS, current_experiment
 
 # MAIN -----------------------------------------------------------------------
 if __name__ == '__main__':
