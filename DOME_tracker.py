@@ -473,6 +473,43 @@ def build_background(fileLocation: str, images_number : int = 10, gain: float = 
 
     return background
 
+def make_backgrounds(experiment_names : [List, str]):
+    """
+    Build and save the backgound of the experiments.
+    
+    The images must be saved in the folder "EXPERIMENTS_DIRECTORY/EXPERIMENT_NAME/images"
+    
+    Parameters
+    ----------
+    experiment_names : List or str
+        The name(s) of the experiment(s) to be tracked.
+    
+    Returns
+    -------
+    None
+    
+    See also
+    --------
+    build_background 
+        Function to generate the model of the background.
+    """
+    if isinstance(experiment_names, str):
+        experiment_names=[experiment_names]
+
+    for exp_counter in range(len(experiment_names)):
+        experiment_name = experiment_names[exp_counter]
+
+        if os.path.isdir(os.path.join(experiments_directory, experiment_name, 'images')):
+            images_folder = os.path.join(experiments_directory, experiment_name, 'images')
+        else:
+            images_folder = os.path.join(experiments_directory, experiment_name)
+
+
+        # Build and save the background model
+        background = build_background(images_folder, 25)
+        cv2.imwrite(os.path.join(experiments_directory, experiment_name, 'background.jpeg'), background)
+        print(f'Background of experiment {experiment_name} saved.')
+
 
 def get_contours(img: np.array, bright_thresh: List, area_r: List, compactness_r: List, background_model=None,
                  expected_obj_number: int = 0, margin_factor : float = 0.25, adjustment_factor : float = 0.02,
@@ -1200,19 +1237,53 @@ if __name__ == '__main__':
     #                       "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6", 
     #                       "2023_07_10_Euglena_8","2023_07_10_Euglena_10","2023_07_10_Euglena_12",
     #                       "2023_07_10_Euglena_15","2023_06_15_Euglena_10",
-    #                       "2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"]
+    #                       "2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"
+    #                       "2023_06_26_Euglena_36", "2023_06_26_Euglena_37", "2023_06_15_Euglena_16", 
+    #                       "2023_07_10_Euglena_21", "2023_07_10_Euglena_22", "2023_06_26_Euglena_39"]
+
+    experiments_gradient_central_light = ['2023_06_12_Euglena_3','2023_06_12_Euglena_4','2023_06_14_Euglena_7',
+                                          '2023_06_15_Euglena_14','2023_06_23_Euglena_5','2023_06_23_Euglena_6',
+                                          '2023_06_26_Euglena_5','2023_06_26_Euglena_6','2023_06_26_Euglena_33'];
+    
+    experiments_gradient_central_dark = ['2023_06_14_Euglena_10','2023_06_15_Euglena_15','2023_06_23_Euglena_7',
+                                          '2023_06_23_Euglena_8','2023_06_23_Euglena_9','2023_06_26_Euglena_7',
+                                          '2023_06_26_Euglena_8','2023_06_26_Euglena_34','2023_06_26_Euglena_35',
+                                          '2023_07_10_Euglena_23','2023_07_10_Euglena_24'] 
+    
+    experiments_gradient_lateral = ['2023_06_12_Euglena_5','2023_06_13_Euglena_16','2023_06_14_Euglena_8',
+                                    '2023_06_15_Euglena_13','2023_06_23_Euglena_3','2023_06_23_Euglena_4',
+                                    '2023_06_26_Euglena_3','2023_06_26_Euglena_4','2023_06_26_Euglena_31',
+                                    '2023_06_26_Euglena_32']
+    
+    experiments_half_half = ['2023_06_12_Euglena_2','2023_06_14_Euglena_6','2023_06_15_Euglena_12',
+                             '2023_06_26_Euglena_29','2023_06_26_Euglena_30','2023_06_23_Euglena_1',
+                             '2023_06_23_Euglena_2','2023_06_26_Euglena_2','2023_06_26_Euglena_1']
+    
+    experiments_circle_light = ['2023_06_12_Euglena_1','2023_06_14_Euglena_1','2023_06_15_Euglena_16','2023_06_23_Euglena_10',
+                                '2023_06_23_Euglena_11','2023_06_26_Euglena_9','2023_06_26_Euglena_10','2023_06_26_Euglena_36',
+                                '2023_06_26_Euglena_37','2023_07_10_Euglena_26']
+    
+    experiments_circle_dark = ['2023_06_13_Euglena_6','2023_06_13_Euglena_15','2023_06_15_Euglena_17',
+                               '2023_06_15_Euglena_18','2023_06_23_Euglena_12','2023_06_23_Euglena_13',
+                               '2023_06_26_Euglena_11','2023_06_26_Euglena_12','2023_06_26_Euglena_38',
+                               '2023_06_26_Euglena_39','2023_07_10_Euglena_25','2023_07_10_Euglena_22']
+    
+    experiments_BCL = ['2023_07_10_Euglena_30','2023_07_10_Euglena_34','2023_07_10_Euglena_35',
+                              '2023_07_10_Euglena_36','2023_07_10_Euglena_37','2023_07_10_Euglena_38']
+    
+    
 
     # Name of the experiment(s) to be tracked
-    experiment_names = ["2023_06_15_Euglena_1"]
+    experiment_names = ["2023_07_10_Euglena_26"]
     
     # Name of the folder to save tracking results
-    #output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
-    output_folder = 'tracking_test'
+    output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
+    #output_folder = 'tracking_test'
 
     # Tracking options
     terminal_time = -1          # time to stop tracking [s], set negative to track the whole experiment
     verbose = False             # print info during tracking
-    show_tracking_images = True # print images during tracking
+    show_tracking_images = False # print images during tracking
     #show_tracking_images = os.name == 'posix' # print images during tracking
 
     # Useful commands
@@ -1220,7 +1291,8 @@ if __name__ == '__main__':
           '\n\tstart_tracking(experiment_names)\t\t\t\t\t\t\t\t\t\t\t\t\tStart tracking of the given experiment(s).'
           '\n\ttest_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)\tTest obj detection on a random image in images_folder.'
           '\n\ttest_detection_parameters(image_name, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)\t\tTest obj detection on the selected image.'
-          '\n\tpositions, inactivity, total_cost, PARAMETERS, current_experiment=load_tracking(output_folder,experiment_name)\tLoad data from an existing tracking.')
+          '\n\tpositions, inactivity, total_cost, PARAMETERS, current_experiment=load_tracking(output_folder,experiment_name)\tLoad data from an existing tracking.'
+          '\n\tmake_backgrounds(experiment_names)\t\t\t\t\t\t\t\t\t\t\t\tBuild and save background models of the given experiment(s).')
 
     # test thresholds for object detection
     # test_detection_parameters(images_folder, BRIGHT_THRESH, AREA_RANGE, COMPAC_RANGE)
