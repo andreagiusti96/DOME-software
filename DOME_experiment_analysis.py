@@ -128,7 +128,7 @@ def detect_outliers(data, m = 2., side='both'):
     return outliers
 
 def remove_agents(agents : [int, List]):
-    global speeds_smooth, acc_smooth, velocities, interp_positions
+    global speeds_smooth, acc_smooth, velocities, interp_positions, positions
     
     if type(agents) is int:
         agents = [agents]
@@ -350,6 +350,21 @@ def moving_average(x, window, weights=[], axis=0):
     y=np.ma.array(y, mask=np.isnan(y))
     return y
 
+def angle_between_vectors(v1 : np.ndarray, v2 : np.ndarray):
+    # output in ]-pi,pi] rad.
+    
+    assert v1.shape == v2.shape, 'v1 and v2 must have the same dimensions'
+    assert v1.shape[-1]==2
+    
+    if len(v1.shape)==1:
+        v1 = np.reshape(v1,[1,2])
+        v2 = np.reshape(v2,[1,2])
+    
+    R = np.array([[0, 1],[-1, 0]])
+    angles = np.arctan2(np.diag(np.dot(v1, np.dot(R,v2.T))), np.diag(np.dot(v1,v2.T)));
+    
+    return angles
+    
 def angle_diff(unit1, unit2):
     angles=np.zeros_like(unit1)
     
@@ -1343,22 +1358,19 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
 
     # plot trajectories
     img = current_experiment.get_img_at_time(totalT)
-    DOMEgraphics.draw_trajectories(positions, inactivity=inactivity, img=img, title="trajectories", max_inactivity=0)
+    DOMEgraphics.draw_trajectories(positions, inactivity=inactivity, img=img, title="trajectories", max_inactivity=0);
 
 
     # replace estimated positions with interpolated ones and apply uniform time sampling
     positions[inactivity!=0]=np.nan
     interp_positions = DOMEtracker.interpolate_positions(positions, activation_times, time_instants)
-    #interp_positions = DOMEtracker.interpolate_positions(positions)
-    DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="interpolated trajectories", max_inactivity=0)
+    DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="interpolated trajectories", max_inactivity=0);
 
     # smooth trajectories
     #interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
     interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
     interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
-    # interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
-    # interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
-    DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="smoothed trajectories", max_inactivity=0)
+    DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="smoothed trajectories", max_inactivity=0);
 
 
     # length of trajectories
@@ -1384,10 +1396,82 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     acc_smooth = moving_average(acc, 3)
     acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
 
+    # directions
+    norm_disp = np.divide(velocities,np.stack([speeds,speeds], axis=2)+0.001)
+    norm_disp = np.ma.array(norm_disp, mask=np.isnan(norm_disp))
+    directions=np.arctan2(norm_disp[:,:,1],norm_disp[:,:,0]) # [rad]
+
+    # compue angular velocity [rad/s]    
+    ang_vel = np.ndarray([velocities.shape[0]-1,velocities.shape[1]])
+    for i in range(velocities.shape[0]-1):
+        ang_vel[i,:] = angle_between_vectors(velocities[i,:,:],velocities[i+1,:,:])
+    ang_vel = ang_vel/deltaT
+    ang_vel = np.ma.array(ang_vel, mask=np.isnan(ang_vel))
+    ang_vel_smooth1 = moving_average(ang_vel, 3)
+    ang_vel_smooth4 = moving_average(ang_vel_smooth1, 3)
+    
+    # inergrate angular velocity to obtain continous direction
+    starting_dir = np.zeros([1, directions.shape[1]])
+    for i in range(directions.shape[1]):
+        # starting_idx = np.ma.flatnotmasked_edges(directions[:,i])
+        try:
+            starting_dir[0,i]= directions[np.ma.flatnotmasked_edges(directions[:,i])[0], i] 
+        except:
+            pass
+    directions_reg = starting_dir + np.cumsum(ang_vel, axis=0)*deltaT
+    directions_reg[directions_reg.mask==1] = np.nan
+    directions_reg_smooth = moving_average(directions_reg, 3)
+
+    # differentiate continous direction to obtain smooth ang vel [rad/s]
+    ang_vel_smooth3 = np.gradient(directions_reg, deltaT, axis=0)
+    ang_vel_smooth3 = moving_average(ang_vel_smooth3, 3)
+    ang_vel_smooth3 = np.ma.array(ang_vel_smooth3, mask=np.isnan(ang_vel_smooth3))
+
+    ang_vel_smooth2 = np.gradient(directions_reg_smooth, deltaT, axis=0)
+    ang_vel_smooth2 = np.ma.array(ang_vel_smooth2, mask=np.isnan(ang_vel_smooth2))
+
+    ag = 20;
+    plt.figure(figsize=(12,20))
+    plt.subplot(5, 1, 1)
+    plt.plot(ang_vel[:,ag])
+    plt.legend(['w'])
+    plt.subplot(5, 1, 2)
+    plt.plot(ang_vel[:,ag], 'grey')
+    plt.plot(ang_vel_smooth1[:,ag])  
+    plt.legend(['w', 'w smooth'])
+    plt.subplot(5, 1, 3)
+    plt.plot(ang_vel_smooth1[:,ag], 'grey')
+    plt.plot(ang_vel_smooth2[:,ag])
+    plt.legend(['w smooth', 'w smooth der'])
+    plt.subplot(5, 1, 4)
+    plt.plot(ang_vel_smooth1[:,ag], 'grey')
+    plt.plot(ang_vel_smooth3[:,ag])
+    plt.legend(['w smooth','w der smooth'])
+    plt.subplot(5, 1, 5)
+    plt.plot(ang_vel_smooth1[:,ag], 'grey')
+    plt.plot(ang_vel_smooth4[:,ag])
+    plt.legend(['w smooth', 'w smooth smooth'])
+    plt.show()
+    
+    plt.figure(figsize=(12,8))
+    plt.plot(ang_vel[:,ag])
+    plt.plot(ang_vel_smooth1[:,ag],'--')  
+    plt.plot(ang_vel_smooth2[:,ag],'-')
+    plt.plot(ang_vel_smooth3[:,ag],'--')
+    plt.plot(ang_vel_smooth4[:,ag],'--')
+    plt.legend(['w', 'w smooth', 'w smooth der', 'w der smooth', 'w smooth smooth'])
+    plt.show()
+
+    ang_vel_smooth = ang_vel_smooth1
+    
     # reject outliers
     outliers_speed=detect_outliers(speeds_smooth, m=variance_thresh, side='top')
     outliers_acc=detect_outliers(acc_smooth, m=variance_thresh, side='top')
-    outliers = outliers_speed * outliers_acc
+    outliers_omega=detect_outliers(ang_vel_smooth, m=variance_thresh, side='both')
+    outliers_omega=np.ma.concatenate([outliers_omega,np.zeros([1,number_of_agents],dtype=bool)])    #outliers = outliers_speed * outliers_acc
+    outliers = outliers_speed * outliers_omega
+    #outliers = outliers_speed * outliers_acc
+    removed_agents=0;
     for a in range(number_of_agents):
         if np.ma.max(outliers[:,a]):
             #remove_agents(i)
@@ -1399,36 +1483,10 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
             interp_positions[:,a,:]= np.nan
             print('Agent '+str(a)+' is an outlier at time(s) ' + str(time_instants[outliers[:,a]])+ 
                   's and has been removed.')
-    print(f'{np.sum(np.ma.max(outliers,axis=1))} outliers removed.')
+            removed_agents = removed_agents+1;
+    print(f'{removed_agents} outliers removed.')
 
-    # directions
-    norm_disp = np.divide(velocities,np.stack([speeds,speeds], axis=2)+0.001)
-    norm_disp = np.ma.array(norm_disp, mask=np.isnan(norm_disp))
-    directions=np.arctan2(norm_disp[:,:,1],norm_disp[:,:,0])
-
-    # compue angular velocity [rad/s]
-    ang_vel = angle_diff(directions[1:,:], directions[:-1,:])
-    ang_vel = np.ma.array(ang_vel, mask=np.isnan(ang_vel))
-
-    # inergrate angular velocity to obtain continous direction
-    starting_dir = np.zeros([1, directions.shape[1]])
-    for i in range(directions.shape[1]):
-        # starting_idx = np.ma.flatnotmasked_edges(directions[:,i])
-        try:
-            starting_dir[0,i]= directions[np.ma.flatnotmasked_edges(directions[:,i])[0], i] 
-        except:
-            pass
-    directions_reg = starting_dir + np.cumsum(ang_vel, axis=0)
-    directions_reg[directions_reg.mask==1] = np.nan
-    directions_reg_smooth = moving_average(directions_reg, 3)
-
-    # differentiate continous direction to obtain smooth ang vel [rad/s]
-    ang_vel_smooth = np.gradient(directions_reg_smooth, deltaT, axis=0)
-    #ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
-    ang_vel_smooth = moving_average(ang_vel_smooth, 3)
-    ang_vel_smooth = np.ma.array(ang_vel_smooth, mask=np.isnan(ang_vel_smooth))
-    # abs_ang_vel_smooth = np.ma.abs(ang_vel_smooth)
-
+    
     # autocorrelation of velocities
     # disp_acorr=[]
     # disp_corr=[]
