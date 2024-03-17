@@ -116,7 +116,6 @@ def detect_outliers(data, m = 2., side='both'):
     data=np.ma.array(data, mask=np.isnan(data))
     d = np.abs(data - np.ma.median(data))
     mdev = np.ma.median(d)
-    #s = d/mdev if mdev else np.zeros(len(d))
     s = d/mdev
     outliers=s>m
     
@@ -550,15 +549,15 @@ def plot_with_shade(x, data, quantile = [0,1], color=None, marker = None):
     return p[0]
 
 def make_experiment_plots(tracking_folder : str):
-    global min_traj_length
-    # PLOTS ----------------------------------------------------------------------------------------
-
     # make folder for plots
     plots_dir = os.path.join(current_experiment.path, tracking_folder, 'plots')
     try:
         os.mkdir(plots_dir)
     except OSError:
         pass
+    
+    # plots options
+    plt.rc('axes', labelsize=12)    # fontsize of the x and y labels
             
     # timesteps
     plt.figure(figsize=(9, 3))
@@ -576,7 +575,7 @@ def make_experiment_plots(tracking_folder : str):
     plt.figure(figsize=(9,3))
     agents_number = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=1)
     plt.plot(time_instants,agents_number)
-    plt.title(f'Number of detected agents over time (total={sum(lengths>min_traj_length)})')
+    plt.title(f'Number of detected agents over time (total={np.sum(lengths>=min_traj_length)})')
     plt.xlabel('Time [s]')
     plt.gca().set_xlim([0, totalT])
     plt.gca().set_ylim(0)
@@ -587,7 +586,7 @@ def make_experiment_plots(tracking_folder : str):
     plt.show()
 
     # length of trajectories histogram
-    plt.title(f'Trajectories duration. Total={len(lengths)}, rejected={sum(lengths<min_traj_length)}')
+    plt.title(f'Trajectories duration. Total={len(lengths)}, rejected={len(lengths) - np.sum(lengths>=min_traj_length)}')
     bins = [0,5,10,20,40,60,80,100, 120]
     plt.hist(lengths, bins)
     plt.axvline(min_traj_length, color='red')
@@ -602,9 +601,9 @@ def make_experiment_plots(tracking_folder : str):
 
     # Inputs
     plt.figure(figsize=(9,6))
-    plt.plot(time_instants,inputs[:,0], color='blue')
     plt.plot(time_instants,inputs[:,1], color='green')
     plt.plot(time_instants,inputs[:,2], color='red')
+    plt.plot(time_instants,inputs[:,0], color='blue')
     plt.title('Inputs')
     plt.xlabel('Time [s]')
     plt.gca().set_xlim([0, totalT])
@@ -633,7 +632,7 @@ def make_experiment_plots(tracking_folder : str):
     # plt.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
     # plt.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
     # plt.xlabel('Time [s]')
-    # plt.ylabel('Speed [px/s]')
+    # plt.ylabel('$v$ [$\mu$m/s]')
     # plt.gca().set_xlim([0, totalT])
     # plt.gca().set_ylim(0)
     # plt.grid()
@@ -643,7 +642,7 @@ def make_experiment_plots(tracking_folder : str):
     # plt.plot(time_instants,np.ma.median(acc_smooth,axis=1))
     # plt.fill_between(time_instants, np.min(acc_smooth,axis=1), np.max(acc_smooth,axis=1),alpha=0.5)
     # plt.gca().set_xlim([0, totalT])
-    # plt.ylabel('Acc [px/s^2]')
+    # plt.ylabel('Acc [$\mu$m/s^2]')
     # plt.grid()
     # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 
@@ -651,7 +650,7 @@ def make_experiment_plots(tracking_folder : str):
     # plt.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
     # plt.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
     # plt.gca().set_xlim([0, totalT])
-    # plt.ylabel('Ang Vel [rad/s]')
+    # plt.ylabel('$|\omega|$ [rad/s]')
     # #plt.xlabel('Time [s]')
     # plt.grid()
     # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
@@ -682,7 +681,7 @@ def make_experiment_plots(tracking_folder : str):
     ax_sp.plot(time_instants, np.ma.median(speeds_smooth, axis=1))
     ax_sp.fill_between(time_instants, np.min(
         speeds_smooth, axis=1), np.max(speeds_smooth, axis=1), alpha=0.5)
-    ax_sp.set_ylabel('Speed [px/s]')
+    ax_sp.set_ylabel('$v$ [$\mu$m/s]')
     ax_sp.set_xlim([0, totalT])
     ax_sp.set_ylim([0, np.max(speeds_smooth)])
     ax_sp.grid()
@@ -696,7 +695,7 @@ def make_experiment_plots(tracking_folder : str):
     ax_angv.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
     ax_angv.set_xlim([0, totalT])
     ax_angv.set_ylim([0, 3])
-    ax_angv.set_ylabel('Ang. Vel. [rad/s]')
+    ax_angv.set_ylabel('$|\omega|$ [rad/s]')
     plt.xlabel('Time [s]')
     ax_angv.grid()
     DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_angv)
@@ -719,7 +718,7 @@ def make_experiment_plots(tracking_folder : str):
         #
         ax_sp.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
         ax_sp.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
-        ax_sp.set_ylabel('Speed [px/s]')
+        ax_sp.set_ylabel('$v$ [$\mu$m/s]')
         ax_sp.set_xlim([0, totalT])
         ax_sp.set_ylim([0, np.max(speeds_smooth)*0.9])
         ax_sp.grid()
@@ -732,7 +731,7 @@ def make_experiment_plots(tracking_folder : str):
         ax_angv.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
         ax_angv.set_xlim([0, totalT])
         ax_angv.set_ylim([0, 2])
-        ax_angv.set_ylabel('Ang. Vel. [rad/s]')
+        ax_angv.set_ylabel('$|\omega|$ [rad/s]')
         plt.xlabel('Time [s]')
         ax_angv.grid()
         DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_angv)
@@ -751,14 +750,14 @@ def make_experiment_plots(tracking_folder : str):
         plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
         add_significance_bar(data=data_to_plot)
         plt.axhline(0, color='gray')
-        plt.ylabel('Speed [px/s]')
+        plt.ylabel('$v$ [$\mu$m/s]')
         plt.title('Boxplots of averages over the agents')
         plt.subplot(2, 1, 2)
         data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
         plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
         add_significance_bar(data=data_to_plot)
         plt.axhline(0, color='gray')
-        plt.ylabel('Ang Vel [rad/s]')
+        plt.ylabel('$|\omega|$ [rad/s]')
         plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
         plt.show()
 
@@ -769,18 +768,18 @@ def make_experiment_plots(tracking_folder : str):
         # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=0), np.mean(speeds_off, axis=0), (np.mean(speeds_on, axis=0) - np.mean(speeds_off, axis=0))]))
         # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
         # plt.axhline(0, color='gray')
-        # plt.ylabel('Speed [px/s]')
+        # plt.ylabel('$v$ [$\mu$m/s]')
         # plt.title('Boxplots')
         # plt.subplot(4, 1, 2)
         # data_to_plot = list(map(lambda X: [x for x in X if x],[np.mean(acc_on, axis=0), np.mean(acc_off, axis=0), (np.mean(acc_on, axis=0) - np.mean(acc_off, axis=0))]))
         # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
         # plt.axhline(0, color='gray')
-        # plt.ylabel('Acc [px/s^2]')
+        # plt.ylabel('Acc [$\mu$m/s^2]')
         # plt.subplot(4, 1, 3)
         # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=0), np.mean(ang_vel_off, axis=0), (np.mean(ang_vel_on, axis=0) - np.mean(ang_vel_off, axis=0))]))
         # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
         # plt.axhline(0, color='gray')
-        # plt.ylabel('Ang Vel [rad/s]')
+        # plt.ylabel('$|\omega|$ [rad/s]')
         # plt.subplot(4, 1, 4)
         # #data_to_plot =  [np.ma.mean(tumbling_on)*100, np.ma.mean(tumbling_off)*100, np.ma.mean(np.ma.mean(tumbling_on, axis=0) - np.ma.mean(tumbling_off, axis=0))*100]
         # #plt.bar([1, 2, 3], data_to_plot)
@@ -797,13 +796,13 @@ def make_experiment_plots(tracking_folder : str):
         # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=0), np.mean(speeds_off, axis=0)]))
         # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
         # plt.axhline(0, color='gray')
-        # plt.ylabel('Speed [px/s]')
+        # plt.ylabel('$v$ [$\mu$m/s]')
         # plt.title('Boxplots of averages over time instants')
         # plt.subplot(2, 1, 2)
         # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=0), np.mean(ang_vel_off, axis=0)]))
         # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
         # plt.axhline(0, color='gray')
-        # plt.ylabel('Ang Vel [rad/s]')
+        # plt.ylabel('$|\omega|$ [rad/s]')
         # plt.savefig(os.path.join(plots_dir, 'boxplots.pdf'), bbox_inches = 'tight')
         # plt.show()
     
@@ -813,80 +812,80 @@ def make_experiment_plots(tracking_folder : str):
         # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on[:5,:], axis=0), np.mean(speeds_off[-5:,:], axis=0), (np.mean(speeds_on[:5,:], axis=0) - np.mean(speeds_off[-5:,:], axis=0))]))
         # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
         # plt.axhline(0, color='gray')
-        # plt.ylabel('Speed [px/s]')
+        # plt.ylabel('$v$ [$\mu$m/s]')
         # plt.title('Boxplots: just before and after the switch')
         # plt.subplot(3, 1, 2)
         # data_to_plot = list(map(lambda X: [x for x in X if x],[np.mean(acc_on[:5,:], axis=0), np.mean(acc_off[-5:,:], axis=0), (np.mean(acc_on[:5,:], axis=0) - np.mean(acc_off[-5:,:], axis=0))]))
         # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
         # plt.axhline(0, color='gray')
-        # plt.ylabel('Acc [px/s^2]')
+        # plt.ylabel('Acc [$\mu$m/s^2]')
         # plt.subplot(3, 1, 3)
         # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on[:5,:], axis=0), np.mean(ang_vel_off[-5:,:], axis=0), (np.mean(ang_vel_on[:5,:], axis=0) - np.mean(ang_vel_off[-5:,:], axis=0))]))
         # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF', 'Difference'])
         # plt.axhline(0, color='gray')
-        # plt.ylabel('Ang Vel [rad/s]')
+        # plt.ylabel('$|\omega|$ [rad/s]')
         # plt.savefig(os.path.join(plots_dir, 'focused_boxplots.pdf'), bbox_inches = 'tight')
         # plt.show()
 
-    # histograms
-    plt.figure(figsize=(4,6))
-    plt.subplot(3, 1, 1)
-    plt.title('Histograms')
-    #bins=np.linspace(0, 40, round(40/5+1))
-    my_histogram([np.mean(speeds_on, axis=0).compressed(), np.mean(speeds_off, axis=0).compressed()], normalize=True)
-    plt.legend(labels=['Light ON', 'Light OFF'])
-    plt.xlabel('Speed [px/s]')
-    #plt.gca().set_ylim([0, 0.25])
-    plt.ylabel('Agents')
-    plt.grid()
-    plt.subplot(3, 1, 2)
-    #bins=np.linspace(0, 5, round(10+1))
-    # my_histogram([np.mean(acc_on, axis=0).compressed(), np.mean(acc_off, axis=0).compressed()], normalize=True)
-    plt.legend(labels=['Light ON', 'Light OFF'])
-    plt.xlabel('Acc [px/s^2]')
-    #plt.gca().set_ylim([0, 0.25])
-    plt.ylabel('Agents')
-    plt.grid()
-    plt.subplot(3, 1, 3)
-    #bins=np.linspace(0, 1, round(10+1))
-    my_histogram([np.mean(ang_vel_on, axis=0).compressed(), np.mean(ang_vel_off, axis=0).compressed()], normalize=True)
-    plt.legend(labels=['Light ON', 'Light OFF'])
-    plt.xlabel('Ang Vel [rad/s]')
-    #plt.gca().set_ylim([0, 0.25])
-    plt.ylabel('Agents')
-    plt.grid()
-    plt.savefig(os.path.join(plots_dir, 'histograms.pdf'), bbox_inches = 'tight')
-    plt.show()
-
-
-    # # focused histograms
-    # plt.figure(figsize=(4,6))
-    # plt.subplot(3, 1, 1)
-    # plt.title('Histograms: just before and after the switch')
-    # #bins=np.linspace(0, 40, round(40/5+1))
-    # my_histogram([np.mean(speeds_on[:5,:], axis=0).compressed(), np.mean(speeds_off[-5:,:], axis=0).compressed()] , normalize=True)
-    # plt.legend(labels=['Light ON', 'Light OFF'])
-    # plt.xlabel('Speed [px/s]')
-    # #plt.gca().set_ylim([0, 0.25])
-    # plt.ylabel('Agents')
-    # plt.grid()
-    # plt.subplot(3, 1, 2)
-    # #bins=np.linspace(0, 5, round(10+1))
-    # my_histogram([np.mean(acc_on[:5,:], axis=0).compressed(), np.mean(acc_off[-5:,:], axis=0).compressed()] , normalize=True)
-    # plt.legend(labels=['Light ON', 'Light OFF'])
-    # plt.xlabel('Acc [px/s^2]')
-    # #plt.gca().set_ylim([0, 0.25])
-    # plt.ylabel('Agents')
-    # plt.grid()
-    # plt.subplot(3, 1, 3)
-    # #bins=np.linspace(0, 1, round(10+1))
-    # my_histogram([np.mean(ang_vel_on[:5,:], axis=0).compressed(), np.mean(ang_vel_off[-5:,:], axis=0).compressed()] , normalize=True)
-    # plt.legend(labels=['Light ON', 'Light OFF'])
-    # plt.xlabel('Ang Vel [rad/s]')
-    # #plt.gca().set_ylim([0, 0.25])
-    # plt.ylabel('Agents')
-    # plt.grid()
-    # plt.show()
+        # histograms
+        plt.figure(figsize=(4,6))
+        plt.subplot(3, 1, 1)
+        plt.title('Histograms')
+        #bins=np.linspace(0, 40, round(40/5+1))
+        my_histogram([np.mean(speeds_on, axis=0).compressed(), np.mean(speeds_off, axis=0).compressed()], normalize=True)
+        plt.legend(labels=['Light ON', 'Light OFF'])
+        plt.xlabel('$v$ [$\mu$m/s]')
+        #plt.gca().set_ylim([0, 0.25])
+        plt.ylabel('Agents')
+        plt.grid()
+        plt.subplot(3, 1, 2)
+        #bins=np.linspace(0, 5, round(10+1))
+        # my_histogram([np.mean(acc_on, axis=0).compressed(), np.mean(acc_off, axis=0).compressed()], normalize=True)
+        plt.legend(labels=['Light ON', 'Light OFF'])
+        plt.xlabel('Acc [$\mu$m/s^2]')
+        #plt.gca().set_ylim([0, 0.25])
+        plt.ylabel('Agents')
+        plt.grid()
+        plt.subplot(3, 1, 3)
+        #bins=np.linspace(0, 1, round(10+1))
+        my_histogram([np.mean(ang_vel_on, axis=0).compressed(), np.mean(ang_vel_off, axis=0).compressed()], normalize=True)
+        plt.legend(labels=['Light ON', 'Light OFF'])
+        plt.xlabel('$|\omega|$ [rad/s]')
+        #plt.gca().set_ylim([0, 0.25])
+        plt.ylabel('Agents')
+        plt.grid()
+        plt.savefig(os.path.join(plots_dir, 'histograms.pdf'), bbox_inches = 'tight')
+        plt.show()
+    
+    
+        # # focused histograms
+        # plt.figure(figsize=(4,6))
+        # plt.subplot(3, 1, 1)
+        # plt.title('Histograms: just before and after the switch')
+        # #bins=np.linspace(0, 40, round(40/5+1))
+        # my_histogram([np.mean(speeds_on[:5,:], axis=0).compressed(), np.mean(speeds_off[-5:,:], axis=0).compressed()] , normalize=True)
+        # plt.legend(labels=['Light ON', 'Light OFF'])
+        # plt.xlabel('$v$ [$\mu$m/s]')
+        # #plt.gca().set_ylim([0, 0.25])
+        # plt.ylabel('Agents')
+        # plt.grid()
+        # plt.subplot(3, 1, 2)
+        # #bins=np.linspace(0, 5, round(10+1))
+        # my_histogram([np.mean(acc_on[:5,:], axis=0).compressed(), np.mean(acc_off[-5:,:], axis=0).compressed()] , normalize=True)
+        # plt.legend(labels=['Light ON', 'Light OFF'])
+        # plt.xlabel('Acc [$\mu$m/s^2]')
+        # #plt.gca().set_ylim([0, 0.25])
+        # plt.ylabel('Agents')
+        # plt.grid()
+        # plt.subplot(3, 1, 3)
+        # #bins=np.linspace(0, 1, round(10+1))
+        # my_histogram([np.mean(ang_vel_on[:5,:], axis=0).compressed(), np.mean(ang_vel_off[-5:,:], axis=0).compressed()] , normalize=True)
+        # plt.legend(labels=['Light ON', 'Light OFF'])
+        # plt.xlabel('$|\omega|$ [rad/s]')
+        # #plt.gca().set_ylim([0, 0.25])
+        # plt.ylabel('Agents')
+        # plt.grid()
+        # plt.show()
 
 
     # # displacements autocorrelation
@@ -901,31 +900,36 @@ def make_experiment_plots(tracking_folder : str):
     # plt.show()
 
     # corrplot speed and ang vel (per agent)
-    plt.figure(figsize=(9,6))
-    agents_motion = pd.DataFrame(np.ma.array([np.ma.mean(speeds_smooth, axis=0), np.ma.mean(abs_ang_vel_smooth, axis=0), np.ma.std(speeds_smooth, axis=0), np.ma.std(abs_ang_vel_smooth, axis=0)]).T)
-    agents_motion.columns = ['mean speed','mean ang vel','std speed','std ang vel']
-    sns.pairplot(agents_motion);
-    plt.savefig(os.path.join(plots_dir, 'corrplot_speed_angv.pdf'), bbox_inches = 'tight');
-    plt.show();
+    plt.figure(figsize=(9, 6))
+    agents_motion = pd.DataFrame(np.ma.array([np.ma.mean(speeds_smooth, axis=0), np.ma.mean(
+        abs_ang_vel_smooth, axis=0), np.ma.std(speeds_smooth, axis=0), np.ma.std(abs_ang_vel_smooth, axis=0)]).T)
+    agents_motion.columns = ['$<v>_t$',
+                             '$<|\omega|>_t$', 'std($v,t$)', 'std($|\omega|,t$)']
+    sns.pairplot(agents_motion)
+    plt.savefig(os.path.join(plots_dir, 'corrplot_speed_angv.pdf'),
+                bbox_inches='tight')
+    plt.show()
 
     # scatter plot MEAN speed and MEAN ang velocity (per agent)
-    plt.figure(figsize=(9,6))
-    c = [np.ma.mean(speeds_smooth, axis=0)]                     #colored by speed
+    plt.figure(figsize=(9, 6))
+    c = [np.ma.mean(speeds_smooth, axis=0)]  # colored by speed
     #c = [np.array([i for i in range(speeds_smooth.shape[1])])] #colored by index
-    scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-    plt.xlabel('Mean Agent Speed [px/s]')
-    plt.ylabel('Mean Agent Ang Vel [rad/s]')
+    scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(
+        abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+    plt.xlabel('$<v>_t$ [$\mu$m/s]')
+    plt.ylabel('$<|\omega|>_t$ [rad/s]')
     #plt.gca().set_xlim([0, 2.5])
     plt.grid()
-    plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_mean.pdf'), bbox_inches = 'tight')
+    plt.savefig(os.path.join(
+        plots_dir, 'scatter_speed_angv_mean.pdf'), bbox_inches='tight')
     plt.show()
-    
+
     # scatter plot MEAN speed and STD speed (per agent)
     plt.figure(figsize=(9,6))
     c = [np.ma.mean(speeds_smooth, axis=0)]
     scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.std(speeds_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-    plt.xlabel('Mean Agent Speed [px/s]')
-    plt.ylabel('Std Agent Speed [px/s]')
+    plt.xlabel('$<v>_t$ [$\mu$m/s]')
+    plt.ylabel('std($v,t$) [$\mu$m/s]')
     #plt.gca().set_xlim([0, 2.5])
     plt.grid()
     plt.savefig(os.path.join(plots_dir, 'scatter_speed_mean_std.pdf'), bbox_inches = 'tight')
@@ -935,8 +939,8 @@ def make_experiment_plots(tracking_folder : str):
     plt.figure(figsize=(9,6))
     c = [np.ma.mean(speeds_smooth, axis=0)]
     scatter_hist([np.ma.mean(abs_ang_vel_smooth, axis=0)], [np.ma.std(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-    plt.xlabel('Mean Agent Ang Vel [rad/s]')
-    plt.ylabel('Std Agent Ang Vel [rad/s]')
+    plt.xlabel('$<|\omega|>_t$ [rad/s]')
+    plt.ylabel('std($|\omega|,t$) [rad/s]')
     #plt.gca().set_xlim([0, 2.5])
     plt.grid()
     plt.savefig(os.path.join(plots_dir, 'scatter_angv_mean_std.pdf'), bbox_inches = 'tight')
@@ -946,8 +950,8 @@ def make_experiment_plots(tracking_folder : str):
     plt.figure(figsize=(9,6))
     c = [np.ma.mean(speeds_smooth, axis=0)]
     scatter_hist([np.ma.std(speeds_smooth, axis=0)], [np.ma.std(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-    plt.xlabel('Std Agents Speed [px/s]')
-    plt.ylabel('Std Agents Ang Vel [rad/s]')
+    plt.xlabel('std($v,t$) [$\mu$m/s]')
+    plt.ylabel('std($|\omega|,t$) [rad/s]')
     #plt.gca().set_xlim([0, 2.5])
     plt.grid()
     plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_std.pdf'), bbox_inches = 'tight')
@@ -960,8 +964,8 @@ def make_experiment_plots(tracking_folder : str):
     c = np.ma.mean(speeds_smooth, axis=0)
     color = [np.tile(c, (len(time_instants)-1,1))]
     scatter_hist(speed_variation, ang_vel_variation, color, n_bins=50, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-    plt.xlabel('Speed / Agent mean speed [log10]')
-    plt.ylabel('Ang Vel / Agent mean ang vel [log10]')
+    plt.xlabel('$v/<v>_t$   [log10]')
+    plt.ylabel('$|\omega|/<|\omega|>_t$   [log10]')
     # plt.gca().set_xlim([0, 20])
     # plt.gca().set_ylim([0, 20])
     plt.grid()
@@ -973,8 +977,8 @@ def make_experiment_plots(tracking_folder : str):
     # x=split(np.ma.divide(speeds_smooth[:-1],np.ma.median(speeds_smooth, axis=0)), condition=tumbling2[:-1]<0.5)
     # y=split(abs_ang_vel_smooth, condition=tumbling2[:-1]<0.5)
     # scatter_hist(x, y, n_bins=20)
-    # plt.xlabel('Speed / Agents median speed')
-    # plt.ylabel('Ang Vel [rad/s]')
+    # plt.xlabel('Speed / med$(v,t)$')
+    # plt.ylabel('$|\omega|$ [rad/s]')
     # plt.gca().set_xlim([0, 2.5])
     # plt.legend(['running', 'tumbling'])
     # plt.grid()
@@ -986,8 +990,8 @@ def make_experiment_plots(tracking_folder : str):
     x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off[:-1],np.ma.median(speeds_smooth, axis=0))]
     y=[ang_vel_on, ang_vel_off]
     scatter_hist(x, y, n_bins=20)
-    plt.xlabel('Speed / Agents median speed')
-    plt.ylabel('Ang Vel [rad/s]')
+    plt.xlabel('$v$/med$(v,t)$')
+    plt.ylabel('$|\omega|$/med$(|\omega|,t)$')
     plt.gca().set_xlim([0, 2.5])
     plt.legend(['Light ON', 'Light OFF'])
     plt.grid()
@@ -999,7 +1003,7 @@ def make_experiment_plots(tracking_folder : str):
     # x=[np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0))]
     # y=[lag1_similarity]
     # scatter_hist(x, y, n_bins=20)
-    # plt.xlabel('Speed / Agents median speed')
+    # plt.xlabel('Speed / med$(v,t)$')
     # plt.ylabel('Lag 1 similarity')
     # plt.gca().set_xlim([0, 2.5])
     # plt.grid()
@@ -1011,7 +1015,7 @@ def make_experiment_plots(tracking_folder : str):
     # x=split(np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0)), condition=tumbling2<0.5)
     # y=split(lag1_similarity, condition=tumbling2<0.5)
     # scatter_hist(x, y, n_bins=20)
-    # plt.xlabel('Speed / Agents median speed')
+    # plt.xlabel('Speed / med$(v,t)$')
     # plt.ylabel('Lag 1 similarity')
     # plt.gca().set_xlim([0, 2.5])
     # plt.legend(['running', 'tumbling'])
@@ -1024,7 +1028,7 @@ def make_experiment_plots(tracking_folder : str):
     # x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off,np.ma.median(speeds_smooth, axis=0))]
     # y=[lag1_similarity_on, lag1_similarity_off]
     # scatter_hist(x, y, n_bins=20)
-    # plt.xlabel('Speed / Agents median speed')
+    # plt.xlabel('Speed / med$(v,t)$')
     # plt.ylabel('Lag 1 similarity')
     # plt.gca().set_xlim([0, 2.5])
     # plt.legend(['Light ON', 'Light OFF'])
@@ -1049,31 +1053,31 @@ def make_experiment_plots(tracking_folder : str):
     agent=random.choice(np.arange(len(lengths))[lengths >= min_traj_length])
     #agent= 102 #145 #127 #40 #109
 
-    # # Speed and Acceleration of one agent
-    # plt.figure(figsize=(9,6))
-    # plt.subplot(2, 1, 1)
-    # plt.plot(time_instants,speeds_smooth[:,agent])
-    # #plt.plot(time_instants,speeds[:,agent], '--')
-    # plt.title('Movement of agent '+str(agent))
-    # plt.gca().set_xlim([0, totalT])
-    # plt.ylabel('Speed [px/s]')
-    # plt.grid()
-    # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-    # #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-    # DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+    # Speed and Acceleration of one agent
+    plt.figure(figsize=(9,6))
+    plt.subplot(2, 1, 1)
+    plt.plot(time_instants,speeds_smooth[:,agent])
+    #plt.plot(time_instants,speeds[:,agent], '--')
+    plt.title('Movement of agent '+str(agent))
+    #plt.gca().set_xlim([0, totalT])
+    plt.ylabel('$v$ [$\mu$m/s]')
+    plt.grid()
+    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+    #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
+    #DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
 
 
-    # plt.subplot(2, 1, 2)
-    # plt.plot(time_instants,acc_smooth[:,agent])
-    # #plt.plot(time_instants,np.abs(acc[:,agent]),'--')
-    # plt.gca().set_xlim([0, totalT])
-    # plt.ylabel('Abs Acc [px/s^2]')
-    # plt.xlabel('Time [s]')
-    # plt.grid()
-    # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-    # #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-    # DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
-    # plt.show()
+    plt.subplot(2, 1, 2)
+    plt.plot(time_instants,acc_smooth[:,agent])
+    #plt.plot(time_instants,np.abs(acc[:,agent]),'--')
+    #plt.gca().set_xlim([0, totalT])
+    plt.ylabel('Acc [$\mu$m/s^2]')
+    plt.xlabel('Time [s]')
+    plt.grid()
+    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+    #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
+    #DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+    plt.show()
 
     # # Direction and Angular Velocity of one agent
     # plt.figure(figsize=(9,6))
@@ -1117,16 +1121,16 @@ def make_experiment_plots(tracking_folder : str):
     # plt.subplot(4, 1, 1)
     # data_to_plot = list(map(lambda X: [x for x in X if x], [speeds_on[:,agent], speeds_off[:,agent]]))
     # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    # plt.ylabel('Speed [px/s]')
+    # plt.ylabel('$v$ [$\mu$m/s]')
     # plt.title('Average values of agent '+ str(agent))
     # plt.subplot(4, 1, 2)
     # data_to_plot = list(map(lambda X: [x for x in X if x], [acc_on[:,agent], acc_off[:,agent]]))
     # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    # plt.ylabel('Acc [px/s^2]')
+    # plt.ylabel('Acc [$\mu$m/s^2]')
     # plt.subplot(4, 1, 3)
     # data_to_plot = list(map(lambda X: [x for x in X if x], [ang_vel_on[:,agent], ang_vel_off[:,agent]]))
     # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    # plt.ylabel('Ang Vel [rad/s]')
+    # plt.ylabel('$|\omega|$ [rad/s]')
     # plt.subplot(4, 1, 4)
     # data_to_plot =  [np.mean(tumbling_on[:,agent])*100, np.mean(tumbling_off[:,agent])*100]
     # plt.bar([1, 2], data_to_plot)
@@ -1192,8 +1196,8 @@ def make_experiment_plots(tracking_folder : str):
     # x=split(speeds_smooth[:-1, agent], condition=tumbling2[:-1, agent]<0.5)
     # y=split(np.ma.abs(ang_vel_smooth[:,agent]), condition=tumbling2[:-1, agent]<0.5)
     # scatter_hist(x, y)
-    # plt.xlabel('Speed [px/s]')
-    # plt.ylabel('Ang Vel [rad/s]')
+    # plt.xlabel('$v$ [$\mu$m/s]')
+    # plt.ylabel('$|\omega|$ [rad/s]')
     # #plt.gca().set_ylim([0, 0.25])
     # plt.legend(['running', 'tumbling'])
     # plt.title('Agent '+ str(agent))
@@ -1205,8 +1209,8 @@ def make_experiment_plots(tracking_folder : str):
     x=[speeds_smooth[:-1, agent]]
     y=[np.ma.abs(ang_vel_smooth[:,agent])]
     scatter_hist(x, y)
-    plt.xlabel('Speed [px/s]')
-    plt.ylabel('Ang Vel [rad/s]')
+    plt.xlabel('$v$ [$\mu$m/s]')
+    plt.ylabel('$|\omega|$ [rad/s]')
     #plt.gca().set_ylim([0, 0.25])
     fig.suptitle('Agent '+ str(agent))
     plt.grid()
@@ -1217,7 +1221,7 @@ def make_experiment_plots(tracking_folder : str):
     # x=split(speeds_smooth[:, agent], condition=tumbling2[:, agent]<0.5)
     # y=split(lag1_similarity[:,agent], condition=tumbling2[:, agent]<0.5)
     # scatter_hist(x, y, n_bins=20)
-    # plt.xlabel('Speed [px/s]')
+    # plt.xlabel('$v$ [$\mu$m/s]')
     # plt.ylabel('Lag 1 similarity')
     # plt.title('Agent '+ str(agent))
     # plt.grid()
@@ -1229,28 +1233,28 @@ def make_experiment_plots(tracking_folder : str):
     # x=[speeds_smooth[:, agent]]
     # y=[lag1_similarity[:,agent]]
     # scatter_hist(x, y, n_bins=20)
-    # plt.xlabel('Speed [px/s]')
+    # plt.xlabel('$v$ [$\mu$m/s]')
     # plt.ylabel('Lag 1 similarity')
     # plt.title('Agent '+ str(agent))
     # plt.grid()
     # plt.show()
 
     # v(k+1) vs v(k) plot 
-    fig=plt.figure(figsize=(10,4))
+    fig=plt.figure(figsize=(12,4))
     plt.subplot(1, 2, 1)
     x=[speeds_smooth[:-1, agent]]
     y=[speeds_smooth[1:, agent]]
     plt.scatter(x, y)
-    plt.xlabel('Speed at time k [px/s]')
-    plt.ylabel('Speed at time k+1 [px/s]')
+    plt.xlabel('$v(k)$ [$\mu$m/s]')
+    plt.ylabel('$v(k+1)$ [$\mu$m/s]')
     plt.grid()
 
     plt.subplot(1, 2, 2)
     x=[ang_vel_smooth[:-1, agent]]
     y=[ang_vel_smooth[1:, agent]]
     plt.scatter(x, y)
-    plt.xlabel('Ang Vel at time k [rad/s]')
-    plt.ylabel('Ang Vel at time k+1 [rad/s]')
+    plt.xlabel('$|\omega|(k)$ [rad/s]')
+    plt.ylabel('$|\omega|(k+1)$ [rad/s]')
     plt.grid()
     fig.suptitle('Agent '+ str(agent))
     plt.show()
@@ -1367,9 +1371,9 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="interpolated trajectories", max_inactivity=0);
 
     # smooth trajectories
-    #interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
     interp_positions[:,:,0] = moving_average(interp_positions[:,:,0],3)
     interp_positions[:,:,1] = moving_average(interp_positions[:,:,1],3)
+    #interp_positions = np.ma.array(interp_positions, mask=np.isnan(interp_positions))
     DOMEgraphics.draw_trajectories(interp_positions, inactivity=inactivity, img=img, title="smoothed trajectories", max_inactivity=0);
 
 
@@ -1382,16 +1386,17 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     # velocities
     #displacements = np.gradient(interp_positions, axis=0)        # [px/frame]
     velocities = np.gradient(interp_positions, deltaT, axis=0)    # [px/s]
+    velocities = velocities * px_size                             # [um/s]
 
-    # speed [px/s]
+    # speed [um/s]
     speeds = np.linalg.norm(velocities, axis=2) 
     speeds = np.ma.array(speeds, mask=np.isnan(speeds))
 
     speeds_smooth = moving_average(speeds, 3)
     speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
 
-    # accelearation [px/s^2]
-    acc = np.gradient(speeds_smooth, axis=0)                                
+    # accelearation [um/s^2]
+    acc = np.gradient(speeds_smooth, deltaT, axis=0)                                
     acc = np.ma.array(acc, mask=np.isnan(acc))
     acc_smooth = moving_average(acc, 3)
     acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
@@ -1402,13 +1407,12 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     directions=np.arctan2(norm_disp[:,:,1],norm_disp[:,:,0]) # [rad]
 
     # compue angular velocity [rad/s]    
-    ang_vel = np.ndarray([velocities.shape[0]-1,velocities.shape[1]])
+    ang_vel = np.ndarray([velocities.shape[0]-1,velocities.shape[1]]) #[rad/s]
     for i in range(velocities.shape[0]-1):
         ang_vel[i,:] = angle_between_vectors(velocities[i,:,:],velocities[i+1,:,:])
     ang_vel = ang_vel/deltaT
     ang_vel = np.ma.array(ang_vel, mask=np.isnan(ang_vel))
-    ang_vel_smooth1 = moving_average(ang_vel, 3)
-    ang_vel_smooth4 = moving_average(ang_vel_smooth1, 3)
+    ang_vel_smooth = moving_average(ang_vel, 3)
     
     # inergrate angular velocity to obtain continous direction
     starting_dir = np.zeros([1, directions.shape[1]])
@@ -1421,56 +1425,59 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     directions_reg = starting_dir + np.cumsum(ang_vel, axis=0)*deltaT
     directions_reg[directions_reg.mask==1] = np.nan
     directions_reg_smooth = moving_average(directions_reg, 3)
-
-    # differentiate continous direction to obtain smooth ang vel [rad/s]
-    ang_vel_smooth3 = np.gradient(directions_reg, deltaT, axis=0)
-    ang_vel_smooth3 = moving_average(ang_vel_smooth3, 3)
-    ang_vel_smooth3 = np.ma.array(ang_vel_smooth3, mask=np.isnan(ang_vel_smooth3))
-
-    ang_vel_smooth2 = np.gradient(directions_reg_smooth, deltaT, axis=0)
-    ang_vel_smooth2 = np.ma.array(ang_vel_smooth2, mask=np.isnan(ang_vel_smooth2))
-
-    ag = 20;
-    plt.figure(figsize=(12,20))
-    plt.subplot(5, 1, 1)
-    plt.plot(ang_vel[:,ag])
-    plt.legend(['w'])
-    plt.subplot(5, 1, 2)
-    plt.plot(ang_vel[:,ag], 'grey')
-    plt.plot(ang_vel_smooth1[:,ag])  
-    plt.legend(['w', 'w smooth'])
-    plt.subplot(5, 1, 3)
-    plt.plot(ang_vel_smooth1[:,ag], 'grey')
-    plt.plot(ang_vel_smooth2[:,ag])
-    plt.legend(['w smooth', 'w smooth der'])
-    plt.subplot(5, 1, 4)
-    plt.plot(ang_vel_smooth1[:,ag], 'grey')
-    plt.plot(ang_vel_smooth3[:,ag])
-    plt.legend(['w smooth','w der smooth'])
-    plt.subplot(5, 1, 5)
-    plt.plot(ang_vel_smooth1[:,ag], 'grey')
-    plt.plot(ang_vel_smooth4[:,ag])
-    plt.legend(['w smooth', 'w smooth smooth'])
-    plt.show()
     
-    plt.figure(figsize=(12,8))
-    plt.plot(ang_vel[:,ag])
-    plt.plot(ang_vel_smooth1[:,ag],'--')  
-    plt.plot(ang_vel_smooth2[:,ag],'-')
-    plt.plot(ang_vel_smooth3[:,ag],'--')
-    plt.plot(ang_vel_smooth4[:,ag],'--')
-    plt.legend(['w', 'w smooth', 'w smooth der', 'w der smooth', 'w smooth smooth'])
-    plt.show()
+    # # testing different smoothing
+    # ang_vel_smooth4 = moving_average(ang_vel_smooth, 3)
+    
+    # ang_vel_smooth3 = np.gradient(directions_reg, deltaT, axis=0)
+    # ang_vel_smooth3 = moving_average(ang_vel_smooth3, 3)
+    # ang_vel_smooth3 = np.ma.array(ang_vel_smooth3, mask=np.isnan(ang_vel_smooth3))
 
-    ang_vel_smooth = ang_vel_smooth1
+    # ang_vel_smooth2 = np.gradient(directions_reg_smooth, deltaT, axis=0)
+    # ang_vel_smooth2 = np.ma.array(ang_vel_smooth2, mask=np.isnan(ang_vel_smooth2))
+    
+    # ag = 20;
+    # plt.figure(figsize=(12,20))
+    # plt.subplot(5, 1, 1)
+    # plt.plot(ang_vel[:,ag])
+    # plt.legend(['w'])
+    # plt.subplot(5, 1, 2)
+    # plt.plot(ang_vel[:,ag], 'grey')
+    # plt.plot(ang_vel_smooth[:,ag])  
+    # plt.legend(['w', 'w smooth'])
+    # plt.subplot(5, 1, 3)
+    # plt.plot(ang_vel_smooth[:,ag], 'grey')
+    # plt.plot(ang_vel_smooth2[:,ag])
+    # plt.legend(['w smooth', 'w smooth der'])
+    # plt.subplot(5, 1, 4)
+    # plt.plot(ang_vel_smooth[:,ag], 'grey')
+    # plt.plot(ang_vel_smooth3[:,ag])
+    # plt.legend(['w smooth','w der smooth'])
+    # plt.subplot(5, 1, 5)
+    # plt.plot(ang_vel_smooth[:,ag], 'grey')
+    # plt.plot(ang_vel_smooth4[:,ag])
+    # plt.legend(['w smooth', 'w smooth smooth'])
+    # plt.show()
+    
+    # plt.figure(figsize=(12,8))
+    # plt.plot(ang_vel[:,ag])
+    # plt.plot(ang_vel_smooth[:,ag],'--')  
+    # plt.plot(ang_vel_smooth2[:,ag],'-')
+    # plt.plot(ang_vel_smooth3[:,ag],'--')
+    # plt.plot(ang_vel_smooth4[:,ag],'--')
+    # plt.legend(['w', 'w smooth', 'w smooth der', 'w der smooth', 'w smooth smooth'])
+    # plt.show()
+
     
     # reject outliers
-    outliers_speed=detect_outliers(speeds_smooth, m=variance_thresh, side='top')
-    outliers_acc=detect_outliers(acc_smooth, m=variance_thresh, side='top')
-    outliers_omega=detect_outliers(ang_vel_smooth, m=variance_thresh, side='both')
-    outliers_omega=np.ma.concatenate([outliers_omega,np.zeros([1,number_of_agents],dtype=bool)])    #outliers = outliers_speed * outliers_acc
-    outliers = outliers_speed * outliers_omega
+    outliers_speed  = detect_outliers(speeds_smooth, m=3, side='top')
+    outliers_acc    = detect_outliers(acc_smooth, m=variance_thresh, side='top')
+    outliers_omega  = detect_outliers(ang_vel_smooth, m=variance_thresh, side='both')
+    outliers_omega  = np.ma.concatenate([outliers_omega,np.zeros([1,number_of_agents],dtype=bool)])    
+    outliers_combo  = detect_outliers((acc_smooth-np.ma.mean(acc_smooth))/np.ma.std(acc_smooth) + (speeds_smooth-np.ma.mean(speeds_smooth))/np.ma.std(speeds_smooth), m=4, side='top')
+    #outliers = outliers_speed * outliers_omega
     #outliers = outliers_speed * outliers_acc
+    outliers = outliers_speed
     removed_agents=0;
     for a in range(number_of_agents):
         if np.ma.max(outliers[:,a]):
@@ -1617,12 +1624,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_all, compare='across', whis = 3)
-    plt.ylabel('Speed [px/s]')
+    plt.ylabel('$v$ [$\mu$m/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('All values')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_all, compare='across', whis = 3)
-    plt.ylabel('Ang Vel [rad/s]')
+    plt.ylabel('$|\omega|$ [rad/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_all_values_across.pdf'), bbox_inches = 'tight')
     plt.show()
@@ -1631,12 +1638,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_all, compare='within', whis = 3)
-    plt.ylabel('Speed [px/s]')
+    plt.ylabel('$v$ [$\mu$m/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('All values')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_all, compare='within', whis = 3)
-    plt.ylabel('Ang Vel [rad/s]')
+    plt.ylabel('$|\omega|$ [rad/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_all_values_within.pdf'), bbox_inches = 'tight')
     plt.show()
@@ -1645,12 +1652,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_all_norm, compare='within', whis = 3)
-    #plt.ylabel('Speed [px/s]')
+    #plt.ylabel('$v$ [$\mu$m/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('All values normalized on OFF median value')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_all_norm, compare='within', whis = 3)
-    #plt.ylabel('Ang Vel [rad/s]')
+    #plt.ylabel('$|\omega|$ [rad/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_all_values_norm.pdf'), bbox_inches = 'tight')
     plt.show()
@@ -1659,12 +1666,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
     my_boxplot([np.ma.concatenate([d[0] for d in speeds_all]), np.ma.concatenate([d[1] for d in speeds_all])], compare='within', whis = 3)
-    plt.ylabel('Speed [px/s]')
+    plt.ylabel('$v$ [$\mu$m/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Aggregate all values')
     plt.subplot(2, 1, 2)
     my_boxplot([np.ma.concatenate([d[0] for d in ang_vel_all]), np.ma.concatenate([d[1] for d in ang_vel_all])], compare='within', whis = 3)
-    plt.ylabel('Ang Vel [rad/s]')
+    plt.ylabel('$|\omega|$ [rad/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_all_values_aggregate.pdf'), bbox_inches = 'tight')
     plt.show()
@@ -1673,12 +1680,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_means, compare='across', whis = 3)
-    plt.ylabel('Speed [px/s]')
+    plt.ylabel('$v$ [$\mu$m/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Averages over agents')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_means, compare='across', whis = 3)
-    plt.ylabel('Ang Vel [rad/s]')
+    plt.ylabel('$|\omega|$ [rad/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_mean_values_across.pdf'), bbox_inches = 'tight')
     plt.show()
@@ -1687,12 +1694,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_means, compare='within', whis = 3)
-    plt.ylabel('Speed [px/s]')
+    plt.ylabel('$v$ [$\mu$m/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Averages over agents')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_means, compare='within', whis = 3)
-    plt.ylabel('Ang Vel [rad/s]')
+    plt.ylabel('$|\omega|$ [rad/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_mean_values_within.pdf'), bbox_inches = 'tight')
     plt.show()
@@ -1701,12 +1708,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
     my_boxplot(speeds_means_norm, compare='within', whis = 3)
-    #plt.ylabel('Speed [px/s]')
+    #plt.ylabel('$v$ [$\mu$m/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Averages over agents normalized on median OFF value')
     plt.subplot(2, 1, 2)
     my_boxplot(ang_vel_means_norm, compare='within', whis = 3)
-    #plt.ylabel('Ang Vel [rad/s]')
+    #plt.ylabel('$|\omega|$ [rad/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_mean_values_norm.pdf'), bbox_inches = 'tight')
     plt.show()
@@ -1715,12 +1722,12 @@ def experiments_comparison(experiment_names : List, tracking_folders : [str, Lis
     plt.figure(figsize=(6,8))
     plt.subplot(2, 1, 1)
     my_boxplot([np.ma.concatenate([d[0] for d in speeds_means]), np.ma.concatenate([d[1] for d in speeds_means])], compare='within', whis = 3)
-    plt.ylabel('Speed [px/s]')
+    plt.ylabel('$v$ [$\mu$m/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.title('Aggregate averages over agents')
     plt.subplot(2, 1, 2)
     my_boxplot([np.ma.concatenate([d[0] for d in ang_vel_means]), np.ma.concatenate([d[1] for d in ang_vel_means])], compare='within', whis = 3)
-    plt.ylabel('Ang Vel [rad/s]')
+    plt.ylabel('$|\omega|$ [rad/s]')
     #plt.gca().set_xticklabels(labels=['Light OFF', 'Light ON'])
     plt.savefig(os.path.join(plots_dir, 'comparison_mean_values_aggregate.pdf'), bbox_inches = 'tight')
     plt.show()
@@ -1889,7 +1896,7 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = [], t
     #plot_with_shade(xvalues, speeds_all_norm_aggregate, quantile=[0.25, 0.75])
     p_on = plot_with_shade(xvalues, speeds_all_on_norm_aggregate, quantile=[0.25, 0.75], marker='o')
     p_off = plot_with_shade(xvalues, speeds_all_off_norm_aggregate, quantile=[0.25, 0.75], marker='o')
-    plt.ylabel('Speed/Median speed first 10s')
+    plt.ylabel('$v$/Median speed first 10s')
     plt.legend([p_on,p_off],['Light ON','Light OFF'])
     plt.title('All values')
     plt.xticks(xvalues,labels)
@@ -1908,7 +1915,7 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = [], t
     plt.subplot(2, 1, 1)
     plot_with_shade(xvalues, speeds_mean_norm_aggregate, quantile=[0.25, 0.75], marker='o')
     plt.xticks(xvalues,labels)
-    plt.ylabel('Speed/Median speed first 10s')
+    plt.ylabel('$v$/Median speed first 10s')
     plt.title('Averages over agents')
     plt.subplot(2, 1, 2)
     plot_with_shade(xvalues, ang_vel_mean_norm_aggregate, quantile=[0.25, 0.75], marker='o')
@@ -1923,7 +1930,7 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = [], t
     p_on = plot_with_shade(xvalues, speeds_mean_on_norm_aggregate, quantile=[0.25, 0.75], marker='o')
     p_off = plot_with_shade(xvalues, speeds_mean_off_norm_aggregate, quantile=[0.25, 0.75], marker='o')
     plt.legend([p_on,p_off],['Light ON','Light OFF'])
-    plt.ylabel('Speed/Median speed first 10s')
+    plt.ylabel('$v$/Median speed first 10s')
     plt.title('Averages over agents')
     plt.xticks(xvalues,labels)
     plt.subplot(2, 1, 2)
@@ -1941,7 +1948,7 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = [], t
     p_on = plot_with_shade(xvalues, speeds_mean_on_norm2_aggregate, quantile=[0.25, 0.75], marker='o')
     p_off = plot_with_shade(xvalues, speeds_mean_off_norm2_aggregate, quantile=[0.25, 0.75], marker='o')
     plt.legend([p_on,p_off],['Light ON','Light OFF'])
-    plt.ylabel('Speed/Median OFF speed')
+    plt.ylabel('$v$/Median OFF speed')
     plt.title('Averages over agents')
     plt.xticks(xvalues,labels)
     plt.subplot(2, 1, 2)
@@ -1978,6 +1985,8 @@ tracking_folder ='last'
 # parameters
 min_traj_length = 5     # minimum length of the trajectories [s]
 variance_thresh = 2.5   # variance threshold for outliers detection
+px_size = 1.25          # conversion factor for 90X magnification [um/px]
+#px_size = 4.44          # conversion factor for 9X magnification [um/px]
 
 
 print('Now use one of the following commands:'
