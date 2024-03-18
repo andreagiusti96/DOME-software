@@ -103,6 +103,7 @@ def identify_agents_parameters(experiment : DOMEexp.ExperimentManager, agents:li
         
     #return mu_s, theta_s, sigma_s, mu_w, theta_w, sigma_w
     
+    
 def split(data : np.array, condition : np.array):
     out_data=[]
     out_data.append(data[condition])
@@ -348,6 +349,27 @@ def moving_average(x, window, weights=[], axis=0):
     
     y=np.ma.array(y, mask=np.isnan(y))
     return y
+
+def masked_grad(data : np.array):
+    data = np.ma.array(data, mask=np.isnan(data),fill_value=np.nan)
+    grad = np.zeros_like(data) * np.nan
+    
+    if len(data.shape)<=2:
+        edges = np.ma.notmasked_contiguous(data, axis=0)
+    
+        for i in range(data.shape[1]):
+            if len(edges[i]):
+                grad[edges[i][0],i] = np.gradient(data[edges[i][0],i])
+
+    else:
+        for j in range(data.shape[2]):
+            edges = np.ma.notmasked_contiguous(data[:,:,j], axis=0)
+        
+            for i in range(data.shape[1]):
+                if len(edges[i]):
+                    grad[edges[i][0],i,j] = np.gradient(data[edges[i][0],i,j])
+
+    return grad
 
 def angle_between_vectors(v1 : np.ndarray, v2 : np.ndarray):
     # output in ]-pi,pi] rad.
@@ -966,8 +988,8 @@ def make_experiment_plots(tracking_folder : str):
     scatter_hist(speed_variation, ang_vel_variation, color, n_bins=50, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
     plt.xlabel('$v/<v>_t$   [log10]')
     plt.ylabel('$|\omega|/<|\omega|>_t$   [log10]')
-    # plt.gca().set_xlim([0, 20])
-    # plt.gca().set_ylim([0, 20])
+    plt.gca().set_xlim([-2, 2])
+    plt.gca().set_ylim([-4, 2])
     plt.grid()
     plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_variation_all.pdf'), bbox_inches = 'tight')
     plt.show()
@@ -1385,8 +1407,9 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
 
     # velocities
     #displacements = np.gradient(interp_positions, axis=0)        # [px/frame]
-    velocities = np.gradient(interp_positions, deltaT, axis=0)    # [px/s]
-    velocities = velocities * px_size                             # [um/s]
+    #velocities = np.gradient(interp_positions, deltaT, axis=0)   # [px/s]
+    velocities = masked_grad(interp_positions)/deltaT             # [px/s]
+    velocities = velocities.filled() * px_size                             # [um/s]
 
     # speed [um/s]
     speeds = np.linalg.norm(velocities, axis=2) 
@@ -1396,7 +1419,8 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     speeds_smooth = np.ma.array(speeds_smooth, mask=np.isnan(speeds_smooth))
 
     # accelearation [um/s^2]
-    acc = np.gradient(speeds_smooth, deltaT, axis=0)                                
+    #acc_old = np.gradient(speeds_smooth, deltaT, axis=0)    
+    acc = masked_grad(speeds_smooth)/deltaT                                         
     acc = np.ma.array(acc, mask=np.isnan(acc))
     acc_smooth = moving_average(acc, 3)
     acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
