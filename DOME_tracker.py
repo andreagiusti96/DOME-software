@@ -1241,6 +1241,20 @@ if __name__ == '__main__':
     #                       "2023_06_26_Euglena_36", "2023_06_26_Euglena_37", "2023_06_15_Euglena_16", 
     #                       "2023_07_10_Euglena_21", "2023_07_10_Euglena_22", "2023_06_26_Euglena_39"]
 
+    experiments_switch_10s = ['2023_06_15_Euglena_7','2023_06_26_Euglena_23','2023_06_26_Euglena_24',
+                              '2023_07_10_Euglena_15','2023_07_10_Euglena_16'];
+    
+    experiments_switch_5s = ['2023_06_15_Euglena_8','2023_06_15_Euglena_9','2023_06_15_Euglena_10',
+                              '2023_06_26_Euglena_25','2023_06_26_Euglena_26',
+                              '2023_07_10_Euglena_17','2023_07_10_Euglena_18'];
+    
+    experiments_switch_1s = ['2023_06_15_Euglena_11','2023_06_26_Euglena_27','2023_06_26_Euglena_28',
+                              '2023_07_10_Euglena_19','2023_07_10_Euglena_20'];
+    
+    experiments_ramp = ['2023_06_15_Euglena_5','2023_06_15_Euglena_6',
+                        '2023_06_26_Euglena_22','2023_06_26_Euglena_21',
+                        '2023_07_10_Euglena_13','2023_07_10_Euglena_14'];
+
     experiments_gradient_central_light = ['2023_06_12_Euglena_3','2023_06_12_Euglena_4','2023_06_14_Euglena_7',
                                           '2023_06_15_Euglena_14','2023_06_23_Euglena_5','2023_06_23_Euglena_6',
                                           '2023_06_26_Euglena_5','2023_06_26_Euglena_6','2023_06_26_Euglena_33'];

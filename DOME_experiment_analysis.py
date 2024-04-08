@@ -849,35 +849,35 @@ def make_experiment_plots(tracking_folder : str):
         # plt.savefig(os.path.join(plots_dir, 'focused_boxplots.pdf'), bbox_inches = 'tight')
         # plt.show()
 
-        # histograms
-        plt.figure(figsize=(4,6))
-        plt.subplot(3, 1, 1)
-        plt.title('Histograms')
-        #bins=np.linspace(0, 40, round(40/5+1))
-        my_histogram([np.mean(speeds_on, axis=0).compressed(), np.mean(speeds_off, axis=0).compressed()], normalize=True)
-        plt.legend(labels=['Light ON', 'Light OFF'])
-        plt.xlabel('$v$ [$\mu$m/s]')
-        #plt.gca().set_ylim([0, 0.25])
-        plt.ylabel('Agents')
-        plt.grid()
-        plt.subplot(3, 1, 2)
-        #bins=np.linspace(0, 5, round(10+1))
-        # my_histogram([np.mean(acc_on, axis=0).compressed(), np.mean(acc_off, axis=0).compressed()], normalize=True)
-        plt.legend(labels=['Light ON', 'Light OFF'])
-        plt.xlabel('Acc [$\mu$m/s^2]')
-        #plt.gca().set_ylim([0, 0.25])
-        plt.ylabel('Agents')
-        plt.grid()
-        plt.subplot(3, 1, 3)
-        #bins=np.linspace(0, 1, round(10+1))
-        my_histogram([np.mean(ang_vel_on, axis=0).compressed(), np.mean(ang_vel_off, axis=0).compressed()], normalize=True)
-        plt.legend(labels=['Light ON', 'Light OFF'])
-        plt.xlabel('$|\omega|$ [rad/s]')
-        #plt.gca().set_ylim([0, 0.25])
-        plt.ylabel('Agents')
-        plt.grid()
-        plt.savefig(os.path.join(plots_dir, 'histograms.pdf'), bbox_inches = 'tight')
-        plt.show()
+        # # histograms
+        # plt.figure(figsize=(4,6))
+        # plt.subplot(3, 1, 1)
+        # plt.title('Histograms')
+        # #bins=np.linspace(0, 40, round(40/5+1))
+        # my_histogram([np.mean(speeds_on, axis=0).compressed(), np.mean(speeds_off, axis=0).compressed()], normalize=True)
+        # plt.legend(labels=['Light ON', 'Light OFF'])
+        # plt.xlabel('$v$ [$\mu$m/s]')
+        # #plt.gca().set_ylim([0, 0.25])
+        # plt.ylabel('Agents')
+        # plt.grid()
+        # plt.subplot(3, 1, 2)
+        # #bins=np.linspace(0, 5, round(10+1))
+        # # my_histogram([np.mean(acc_on, axis=0).compressed(), np.mean(acc_off, axis=0).compressed()], normalize=True)
+        # plt.legend(labels=['Light ON', 'Light OFF'])
+        # plt.xlabel('Acc [$\mu$m/s^2]')
+        # #plt.gca().set_ylim([0, 0.25])
+        # plt.ylabel('Agents')
+        # plt.grid()
+        # plt.subplot(3, 1, 3)
+        # #bins=np.linspace(0, 1, round(10+1))
+        # my_histogram([np.mean(ang_vel_on, axis=0).compressed(), np.mean(ang_vel_off, axis=0).compressed()], normalize=True)
+        # plt.legend(labels=['Light ON', 'Light OFF'])
+        # plt.xlabel('$|\omega|$ [rad/s]')
+        # #plt.gca().set_ylim([0, 0.25])
+        # plt.ylabel('Agents')
+        # plt.grid()
+        # plt.savefig(os.path.join(plots_dir, 'histograms.pdf'), bbox_inches = 'tight')
+        # plt.show()
     
     
         # # focused histograms
@@ -1999,9 +1999,10 @@ on255_experiments=['2023_06_15_Euglena_4','2023_06_26_Euglena_19', '2023_07_10_E
 on150_experiments=['2023_06_15_Euglena_3','2023_06_26_Euglena_17', '2023_07_10_Euglena_10']
 on75_experiments=['2023_06_15_Euglena_2','2023_06_26_Euglena_15', '2023_07_10_Euglena_8']
 
-switch10_experiments=['2023_06_15_Euglena_7','2023_06_26_Euglena_23', '2023_07_10_Euglena_15']
-switch5_experiments=['2023_06_15_Euglena_8','2023_06_26_Euglena_25', '2023_07_10_Euglena_18']
-switch1_experiments = ["2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"]
+experiments_switch_10s = ['2023_06_15_Euglena_7','2023_06_26_Euglena_23','2023_06_26_Euglena_24',
+                          '2023_07_10_Euglena_15','2023_07_10_Euglena_16'];
+experiments_switch_5s=['2023_06_15_Euglena_8','2023_06_26_Euglena_25', '2023_07_10_Euglena_18']
+experiments_switch_1s = ["2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"]
 
 #tracking_folder ='tracking_2023_10_09'
 tracking_folder ='last'
