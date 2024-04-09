@@ -1273,9 +1273,10 @@ if __name__ == '__main__':
                              '2023_06_26_Euglena_29','2023_06_26_Euglena_30','2023_06_23_Euglena_1',
                              '2023_06_23_Euglena_2','2023_06_26_Euglena_2','2023_06_26_Euglena_1']
     
-    experiments_circle_light = ['2023_06_12_Euglena_1','2023_06_14_Euglena_1','2023_06_15_Euglena_16','2023_06_23_Euglena_10',
-                                '2023_06_23_Euglena_11','2023_06_26_Euglena_9','2023_06_26_Euglena_10','2023_06_26_Euglena_36',
-                                '2023_06_26_Euglena_37','2023_07_10_Euglena_26']
+    experiments_circle_light = ['2023_06_12_Euglena_1','2023_06_14_Euglena_1','2023_06_15_Euglena_16',
+                                '2023_06_23_Euglena_10','2023_06_23_Euglena_11','2023_06_26_Euglena_9',
+                                '2023_06_26_Euglena_10','2023_06_26_Euglena_36','2023_06_26_Euglena_37',
+                                '2023_07_10_Euglena_26']
     
     experiments_circle_dark = ['2023_06_13_Euglena_6','2023_06_13_Euglena_15','2023_06_15_Euglena_17',
                                '2023_06_15_Euglena_18','2023_06_23_Euglena_12','2023_06_23_Euglena_13',
@@ -1285,7 +1286,11 @@ if __name__ == '__main__':
     experiments_BCL = ['2023_07_10_Euglena_30','2023_07_10_Euglena_34','2023_07_10_Euglena_35',
                               '2023_07_10_Euglena_36','2023_07_10_Euglena_37','2023_07_10_Euglena_38']
     
-    
+    experiments_to_track = ['2023_06_26_Euglena_14','2023_06_26_Euglena_16','2023_07_10_Euglena_7',
+                            '2023_06_26_Euglena_18','2023_07_10_Euglena_9','2023_06_26_Euglena_20',
+                            '2023_06_15_Euglena_5','2023_06_15_Euglena_6','2023_06_26_Euglena_21',
+                            '2023_06_26_Euglena_22','2023_07_10_Euglena_13','2023_06_26_Euglena_26',
+                            '2023_07_10_Euglena_17']
 
     # Name of the experiment(s) to be tracked
     experiment_names = ["2023_07_10_Euglena_26"]
