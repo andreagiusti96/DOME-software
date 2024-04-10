@@ -1231,16 +1231,9 @@ if __name__ == '__main__':
     experiments_directory = '/Volumes/DOMEPEN/Experiments'
     # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
-
-    # tracked_experiments = ["2023_06_15_Euglena_1","2023_06_15_Euglena_2",
-    #                       "2023_06_26_Euglena_13", "2023_06_26_Euglena_23", 
-    #                       "2023_06_26_Euglena_37","2023_07_10_Euglena_5","2023_07_10_Euglena_6", 
-    #                       "2023_07_10_Euglena_8","2023_07_10_Euglena_10","2023_07_10_Euglena_12",
-    #                       "2023_07_10_Euglena_15","2023_06_15_Euglena_10",
-    #                       "2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"
-    #                       "2023_06_26_Euglena_36", "2023_06_26_Euglena_37", "2023_06_15_Euglena_16", 
-    #                       "2023_07_10_Euglena_21", "2023_07_10_Euglena_22", "2023_06_26_Euglena_39"]
-
+    experiments_off = ['2023_06_15_Euglena_1','2023_06_26_Euglena_13', '2023_06_26_Euglena_14',
+                       '2023_07_10_Euglena_5','2023_07_10_Euglena_6']
+        
     experiments_switch_10s = ['2023_06_15_Euglena_7','2023_06_26_Euglena_23','2023_06_26_Euglena_24',
                               '2023_07_10_Euglena_15','2023_07_10_Euglena_16'];
     
@@ -1254,6 +1247,15 @@ if __name__ == '__main__':
     experiments_ramp = ['2023_06_15_Euglena_5','2023_06_15_Euglena_6',
                         '2023_06_26_Euglena_22','2023_06_26_Euglena_21',
                         '2023_07_10_Euglena_13','2023_07_10_Euglena_14'];
+        
+    experiments_on255=['2023_06_15_Euglena_4','2023_06_26_Euglena_19','2023_06_26_Euglena_20',
+                       '2023_07_10_Euglena_11', '2023_07_10_Euglena_12']
+    
+    experiments_on150=['2023_06_15_Euglena_3','2023_06_26_Euglena_17','2023_06_26_Euglena_18',
+                       '2023_07_10_Euglena_9', '2023_07_10_Euglena_10']
+    
+    experiments_on75 =['2023_06_15_Euglena_2','2023_06_26_Euglena_15','2023_06_26_Euglena_16',
+                      '2023_07_10_Euglena_7', '2023_07_10_Euglena_8']
 
     experiments_gradient_central_light = ['2023_06_12_Euglena_3','2023_06_12_Euglena_4','2023_06_14_Euglena_7',
                                           '2023_06_15_Euglena_14','2023_06_23_Euglena_5','2023_06_23_Euglena_6',

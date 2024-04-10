@@ -908,6 +908,19 @@ def make_experiment_plots(tracking_folder : str):
         # plt.ylabel('Agents')
         # plt.grid()
         # plt.show()
+        
+        # scatter plot speed and ang velocity - cluster wrt light input
+        plt.figure(figsize=(9,6))
+        x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off[:-1],np.ma.median(speeds_smooth, axis=0))]
+        y=[ang_vel_on, ang_vel_off]
+        scatter_hist(x, y, n_bins=20)
+        plt.xlabel('$v$/med$(v,t)$')
+        plt.ylabel('$|\omega|$/med$(|\omega|,t)$')
+        plt.gca().set_xlim([0, 2.5])
+        plt.legend(['Light ON', 'Light OFF'])
+        plt.grid()
+        plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_light.pdf'), bbox_inches = 'tight')
+        plt.show()
 
 
     # # displacements autocorrelation
@@ -1007,19 +1020,6 @@ def make_experiment_plots(tracking_folder : str):
     # plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_tumbling.pdf'), bbox_inches = 'tight')
     # plt.show()
 
-    # scatter plot speed and ang velocity - cluster wrt light input
-    plt.figure(figsize=(9,6))
-    x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off[:-1],np.ma.median(speeds_smooth, axis=0))]
-    y=[ang_vel_on, ang_vel_off]
-    scatter_hist(x, y, n_bins=20)
-    plt.xlabel('$v$/med$(v,t)$')
-    plt.ylabel('$|\omega|$/med$(|\omega|,t)$')
-    plt.gca().set_xlim([0, 2.5])
-    plt.legend(['Light ON', 'Light OFF'])
-    plt.grid()
-    plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_light.pdf'), bbox_inches = 'tight')
-    plt.show()
-
     # # scatter plot speed and lag1 similarity
     # plt.figure(figsize=(9,6))
     # x=[np.ma.divide(speeds_smooth,np.ma.median(speeds_smooth, axis=0))]
@@ -1070,227 +1070,227 @@ def make_experiment_plots(tracking_folder : str):
     # plt.savefig(os.path.join(plots_dir, 'tumbling_light.pdf'), bbox_inches = 'tight')
 
 
-    # Select one agent ---------------------------------------------------------------------------------
-    agent=np.argmax(lengths)
-    agent=random.choice(np.arange(len(lengths))[lengths >= min_traj_length])
-    #agent= 102 #145 #127 #40 #109
+    # # Select one agent ---------------------------------------------------------------------------------
+    # agent=np.argmax(lengths)
+    # agent=random.choice(np.arange(len(lengths))[lengths >= min_traj_length])
+    # #agent= 102 #145 #127 #40 #109
 
-    # Speed and Acceleration of one agent
-    plt.figure(figsize=(9,6))
-    plt.subplot(2, 1, 1)
-    plt.plot(time_instants,speeds_smooth[:,agent])
-    #plt.plot(time_instants,speeds[:,agent], '--')
-    plt.title('Movement of agent '+str(agent))
-    #plt.gca().set_xlim([0, totalT])
-    plt.ylabel('$v$ [$\mu$m/s]')
-    plt.grid()
-    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-    #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-    #DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
-
-
-    plt.subplot(2, 1, 2)
-    plt.plot(time_instants,acc_smooth[:,agent])
-    #plt.plot(time_instants,np.abs(acc[:,agent]),'--')
-    #plt.gca().set_xlim([0, totalT])
-    plt.ylabel('Acc [$\mu$m/s^2]')
-    plt.xlabel('Time [s]')
-    plt.grid()
-    DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
-    #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-    #DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
-    plt.show()
-
-    # # Direction and Angular Velocity of one agent
+    # # Speed and Acceleration of one agent
     # plt.figure(figsize=(9,6))
     # plt.subplot(2, 1, 1)
-    # #plt.plot(time_instants[1:],directions[:,agent])
-    # plt.plot(time_instants[1:],directions_reg_smooth[:,agent])
-    # #plt.plot(time_instants[1:],directions_reg[:,agent],'--')
+    # plt.plot(time_instants,speeds_smooth[:,agent])
+    # #plt.plot(time_instants,speeds[:,agent], '--')
     # plt.title('Movement of agent '+str(agent))
-    # plt.gca().set_xlim([0, totalT])
-    # plt.ylabel('Direction [rad]')
+    # #plt.gca().set_xlim([0, totalT])
+    # plt.ylabel('$v$ [$\mu$m/s]')
     # plt.grid()
     # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
     # #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-    # DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+    # #DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
 
-    # # plt.subplot(3, 1, 2)
-    # # plt.plot(time_instants[:-1],directions[:,agent])
-    # # plt.plot(time_instants[:-1],directions_smooth[:,agent])
-    # # plt.title('Movement of agent '+str(agent))
-    # # plt.gca().set_xlim([0, totalT])
-    # # plt.gca().set_ylim([-np.pi, np.pi])
-    # # plt.ylabel('Direction [rad]')
-    # # plt.yticks(np.linspace(-np.pi, np.pi, 5))
-    # # plt.grid()
-    # # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
 
     # plt.subplot(2, 1, 2)
-    # plt.plot(time_instants[1:],np.abs(ang_vel_smooth[:,agent]))
-    # #plt.plot(time_instants[1:],np.abs(ang_vel[:,agent]),'--')
-    # plt.gca().set_xlim([0, totalT])
-    # plt.ylabel('Abs Angular Vel [rad/s]')
+    # plt.plot(time_instants,acc_smooth[:,agent])
+    # #plt.plot(time_instants,np.abs(acc[:,agent]),'--')
+    # #plt.gca().set_xlim([0, totalT])
+    # plt.ylabel('Acc [$\mu$m/s^2]')
     # plt.xlabel('Time [s]')
     # plt.grid()
     # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
     # #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-    # DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+    # #DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
     # plt.show()
 
-    # # Barplots of one agent
-    # plt.figure(figsize=(4,8))
-    # plt.subplot(4, 1, 1)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [speeds_on[:,agent], speeds_off[:,agent]]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    # plt.ylabel('$v$ [$\mu$m/s]')
-    # plt.title('Average values of agent '+ str(agent))
-    # plt.subplot(4, 1, 2)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [acc_on[:,agent], acc_off[:,agent]]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    # plt.ylabel('Acc [$\mu$m/s^2]')
-    # plt.subplot(4, 1, 3)
-    # data_to_plot = list(map(lambda X: [x for x in X if x], [ang_vel_on[:,agent], ang_vel_off[:,agent]]))
-    # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-    # plt.ylabel('$|\omega|$ [rad/s]')
-    # plt.subplot(4, 1, 4)
-    # data_to_plot =  [np.mean(tumbling_on[:,agent])*100, np.mean(tumbling_off[:,agent])*100]
-    # plt.bar([1, 2], data_to_plot)
-    # plt.xticks([1, 2],labels=['Light ON', 'Light OFF'])
-    # plt.ylabel('Tumbling [% of frames]')
-    # plt.show()
+    # # # Direction and Angular Velocity of one agent
+    # # plt.figure(figsize=(9,6))
+    # # plt.subplot(2, 1, 1)
+    # # #plt.plot(time_instants[1:],directions[:,agent])
+    # # plt.plot(time_instants[1:],directions_reg_smooth[:,agent])
+    # # #plt.plot(time_instants[1:],directions_reg[:,agent],'--')
+    # # plt.title('Movement of agent '+str(agent))
+    # # plt.gca().set_xlim([0, totalT])
+    # # plt.ylabel('Direction [rad]')
+    # # plt.grid()
+    # # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+    # # #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
+    # # DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+
+    # # # plt.subplot(3, 1, 2)
+    # # # plt.plot(time_instants[:-1],directions[:,agent])
+    # # # plt.plot(time_instants[:-1],directions_smooth[:,agent])
+    # # # plt.title('Movement of agent '+str(agent))
+    # # # plt.gca().set_xlim([0, totalT])
+    # # # plt.gca().set_ylim([-np.pi, np.pi])
+    # # # plt.ylabel('Direction [rad]')
+    # # # plt.yticks(np.linspace(-np.pi, np.pi, 5))
+    # # # plt.grid()
+    # # # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+
+    # # plt.subplot(2, 1, 2)
+    # # plt.plot(time_instants[1:],np.abs(ang_vel_smooth[:,agent]))
+    # # #plt.plot(time_instants[1:],np.abs(ang_vel[:,agent]),'--')
+    # # plt.gca().set_xlim([0, totalT])
+    # # plt.ylabel('Abs Angular Vel [rad/s]')
+    # # plt.xlabel('Time [s]')
+    # # plt.grid()
+    # # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants)
+    # # #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
+    # # DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+    # # plt.show()
+
+    # # # Barplots of one agent
+    # # plt.figure(figsize=(4,8))
+    # # plt.subplot(4, 1, 1)
+    # # data_to_plot = list(map(lambda X: [x for x in X if x], [speeds_on[:,agent], speeds_off[:,agent]]))
+    # # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+    # # plt.ylabel('$v$ [$\mu$m/s]')
+    # # plt.title('Average values of agent '+ str(agent))
+    # # plt.subplot(4, 1, 2)
+    # # data_to_plot = list(map(lambda X: [x for x in X if x], [acc_on[:,agent], acc_off[:,agent]]))
+    # # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+    # # plt.ylabel('Acc [$\mu$m/s^2]')
+    # # plt.subplot(4, 1, 3)
+    # # data_to_plot = list(map(lambda X: [x for x in X if x], [ang_vel_on[:,agent], ang_vel_off[:,agent]]))
+    # # plt.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+    # # plt.ylabel('$|\omega|$ [rad/s]')
+    # # plt.subplot(4, 1, 4)
+    # # data_to_plot =  [np.mean(tumbling_on[:,agent])*100, np.mean(tumbling_off[:,agent])*100]
+    # # plt.bar([1, 2], data_to_plot)
+    # # plt.xticks([1, 2],labels=['Light ON', 'Light OFF'])
+    # # plt.ylabel('Tumbling [% of frames]')
+    # # plt.show()
 
 
-    # disp_acorr=vector_autocorrelation(displacements[:,agent,:])
-    # disp_corr=vector_correlation(displacements[:,agent,:], displacements[:,agent,:])
-    # disp_similarity = vector_similarity(displacements[:,agent,:], displacements[:,agent,:])
+    # # disp_acorr=vector_autocorrelation(displacements[:,agent,:])
+    # # disp_corr=vector_correlation(displacements[:,agent,:], displacements[:,agent,:])
+    # # disp_similarity = vector_similarity(displacements[:,agent,:], displacements[:,agent,:])
 
-    # signal_similarity=np.max(correlation(disp_corr, disp_acorr),axis=1)
-    # signal_difference=np.zeros([len(disp_corr)])*np.nan
-    # for i in range(round(len(disp_corr)-5)):
-    #     signal_difference[i]=np.linalg.norm(disp_corr[i,i:i+5]- disp_acorr[0:5])/len(disp_acorr[0:5])
-
-
-    # # displacements autocorrelation
-    # plt.figure()
-    # for i in range(round(len(disp_corr)/2)):
-    #     plt.plot(disp_corr[i,i:])
-    #     plt.plot(disp_acorr, marker='o')
-    #     plt.title('displacements autocorrelation of agent '+ str(agent)+ 't='+str(i))
-    #     plt.xlabel('lag')
-    #     plt.grid()
-    #     plt.show()
-
-    # # displacements self similarity
-    # plt.figure()
-    # plt.plot(vector_auto_similarity(displacements[:,agent,:]))
-    # plt.title('displacements self similarity of agent '+ str(agent))
-    # plt.xlabel('lag')
-    # plt.grid()
-    # plt.show()
-
-    # # lag 1 displacements similarity
-    # plt.figure()
-    # plt.plot(time_instants,lag1_similarity[:,agent])
-    # plt.axhline(lag1_similarity_thresh,color='gray')
-    # plt.title('lag 1 displacements similarity of agent '+ str(agent))
-    # plt.xlabel('time [s]')
-    # plt.ylim([0, 1.1])
-    # #plt.xlim([0, totalT])
-    # plt.grid()
-    # #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
-    # DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
-    # plt.show()
-
-    # # displacements signal similarity
-    # plt.figure()
-    # plt.plot(np.diff(signal_similarity))
-    # plt.plot(signal_similarity)
-    # plt.plot(signal_difference)
-    # plt.title('displacements signal similarity of agent '+ str(agent))
-    # plt.xlabel('time')
-    # plt.grid()
-    # plt.show()
+    # # signal_similarity=np.max(correlation(disp_corr, disp_acorr),axis=1)
+    # # signal_difference=np.zeros([len(disp_corr)])*np.nan
+    # # for i in range(round(len(disp_corr)-5)):
+    # #     signal_difference[i]=np.linalg.norm(disp_corr[i,i:i+5]- disp_acorr[0:5])/len(disp_acorr[0:5])
 
 
-    # # scatter plot speed and ang velocity of one agent clustered on Tumbling
-    # plt.figure(figsize=(9,6))
-    # x=split(speeds_smooth[:-1, agent], condition=tumbling2[:-1, agent]<0.5)
-    # y=split(np.ma.abs(ang_vel_smooth[:,agent]), condition=tumbling2[:-1, agent]<0.5)
+    # # # displacements autocorrelation
+    # # plt.figure()
+    # # for i in range(round(len(disp_corr)/2)):
+    # #     plt.plot(disp_corr[i,i:])
+    # #     plt.plot(disp_acorr, marker='o')
+    # #     plt.title('displacements autocorrelation of agent '+ str(agent)+ 't='+str(i))
+    # #     plt.xlabel('lag')
+    # #     plt.grid()
+    # #     plt.show()
+
+    # # # displacements self similarity
+    # # plt.figure()
+    # # plt.plot(vector_auto_similarity(displacements[:,agent,:]))
+    # # plt.title('displacements self similarity of agent '+ str(agent))
+    # # plt.xlabel('lag')
+    # # plt.grid()
+    # # plt.show()
+
+    # # # lag 1 displacements similarity
+    # # plt.figure()
+    # # plt.plot(time_instants,lag1_similarity[:,agent])
+    # # plt.axhline(lag1_similarity_thresh,color='gray')
+    # # plt.title('lag 1 displacements similarity of agent '+ str(agent))
+    # # plt.xlabel('time [s]')
+    # # plt.ylim([0, 1.1])
+    # # #plt.xlim([0, totalT])
+    # # plt.grid()
+    # # #DOMEgraphics.highligth_inputs(tumbling[:,agent].astype(float), 'green')
+    # # DOMEgraphics.highligth_inputs(tumbling2[:,agent].astype(float), time_instants,'yellow')
+    # # plt.show()
+
+    # # # displacements signal similarity
+    # # plt.figure()
+    # # plt.plot(np.diff(signal_similarity))
+    # # plt.plot(signal_similarity)
+    # # plt.plot(signal_difference)
+    # # plt.title('displacements signal similarity of agent '+ str(agent))
+    # # plt.xlabel('time')
+    # # plt.grid()
+    # # plt.show()
+
+
+    # # # scatter plot speed and ang velocity of one agent clustered on Tumbling
+    # # plt.figure(figsize=(9,6))
+    # # x=split(speeds_smooth[:-1, agent], condition=tumbling2[:-1, agent]<0.5)
+    # # y=split(np.ma.abs(ang_vel_smooth[:,agent]), condition=tumbling2[:-1, agent]<0.5)
+    # # scatter_hist(x, y)
+    # # plt.xlabel('$v$ [$\mu$m/s]')
+    # # plt.ylabel('$|\omega|$ [rad/s]')
+    # # #plt.gca().set_ylim([0, 0.25])
+    # # plt.legend(['running', 'tumbling'])
+    # # plt.title('Agent '+ str(agent))
+    # # plt.grid()
+    # # plt.show()
+
+    # # scatter plot speed and ang velocity of one agent
+    # fig = plt.figure(figsize=(9,6))
+    # x=[speeds_smooth[:-1, agent]]
+    # y=[np.ma.abs(ang_vel_smooth[:,agent])]
     # scatter_hist(x, y)
     # plt.xlabel('$v$ [$\mu$m/s]')
     # plt.ylabel('$|\omega|$ [rad/s]')
     # #plt.gca().set_ylim([0, 0.25])
-    # plt.legend(['running', 'tumbling'])
-    # plt.title('Agent '+ str(agent))
+    # fig.suptitle('Agent '+ str(agent))
     # plt.grid()
     # plt.show()
 
-    # scatter plot speed and ang velocity of one agent
-    fig = plt.figure(figsize=(9,6))
-    x=[speeds_smooth[:-1, agent]]
-    y=[np.ma.abs(ang_vel_smooth[:,agent])]
-    scatter_hist(x, y)
-    plt.xlabel('$v$ [$\mu$m/s]')
-    plt.ylabel('$|\omega|$ [rad/s]')
-    #plt.gca().set_ylim([0, 0.25])
-    fig.suptitle('Agent '+ str(agent))
-    plt.grid()
-    plt.show()
+    # # # scatter plot speed and lag1 similarity clustering on Tumbling
+    # # plt.figure(figsize=(9,6))
+    # # x=split(speeds_smooth[:, agent], condition=tumbling2[:, agent]<0.5)
+    # # y=split(lag1_similarity[:,agent], condition=tumbling2[:, agent]<0.5)
+    # # scatter_hist(x, y, n_bins=20)
+    # # plt.xlabel('$v$ [$\mu$m/s]')
+    # # plt.ylabel('Lag 1 similarity')
+    # # plt.title('Agent '+ str(agent))
+    # # plt.grid()
+    # # plt.show()
 
-    # # scatter plot speed and lag1 similarity clustering on Tumbling
-    # plt.figure(figsize=(9,6))
-    # x=split(speeds_smooth[:, agent], condition=tumbling2[:, agent]<0.5)
-    # y=split(lag1_similarity[:,agent], condition=tumbling2[:, agent]<0.5)
-    # scatter_hist(x, y, n_bins=20)
-    # plt.xlabel('$v$ [$\mu$m/s]')
-    # plt.ylabel('Lag 1 similarity')
-    # plt.title('Agent '+ str(agent))
+
+    # # # scatter plot speed and lag1 similarity
+    # # plt.figure(figsize=(9,6))
+    # # x=[speeds_smooth[:, agent]]
+    # # y=[lag1_similarity[:,agent]]
+    # # scatter_hist(x, y, n_bins=20)
+    # # plt.xlabel('$v$ [$\mu$m/s]')
+    # # plt.ylabel('Lag 1 similarity')
+    # # plt.title('Agent '+ str(agent))
+    # # plt.grid()
+    # # plt.show()
+
+    # # v(k+1) vs v(k) plot 
+    # fig=plt.figure(figsize=(12,4))
+    # plt.subplot(1, 2, 1)
+    # x=[speeds_smooth[:-1, agent]]
+    # y=[speeds_smooth[1:, agent]]
+    # plt.scatter(x, y)
+    # plt.xlabel('$v(k)$ [$\mu$m/s]')
+    # plt.ylabel('$v(k+1)$ [$\mu$m/s]')
     # plt.grid()
+
+    # plt.subplot(1, 2, 2)
+    # x=[ang_vel_smooth[:-1, agent]]
+    # y=[ang_vel_smooth[1:, agent]]
+    # plt.scatter(x, y)
+    # plt.xlabel('$|\omega|(k)$ [rad/s]')
+    # plt.ylabel('$|\omega|(k+1)$ [rad/s]')
+    # plt.grid()
+    # fig.suptitle('Agent '+ str(agent))
     # plt.show()
 
 
-    # # scatter plot speed and lag1 similarity
-    # plt.figure(figsize=(9,6))
-    # x=[speeds_smooth[:, agent]]
-    # y=[lag1_similarity[:,agent]]
-    # scatter_hist(x, y, n_bins=20)
-    # plt.xlabel('$v$ [$\mu$m/s]')
-    # plt.ylabel('Lag 1 similarity')
-    # plt.title('Agent '+ str(agent))
-    # plt.grid()
+    # # plot trajectory of one agent
+    # last_index = inactivity.shape[0] - (inactivity[:, agent]<=0)[::-1].argmax(0) - 1
+    # img = current_experiment.get_img_at_time(last_index*deltaT)
+    # DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivity[:,agent:agent+1], img, "trajectory of agent " +str(agent));
+    # # #tumbling_pos = interp_positions[:-1,agent,:][tumbling[:,agent]>0]
+    # # tumbling_pos2 = interp_positions[:,agent,:][tumbling2[:,agent]>0]
+    # # #plt.scatter(tumbling_pos[:,0], tumbling_pos[:,1], color='green' )
+    # # plt.scatter(tumbling_pos2[:,0], tumbling_pos2[:,1], color='yellow' )
     # plt.show()
-
-    # v(k+1) vs v(k) plot 
-    fig=plt.figure(figsize=(12,4))
-    plt.subplot(1, 2, 1)
-    x=[speeds_smooth[:-1, agent]]
-    y=[speeds_smooth[1:, agent]]
-    plt.scatter(x, y)
-    plt.xlabel('$v(k)$ [$\mu$m/s]')
-    plt.ylabel('$v(k+1)$ [$\mu$m/s]')
-    plt.grid()
-
-    plt.subplot(1, 2, 2)
-    x=[ang_vel_smooth[:-1, agent]]
-    y=[ang_vel_smooth[1:, agent]]
-    plt.scatter(x, y)
-    plt.xlabel('$|\omega|(k)$ [rad/s]')
-    plt.ylabel('$|\omega|(k+1)$ [rad/s]')
-    plt.grid()
-    fig.suptitle('Agent '+ str(agent))
-    plt.show()
-
-
-    # plot trajectory of one agent
-    last_index = inactivity.shape[0] - (inactivity[:, agent]<=0)[::-1].argmax(0) - 1
-    img = current_experiment.get_img_at_time(last_index*deltaT)
-    DOMEgraphics.draw_trajectories(interp_positions[:,agent:agent+1,:], [], inactivity[:,agent:agent+1], img, "trajectory of agent " +str(agent));
-    # #tumbling_pos = interp_positions[:-1,agent,:][tumbling[:,agent]>0]
-    # tumbling_pos2 = interp_positions[:,agent,:][tumbling2[:,agent]>0]
-    # #plt.scatter(tumbling_pos[:,0], tumbling_pos[:,1], color='green' )
-    # plt.scatter(tumbling_pos2[:,0], tumbling_pos2[:,1], color='yellow' )
-    plt.show()
 
 
     
@@ -1298,7 +1298,7 @@ def analyse_experiment(experiment_name : str, tracking_folder : str ='last' ):
     global positions, inactivity, inputs, time_instants, time_steps, deltaT, totalT
     global current_experiment, interp_positions, speeds_smooth, acc_smooth
     global ang_vel_smooth, speeds_on, speeds_off, ang_vel_on, ang_vel_off, lengths, abs_ang_vel_smooth
-    
+        
     ## LOAD EXPERIMENT DATA
     if type(experiment_name) is str:
         current_experiment = DOMEexp.open_experiment(experiment_name, experiments_directory)  
@@ -1325,12 +1325,14 @@ def analyse_experiment(experiment_name : str, tracking_folder : str ='last' ):
     
     ## PERFORM TRAJECTORIES ANALYSIS (IF NOT EXISTING) AND LOAD DATA
     analysed_data_path = os.path.join(current_experiment.path, tracking_folder, "analysed_data.npz")
-
-    if not os.path.isfile(analysed_data_path):
-        print("Analysing trajectories...")
-        analyse_trajectories(current_experiment, tracking_folder)
-    else:
-        print("Loading existing analysis data...")
+    
+    print("Analysing trajectories...")
+    analyse_trajectories(current_experiment, tracking_folder)
+    # if not os.path.isfile(analysed_data_path):
+    #     print("Analysing trajectories...")
+    #     analyse_trajectories(current_experiment, tracking_folder)
+    # else:
+    #     print("Loading existing analysis data...")
         
     with current_experiment.get_data(analysed_data_path) as analysed_data:
         interp_positions=analysed_data["interp_positions"]
@@ -1409,7 +1411,7 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     #displacements = np.gradient(interp_positions, axis=0)        # [px/frame]
     #velocities = np.gradient(interp_positions, deltaT, axis=0)   # [px/s]
     velocities = masked_grad(interp_positions)/deltaT             # [px/s]
-    velocities = velocities.filled() * px_size                             # [um/s]
+    velocities = velocities.filled() * px_size                    # [um/s]
 
     # speed [um/s]
     speeds = np.linalg.norm(velocities, axis=2) 
@@ -1991,18 +1993,35 @@ def scenarios_comparison(experiment_names : List, labels = None, xvalues = [], t
 experiments_directory = '/Volumes/DOMEPEN/Experiments'
 # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
-experiment_name = "2023_06_15_Euglena_1"
 
-off_experiments=['2023_06_15_Euglena_1','2023_06_26_Euglena_13', '2023_07_10_Euglena_6']
-
-on255_experiments=['2023_06_15_Euglena_4','2023_06_26_Euglena_19', '2023_07_10_Euglena_12']
-on150_experiments=['2023_06_15_Euglena_3','2023_06_26_Euglena_17', '2023_07_10_Euglena_10']
-on75_experiments=['2023_06_15_Euglena_2','2023_06_26_Euglena_15', '2023_07_10_Euglena_8']
-
+experiments_off = ['2023_06_15_Euglena_1','2023_06_26_Euglena_13', '2023_06_26_Euglena_14',
+                   '2023_07_10_Euglena_5','2023_07_10_Euglena_6']
+    
 experiments_switch_10s = ['2023_06_15_Euglena_7','2023_06_26_Euglena_23','2023_06_26_Euglena_24',
                           '2023_07_10_Euglena_15','2023_07_10_Euglena_16'];
-experiments_switch_5s=['2023_06_15_Euglena_8','2023_06_26_Euglena_25', '2023_07_10_Euglena_18']
-experiments_switch_1s = ["2023_06_15_Euglena_11","2023_06_26_Euglena_28","2023_07_10_Euglena_19"]
+
+experiments_switch_5s = ['2023_06_15_Euglena_8','2023_06_15_Euglena_9','2023_06_15_Euglena_10',
+                          '2023_06_26_Euglena_25','2023_06_26_Euglena_26',
+                          '2023_07_10_Euglena_17','2023_07_10_Euglena_18'];
+
+experiments_switch_1s = ['2023_06_15_Euglena_11','2023_06_26_Euglena_27','2023_06_26_Euglena_28',
+                          '2023_07_10_Euglena_19','2023_07_10_Euglena_20'];
+
+experiments_ramp = ['2023_06_15_Euglena_5','2023_06_15_Euglena_6',
+                    '2023_06_26_Euglena_22','2023_06_26_Euglena_21',
+                    '2023_07_10_Euglena_13','2023_07_10_Euglena_14'];
+    
+experiments_on255=['2023_06_15_Euglena_4','2023_06_26_Euglena_19','2023_06_26_Euglena_20',
+                   '2023_07_10_Euglena_11', '2023_07_10_Euglena_12']
+
+experiments_on150=['2023_06_15_Euglena_3','2023_06_26_Euglena_17','2023_06_26_Euglena_18',
+                   '2023_07_10_Euglena_9', '2023_07_10_Euglena_10']
+
+experiments_on75 =['2023_06_15_Euglena_2','2023_06_26_Euglena_15','2023_06_26_Euglena_16',
+                  '2023_07_10_Euglena_7', '2023_07_10_Euglena_8']
+
+experiment_name = "2023_06_15_Euglena_1"
+
 
 #tracking_folder ='tracking_2023_10_09'
 tracking_folder ='last'
