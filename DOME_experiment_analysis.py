@@ -371,6 +371,27 @@ def masked_grad(data : np.array):
 
     return grad
 
+def masked_backward_diff(data : np.array):
+    data = np.ma.array(data, mask=np.isnan(data),fill_value=np.nan)
+    dif = np.zeros_like(data) * np.nan
+    
+    if len(data.shape)<=2:
+        edges = np.ma.notmasked_contiguous(data, axis=0)
+    
+        for i in range(data.shape[1]):
+            if len(edges[i]):
+                dif[edges[i][0],i] = np.concatenate([[data[edges[i][0].start+1,i]-data[edges[i][0].start,i]], np.diff(data[edges[i][0],i],axis=0)])
+
+    else:
+        for j in range(data.shape[2]):
+            edges = np.ma.notmasked_contiguous(data[:,:,j], axis=0)
+        
+            for i in range(data.shape[1]):
+                if len(edges[i]):
+                    dif[edges[i][0],i,j] = np.concatenate([[data[edges[i][0].start+1,i,j]-data[edges[i][0].start,i,j]], np.diff(data[edges[i][0],i,j],axis=0)])
+
+    return dif
+
 def angle_between_vectors(v1 : np.ndarray, v2 : np.ndarray):
     # output in ]-pi,pi] rad.
     
@@ -921,8 +942,8 @@ def make_experiment_plots(tracking_folder : str):
         plt.grid()
         plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_light.pdf'), bbox_inches = 'tight')
         plt.show()
-
-
+    
+    
     # # displacements autocorrelation
     # disp_acorr_df=pd.DataFrame(disp_acorr)
     # disp_acorr_df=disp_acorr_df.loc[:,0:20]
@@ -933,7 +954,7 @@ def make_experiment_plots(tracking_folder : str):
     # plt.grid()
     # plt.xlim([0, 20])
     # plt.show()
-
+    
     # corrplot speed and ang vel (per agent)
     plt.figure(figsize=(9, 6))
     agents_motion = pd.DataFrame(np.ma.array([np.ma.mean(speeds_smooth, axis=0), np.ma.mean(
@@ -944,7 +965,7 @@ def make_experiment_plots(tracking_folder : str):
     plt.savefig(os.path.join(plots_dir, 'corrplot_speed_angv.pdf'),
                 bbox_inches='tight')
     plt.show()
-
+    
     # scatter plot MEAN speed and MEAN ang velocity (per agent)
     plt.figure(figsize=(9, 6))
     c = [np.ma.mean(speeds_smooth, axis=0)]  # colored by speed
@@ -958,7 +979,7 @@ def make_experiment_plots(tracking_folder : str):
     plt.savefig(os.path.join(
         plots_dir, 'scatter_speed_angv_mean.pdf'), bbox_inches='tight')
     plt.show()
-
+    
     # scatter plot MEAN speed and STD speed (per agent)
     plt.figure(figsize=(9,6))
     c = [np.ma.mean(speeds_smooth, axis=0)]
@@ -980,7 +1001,7 @@ def make_experiment_plots(tracking_folder : str):
     plt.grid()
     plt.savefig(os.path.join(plots_dir, 'scatter_angv_mean_std.pdf'), bbox_inches = 'tight')
     plt.show()
-
+    
     # scatter plot STD speed and STD ang velocity (per agent)
     plt.figure(figsize=(9,6))
     c = [np.ma.mean(speeds_smooth, axis=0)]
@@ -991,7 +1012,7 @@ def make_experiment_plots(tracking_folder : str):
     plt.grid()
     plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_std.pdf'), bbox_inches = 'tight')
     plt.show()
-
+    
     # scatter plot speed variation and ang velocity variation
     fig=plt.figure(figsize=(9,6))
     speed_variation = [np.log10(speeds_smooth[:-1]/np.ma.mean(speeds_smooth, axis=0))]
@@ -1409,8 +1430,8 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
 
     # velocities
     #displacements = np.gradient(interp_positions, axis=0)        # [px/frame]
-    #velocities = np.gradient(interp_positions, deltaT, axis=0)   # [px/s]
     velocities = masked_grad(interp_positions)/deltaT             # [px/s]
+    velocities = masked_backward_diff(interp_positions)/deltaT    # [px/s]
     velocities = velocities.filled() * px_size                    # [um/s]
 
     # speed [um/s]
@@ -2020,7 +2041,7 @@ experiments_on150=['2023_06_15_Euglena_3','2023_06_26_Euglena_17','2023_06_26_Eu
 experiments_on75 =['2023_06_15_Euglena_2','2023_06_26_Euglena_15','2023_06_26_Euglena_16',
                   '2023_07_10_Euglena_7', '2023_07_10_Euglena_8']
 
-experiment_name = "2023_06_15_Euglena_1"
+experiment_name = "2023_07_10_Euglena_15"
 
 
 #tracking_folder ='tracking_2023_10_09'
