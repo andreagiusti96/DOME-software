@@ -150,7 +150,7 @@ def remove_agents(agents : [int, List]):
 def detect_tumbling(speed, ang_vel, m=2.):
     speed=np.ma.array(speed, mask=np.isnan(speed))
     ang_vel=np.ma.array(ang_vel, mask=np.isnan(ang_vel))
-    slow = detect_outliers(speed[:-1], m, 'bottom')
+    slow = detect_outliers(speed, m, 'bottom')
     turning = detect_outliers(ang_vel, m, 'top')
     tumbling = slow * turning
     return tumbling
@@ -734,8 +734,8 @@ def make_experiment_plots(tracking_folder : str):
     x_val = x_val/sum(x_val)/(x_bins[1]-x_bins[0])
     ax_sp_box.barh(x_bins[:-1], x_val, height=1.0*np.diff(x_bins), align='edge', alpha=0.5)
     #
-    ax_angv.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
-    ax_angv.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
+    ax_angv.plot(time_instants,np.ma.median(np.abs(ang_vel_smooth),axis=1))
+    ax_angv.fill_between(time_instants, np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
     ax_angv.set_xlim([0, totalT])
     ax_angv.set_ylim([0, 3])
     ax_angv.set_ylabel('$|\omega|$ [rad/s]')
@@ -770,8 +770,8 @@ def make_experiment_plots(tracking_folder : str):
         ax_sp_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
         add_significance_bar(data=data_to_plot, axis=ax_sp_box)
         #
-        ax_angv.plot(time_instants[:-1],np.ma.median(np.abs(ang_vel_smooth),axis=1))
-        ax_angv.fill_between(time_instants[:-1], np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
+        ax_angv.plot(time_instants,np.ma.median(np.abs(ang_vel_smooth),axis=1))
+        ax_angv.fill_between(time_instants, np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
         ax_angv.set_xlim([0, totalT])
         ax_angv.set_ylim([0, 2])
         ax_angv.set_ylabel('$|\omega|$ [rad/s]')
@@ -932,7 +932,7 @@ def make_experiment_plots(tracking_folder : str):
         
         # scatter plot speed and ang velocity - cluster wrt light input
         plt.figure(figsize=(9,6))
-        x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off[:-1],np.ma.median(speeds_smooth, axis=0))]
+        x=[np.ma.divide(speeds_on,np.ma.median(speeds_smooth, axis=0)), np.ma.divide(speeds_off,np.ma.median(speeds_smooth, axis=0))]
         y=[ang_vel_on, ang_vel_off]
         scatter_hist(x, y, n_bins=20)
         plt.xlabel('$v$/med$(v,t)$')
@@ -1015,10 +1015,10 @@ def make_experiment_plots(tracking_folder : str):
     
     # scatter plot speed variation and ang velocity variation
     fig=plt.figure(figsize=(9,6))
-    speed_variation = [np.log10(speeds_smooth[:-1]/np.ma.mean(speeds_smooth, axis=0))]
+    speed_variation = [np.log10(speeds_smooth/np.ma.mean(speeds_smooth, axis=0))]
     ang_vel_variation = [np.log10(abs_ang_vel_smooth/np.ma.mean(abs_ang_vel_smooth, axis=0))]
     c = np.ma.mean(speeds_smooth, axis=0)
-    color = [np.tile(c, (len(time_instants)-1,1))]
+    color = [np.tile(c, (len(time_instants),1))]
     scatter_hist(speed_variation, ang_vel_variation, color, n_bins=50, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
     plt.xlabel('$v/<v>_t$   [log10]')
     plt.ylabel('$|\omega|/<|\omega|>_t$   [log10]')
@@ -1429,8 +1429,8 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     interp_positions[:,lengths<min_traj_length,:]= np.nan
 
     # velocities
-    #displacements = np.gradient(interp_positions, axis=0)        # [px/frame]
-    velocities = masked_grad(interp_positions)/deltaT             # [px/s]
+    #displacements = masked_backward_diff(interp_positions)        # [px/frame]
+    #velocities = masked_grad(interp_positions)/deltaT             # [px/s]
     velocities = masked_backward_diff(interp_positions)/deltaT    # [px/s]
     velocities = velocities.filled() * px_size                    # [um/s]
 
@@ -1453,10 +1453,19 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     norm_disp = np.ma.array(norm_disp, mask=np.isnan(norm_disp))
     directions=np.arctan2(norm_disp[:,:,1],norm_disp[:,:,0]) # [rad]
 
-    # compue angular velocity [rad/s]    
-    ang_vel = np.ndarray([velocities.shape[0]-1,velocities.shape[1]]) #[rad/s]
-    for i in range(velocities.shape[0]-1):
-        ang_vel[i,:] = angle_between_vectors(velocities[i,:,:],velocities[i+1,:,:])
+    # compue angular velocity [rad/s] - Forward Euler
+    # ang_vel = np.ndarray([velocities.shape[0],velocities.shape[1]]) #[rad/s]
+    # for i in range(velocities.shape[0]-1):
+    #     ang_vel[i,:] = angle_between_vectors(velocities[i,:,:],velocities[i+1,:,:])
+    # ang_vel[-1,:] = angle_between_vectors(velocities[-2,:,:],velocities[-1,:,:])
+    # ang_vel[-2,:] = angle_between_vectors(velocities[-2,:,:],velocities[-1,:,:])
+    
+    # compue angular velocity [rad/s] - Backward Euler
+    ang_vel = np.ndarray([velocities.shape[0],velocities.shape[1]]) #[rad/s]
+    ang_vel[0,:] = angle_between_vectors(velocities[1,:,:],velocities[2,:,:])
+    ang_vel[1,:] = angle_between_vectors(velocities[1,:,:],velocities[2,:,:])
+    for i in range(2, velocities.shape[0]):
+        ang_vel[i,:] = angle_between_vectors(velocities[i-1,:,:],velocities[i,:,:])
     ang_vel = ang_vel/deltaT
     ang_vel = np.ma.array(ang_vel, mask=np.isnan(ang_vel))
     ang_vel_smooth = moving_average(ang_vel, 3)
@@ -1570,7 +1579,7 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     # values for different inputs
     [speeds_on, speeds_off] = split(speeds_smooth, condition=inputs[:,0]>=50)
     [acc_on, acc_off] = split(acc_smooth, condition=inputs[:,0]>=50)
-    [ang_vel_on, ang_vel_off] = split(np.abs(ang_vel_smooth), condition=inputs[:-1,0]>=50)
+    [ang_vel_on, ang_vel_off] = split(np.abs(ang_vel_smooth), condition=inputs[:,0]>=50)
     [tumbling_on, tumbling_off] = split(tumbling2, condition=inputs[:,0]>=50)
     [lag1_similarity_on, lag1_similarity_off] = split(lag1_similarity, condition=inputs[:,0]>=50)
 
@@ -2040,6 +2049,8 @@ experiments_on150=['2023_06_15_Euglena_3','2023_06_26_Euglena_17','2023_06_26_Eu
 
 experiments_on75 =['2023_06_15_Euglena_2','2023_06_26_Euglena_15','2023_06_26_Euglena_16',
                   '2023_07_10_Euglena_7', '2023_07_10_Euglena_8']
+
+all_experiments = experiments_off +experiments_switch_10s+experiments_switch_5s+experiments_switch_1s +experiments_ramp+experiments_on255+experiments_on150+experiments_on75
 
 experiment_name = "2023_07_10_Euglena_15"
 
