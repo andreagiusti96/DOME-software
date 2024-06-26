@@ -29,11 +29,6 @@ from typing import List
 import DOME_graphics as DOMEgraphics
 import DOME_experiment_manager as DOMEexp
 
-NEW_ID_COST_MIN = 1
-NEW_ID_COST_DIST_CAP = 3
-DISTANCE_COST_FACTORS = [0, 1]
-INACTIVITY_COST_FACTORS = [0, 1]
-
 
 def matchingCost(distance : np.array, inactivity : int):
     """
@@ -71,7 +66,7 @@ def plotCosts():
 
     maxdist = 4
     distances = np.linspace(0, maxdist)
-    inactivity = np.array([0, 1, 2, 3, 4, 5])
+    inactivity = np.arange(0,10)
 
     matching_cost = np.zeros([len(distances), len(inactivity)])
 
@@ -156,7 +151,7 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
     avg_cost = cost / (len(new_ids) + 0.001)
 
     if verbose:
-        print('matching cost = ' + str(round(cost, 2)) + '\t avg = ' + str(round(avg_cost, 2)))
+        print('matching cost: total = ' + str(round(cost, 2)) + '\t avg = ' + str(round(avg_cost, 2)))
 
     return new_ids, cost
 
@@ -447,7 +442,6 @@ def build_background(fileLocation: str, images_number : int = 10, gain: float = 
 
     images = np.ndarray([images_number, 1080, 1920], dtype=np.uint8)
     indices = np.linspace(0, len(paths) - 1, num=images_number, dtype=int)
-    # indices = np.linspace(0, images_number-1, num=images_number, dtype=int)
 
     selected_paths = [paths[i] for i in indices]
 
@@ -811,7 +805,7 @@ def overlap_trajectories(experiment : DOMEexp.ExperimentManager = None):
         time = DOMEexp.get_time_from_title(filename)
         img = cv2.imread(filename)
         fig = DOMEgraphics.draw_trajectories(positions[:counter + 1], [], inactivity[:counter + 1], img,
-                                             title='time=' + str(time), max_inactivity=3, time_window=5, show=False)
+                                             title='time=' + str(time), max_inactivity=DRAW_MAX_INACTIVITY, time_window=DRAW_TRAJECTORY_LENGTH, show=False)
         fig.savefig(os.path.join(experiment.path, output_folder, 'trk_' + '%04.1f' % time + '.jpeg'), dpi=100)
         print(f'\rGenerating tracking images: {round((counter+1)/frames_number*100,1)}% of {frames_number} images', end='\r')
     print("\nNow you can use DOMEgraphics.make_video to generate the video.")
@@ -1015,7 +1009,7 @@ def extract_data_from_images(fileLocation : str, output_folder: str, parameters 
 
         # print image
         fig = DOMEgraphics.draw_trajectories(positions[:counter + 1], [], inactivity[:counter + 1], img,
-                                             title='time=' + str(time), max_inactivity=3, time_window=5, show=show)
+                                             title='time=' + str(time), max_inactivity=DRAW_MAX_INACTIVITY, time_window=DRAW_TRAJECTORY_LENGTH, show=show)
         fig.savefig(os.path.join(fileLocation, output_folder, 'trk_' + '%04.1f' % time + '.jpeg'), dpi=100)
 
         # if verbose print info
@@ -1174,10 +1168,6 @@ def start_tracking(experiment_names : [List, str]):
 
 # MAIN -----------------------------------------------------------------------
 if __name__ == '__main__':
-    # IMAGE POROCESSING PARAMETERS
-    AUTO_SCALING = -1       # value for automatic brightness adjustment
-    DEFAULT_COLOR = "red"   # color channel used for gray-scale conversion "gray", "blue", "green" or "red"
-    DEFAULT_BLUR = 9        # size of the blurring window [in pixels]
 
 
     # OBJECT DETECTION AND TRACKING PARAMETERS
@@ -1190,21 +1180,32 @@ if __name__ == '__main__':
     # }
     
     
-    # Euglena
-    PARAMETERS = {
-        "AREA_RANGE" : [175, 1500],
-        "COMPAC_RANGE" : [0.55, 0.90],
-        "BRIGHT_THRESH" : [85],
-        "TYPICAL_VEL" : 70,             # [px/s]
-        "INERTIA" : 0.9
-    }
+    # # Euglena
+    # PARAMETERS = {
+    #     "AREA_RANGE" : [175, 1500],
+    #     "COMPAC_RANGE" : [0.55, 0.90],
+    #     "BRIGHT_THRESH" : [85],
+    #     "TYPICAL_VEL" : 70,             # [px/s]
+    #     "INERTIA" : 0.9
+    # }
+    # NEW_ID_COST_MIN = 1
+    # NEW_ID_COST_DIST_CAP = 3
+    # DISTANCE_COST_FACTORS = [0, 1]
+    # INACTIVITY_COST_FACTORS = [0, 1]
+    # # IMAGE POROCESSING PARAMETERS
+    # AUTO_SCALING = -1       # value for automatic brightness adjustment
+    # DEFAULT_COLOR = "red"   # color channel used for gray-scale conversion "gray", "blue", "green" or "red"
+    # DEFAULT_BLUR = 9        # size of the blurring window [in pixels]
+    # # VISUALIZATION
+    # DRAW_TRAJECTORY_LENGTH = 5
+    # DRAW_MAX_INACTIVITY = 3
 
     # # P. Caudatum
     # PARAMETERS = {
     #     "AREA_RANGE" : [250, 3000],
     #     "COMPAC_RANGE" : [0.5, 0.9],
     #     "BRIGHT_THRESH" : [70],
-    #     "TYPICAL_VEL" : 100
+    #     "TYPICAL_VEL" : 100,
     #     "INERTIA" : 0.9
     # }
 
@@ -1213,86 +1214,97 @@ if __name__ == '__main__':
     #     "AREA_RANGE" : [150, 1500],
     #     "COMPAC_RANGE" : [0.6, 0.9],
     #     "BRIGHT_THRESH" : [60],
-    #     "TYPICAL_VEL" : 50
+    #     "TYPICAL_VEL" : 50,
     #     "INERTIA" : 0.9
     # }
 
-    # # Volvox
-    # PARAMETERS = {
-    #     "AREA_RANGE" : [1000, 6000],
-    #     "COMPAC_RANGE" : [0.7, 1.0],
-    #     "BRIGHT_THRESH" : [70],
-    #     "TYPICAL_VEL" : 30
-    #     "INERTIA" : 0.9
-    # }
-
+    # Volvox
+    PARAMETERS = {
+        "AREA_RANGE" : [800, 6000],
+        "COMPAC_RANGE" : [0.65, 1.0],
+        "BRIGHT_THRESH" : [90],
+        "TYPICAL_VEL" : 30,
+        "INERTIA" : 0.9
+    }
+    # TRACKING
+    NEW_ID_COST_MIN = 1
+    NEW_ID_COST_DIST_CAP = 3
+    DISTANCE_COST_FACTORS = [0, 1]
+    INACTIVITY_COST_FACTORS = [0, 0.25]
+    # IMAGE POROCESSING PARAMETERS
+    AUTO_SCALING = -1       # value for automatic brightness adjustment
+    DEFAULT_COLOR = "red"   # color channel used for gray-scale conversion "gray", "blue", "green" or "red"
+    DEFAULT_BLUR = 15        # side of the blurring window [in pixels]
+    # VISUALIZATION
+    DRAW_TRAJECTORY_LENGTH = 10
+    DRAW_MAX_INACTIVITY = 7
+    
     # Directory where DOME experiments folders are saved
     # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'
     experiments_directory = '/Volumes/DOMEPEN/Experiments'
     # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
-    experiments_off = ['2023_06_15_Euglena_1','2023_06_26_Euglena_13', '2023_06_26_Euglena_14',
+    Euglena_off = ['2023_06_15_Euglena_1','2023_06_26_Euglena_13', '2023_06_26_Euglena_14',
                        '2023_07_10_Euglena_5','2023_07_10_Euglena_6']
         
-    experiments_switch_10s = ['2023_06_15_Euglena_7','2023_06_26_Euglena_23','2023_06_26_Euglena_24',
+    Euglena_switch_10s = ['2023_06_15_Euglena_7','2023_06_26_Euglena_23','2023_06_26_Euglena_24',
                               '2023_07_10_Euglena_15','2023_07_10_Euglena_16'];
     
-    experiments_switch_5s = ['2023_06_15_Euglena_8','2023_06_15_Euglena_9','2023_06_15_Euglena_10',
+    Euglena_switch_5s = ['2023_06_15_Euglena_8','2023_06_15_Euglena_9','2023_06_15_Euglena_10',
                               '2023_06_26_Euglena_25','2023_06_26_Euglena_26',
                               '2023_07_10_Euglena_17','2023_07_10_Euglena_18'];
     
-    experiments_switch_1s = ['2023_06_15_Euglena_11','2023_06_26_Euglena_27','2023_06_26_Euglena_28',
+    Euglena_switch_1s = ['2023_06_15_Euglena_11','2023_06_26_Euglena_27','2023_06_26_Euglena_28',
                               '2023_07_10_Euglena_19','2023_07_10_Euglena_20'];
     
-    experiments_ramp = ['2023_06_15_Euglena_5','2023_06_15_Euglena_6',
+    Euglena_ramp = ['2023_06_15_Euglena_5','2023_06_15_Euglena_6',
                         '2023_06_26_Euglena_22','2023_06_26_Euglena_21',
                         '2023_07_10_Euglena_13','2023_07_10_Euglena_14'];
         
-    experiments_on255=['2023_06_15_Euglena_4','2023_06_26_Euglena_19','2023_06_26_Euglena_20',
+    Euglena_on255=['2023_06_15_Euglena_4','2023_06_26_Euglena_19','2023_06_26_Euglena_20',
                        '2023_07_10_Euglena_11', '2023_07_10_Euglena_12']
     
-    experiments_on150=['2023_06_15_Euglena_3','2023_06_26_Euglena_17','2023_06_26_Euglena_18',
+    Euglena_on150=['2023_06_15_Euglena_3','2023_06_26_Euglena_17','2023_06_26_Euglena_18',
                        '2023_07_10_Euglena_9', '2023_07_10_Euglena_10']
     
-    experiments_on75 =['2023_06_15_Euglena_2','2023_06_26_Euglena_15','2023_06_26_Euglena_16',
+    Euglena_on75 =['2023_06_15_Euglena_2','2023_06_26_Euglena_15','2023_06_26_Euglena_16',
                       '2023_07_10_Euglena_7', '2023_07_10_Euglena_8']
 
-    experiments_gradient_central_light = ['2023_06_12_Euglena_3','2023_06_12_Euglena_4','2023_06_14_Euglena_7',
+    Euglena_gradient_central_light = ['2023_06_12_Euglena_3','2023_06_12_Euglena_4','2023_06_14_Euglena_7',
                                           '2023_06_15_Euglena_14','2023_06_23_Euglena_5','2023_06_23_Euglena_6',
                                           '2023_06_26_Euglena_5','2023_06_26_Euglena_6','2023_06_26_Euglena_33'];
     
-    experiments_gradient_central_dark = ['2023_06_14_Euglena_10','2023_06_15_Euglena_15','2023_06_23_Euglena_7',
+    Euglena_gradient_central_dark = ['2023_06_14_Euglena_10','2023_06_15_Euglena_15','2023_06_23_Euglena_7',
                                           '2023_06_23_Euglena_8','2023_06_23_Euglena_9','2023_06_26_Euglena_7',
                                           '2023_06_26_Euglena_8','2023_06_26_Euglena_34','2023_06_26_Euglena_35',
                                           '2023_07_10_Euglena_23','2023_07_10_Euglena_24'] 
     
-    experiments_gradient_lateral = ['2023_06_12_Euglena_5','2023_06_13_Euglena_16','2023_06_14_Euglena_8',
+    Euglena_gradient_lateral = ['2023_06_12_Euglena_5','2023_06_13_Euglena_16','2023_06_14_Euglena_8',
                                     '2023_06_15_Euglena_13','2023_06_23_Euglena_3','2023_06_23_Euglena_4',
                                     '2023_06_26_Euglena_3','2023_06_26_Euglena_4','2023_06_26_Euglena_31',
                                     '2023_06_26_Euglena_32']
     
-    experiments_half_half = ['2023_06_12_Euglena_2','2023_06_14_Euglena_6','2023_06_15_Euglena_12',
+    Euglena_half_half = ['2023_06_12_Euglena_2','2023_06_14_Euglena_6','2023_06_15_Euglena_12',
                              '2023_06_26_Euglena_29','2023_06_26_Euglena_30','2023_06_23_Euglena_1',
                              '2023_06_23_Euglena_2','2023_06_26_Euglena_2','2023_06_26_Euglena_1']
     
-    experiments_circle_light = ['2023_06_12_Euglena_1','2023_06_14_Euglena_1','2023_06_15_Euglena_16',
+    Euglena_circle_light = ['2023_06_12_Euglena_1','2023_06_14_Euglena_1','2023_06_15_Euglena_16',
                                 '2023_06_23_Euglena_10','2023_06_23_Euglena_11','2023_06_26_Euglena_9',
                                 '2023_06_26_Euglena_10','2023_06_26_Euglena_36','2023_06_26_Euglena_37',
                                 '2023_07_10_Euglena_26']
     
-    experiments_circle_dark = ['2023_06_13_Euglena_6','2023_06_13_Euglena_15','2023_06_15_Euglena_17',
-                               '2023_06_15_Euglena_18','2023_06_23_Euglena_12','2023_06_23_Euglena_13',
-                               '2023_06_26_Euglena_11','2023_06_26_Euglena_12','2023_06_26_Euglena_38',
-                               '2023_06_26_Euglena_39','2023_07_10_Euglena_25','2023_07_10_Euglena_22']
+    Euglena_circle_dark = ['2023_06_13_Euglena_3','2023_06_13_Euglena_4','2023_06_13_Euglena_6','2023_06_13_Euglena_15',
+                               '2023_06_15_Euglena_17','2023_06_15_Euglena_18',
+                               '2023_06_23_Euglena_12','2023_06_23_Euglena_13',
+                               '2023_06_26_Euglena_11','2023_06_26_Euglena_12',
+                               '2023_06_26_Euglena_38','2023_06_26_Euglena_39',
+                               '2023_06_27_Euglena_20','2023_06_27_Euglena_21', '2023_07_10_Euglena_2',
+                               '2023_07_10_Euglena_25','2023_07_10_Euglena_21','2023_07_10_Euglena_22']
     
-    experiments_BCL = ['2023_07_10_Euglena_30','2023_07_10_Euglena_34','2023_07_10_Euglena_35',
+    Euglena_BCL = ['2023_07_10_Euglena_30','2023_07_10_Euglena_34','2023_07_10_Euglena_35',
                               '2023_07_10_Euglena_36','2023_07_10_Euglena_37','2023_07_10_Euglena_38']
     
-    experiments_to_track = ['2023_06_26_Euglena_14','2023_06_26_Euglena_16','2023_07_10_Euglena_7',
-                            '2023_06_26_Euglena_18','2023_07_10_Euglena_9','2023_06_26_Euglena_20',
-                            '2023_06_15_Euglena_5','2023_06_15_Euglena_6','2023_06_26_Euglena_21',
-                            '2023_06_26_Euglena_22','2023_07_10_Euglena_13','2023_06_26_Euglena_26',
-                            '2023_07_10_Euglena_17']
+    Volvox_switch_10s = ['2023_07_06_Volvox_11','2023_07_06_Volvox_5']
 
     # Name of the experiment(s) to be tracked
     experiment_names = ["2023_07_10_Euglena_26"]
@@ -1302,9 +1314,9 @@ if __name__ == '__main__':
     #output_folder = 'tracking_test'
 
     # Tracking options
-    terminal_time = -1          # time to stop tracking [s], set negative to track the whole experiment
-    verbose = False             # print info during tracking
-    show_tracking_images = False # print images during tracking
+    terminal_time = 60          # time to stop tracking [s], set negative to track the whole experiment
+    verbose = True             # print info during tracking
+    show_tracking_images = True # print images during tracking
     #show_tracking_images = os.name == 'posix' # print images during tracking
 
     # Useful commands
