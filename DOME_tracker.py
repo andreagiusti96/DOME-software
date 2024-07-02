@@ -118,6 +118,9 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
     costs_matching = np.ndarray([len(new_positions), number_of_objects])
     costs_newid = np.ndarray([len(new_positions), len(new_positions)])
 
+    if len(new_positions.shape)<2:
+        print(f'{len(new_positions.shape)}')
+        
     assert len(new_positions.shape) == 2
     assert len(positions.shape) == 2
     assert new_positions.shape[1] == 2
@@ -126,7 +129,8 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
     TYPICAL_VEL = PARAMETERS["TYPICAL_VEL"]
 
     # compute distances between all possible pairs (estimated positions, detected positions)
-    distances = np.squeeze(scipy.spatial.distance.cdist(new_positions, positions))
+    #distances = np.squeeze(scipy.spatial.distance.cdist(new_positions, positions))
+    distances = scipy.spatial.distance.cdist(new_positions, positions)
     distances = distances / (TYPICAL_VEL*deltaT)
 
     # build the matrix of costs
@@ -665,10 +669,10 @@ def get_positions(contours : List):
         Position of the center of each object. Shape=(Nx2)
 
     """
-    positions = []
-    for contour in contours:
-        (x, y, w, h) = cv2.boundingRect(contour)
-        positions.append([x + (w / 2), y + (h / 2)])
+    positions = np.ndarray([len(contours),2])
+    for i in range(len(contours)):
+        (x, y, w, h) = cv2.boundingRect(contours[i])
+        positions[i,:]=[x + (w / 2), y + (h / 2)]
 
     return positions
 
@@ -1304,19 +1308,21 @@ if __name__ == '__main__':
     Euglena_BCL = ['2023_07_10_Euglena_30','2023_07_10_Euglena_34','2023_07_10_Euglena_35',
                               '2023_07_10_Euglena_36','2023_07_10_Euglena_37','2023_07_10_Euglena_38']
     
-    Volvox_switch_10s = ['2023_07_06_Volvox_11','2023_07_06_Volvox_5']
+    Volvox_switch_10s = ['2023_07_05_Volvox_2','2023_07_06_Volvox_11','2023_07_06_Volvox_5']
+    
+    Volvox_on255 = ['2023_06_08_Volvox_3','2023_06_08_Volvox_4','2023_07_04_Volvox_8','2023_07_04_Volvox_9','2023_07_05_Volvox_5','2023_07_06_Volvox_21','2023_07_06_Volvox_22','2023_07_06_Volvox_23']
 
     # Name of the experiment(s) to be tracked
-    experiment_names = ["2023_07_10_Euglena_26"]
+    experiment_names = ["2023_07_04_Volvox_9"]
     
     # Name of the folder to save tracking results
     output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')
     #output_folder = 'tracking_test'
 
     # Tracking options
-    terminal_time = 60          # time to stop tracking [s], set negative to track the whole experiment
-    verbose = True             # print info during tracking
-    show_tracking_images = True # print images during tracking
+    terminal_time = -1          # time to stop tracking [s], set negative to track the whole experiment
+    verbose = False             # print info during tracking
+    show_tracking_images = False # print images during tracking
     #show_tracking_images = os.name == 'posix' # print images during tracking
 
     # Useful commands
