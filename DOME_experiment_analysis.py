@@ -111,19 +111,33 @@ def split(data : np.array, condition : np.array):
     
     return out_data
 
-def detect_outliers(data, m = 2., side='both'):
+def detect_outliers(data, m = 4., side='both', method = 'sMAD'):
     assert side in ['both', 'top', 'bottom']
+    assert method in ['sMAD', 'quartiles']
     
     data=np.ma.array(data, mask=np.isnan(data))
-    d = np.abs(data - np.ma.median(data))
-    mdev = np.ma.median(d)
-    s = d/mdev
-    outliers=s>m
     
-    if side=='top':
-        outliers = outliers * (data > np.ma.median(data))
-    elif side=='bottom':
-        outliers = outliers * (data < np.ma.median(data))    
+    if method == 'quartiles':
+        data=np.ma.filled(data, fill_value=np.nan)
+        q3, q1 = np.nanpercentile(data, [75 ,25])
+        iqr = q3 - q1
+        outliers = (data < q1-m*iqr) | (data > q3+m*iqr)
+        outliers = np.ma.array(outliers, mask=np.isnan(data))
+        data=np.ma.array(data, mask=np.isnan(data))
+    elif method == 'quartile2sMAD':
+        m = m*2+1   # convert from quartile to sMAV threshold
+        MAD = np.abs(data - np.ma.median(data))
+        sMAD = MAD/np.ma.median(MAD)   # scaled median absolute deviation
+        outliers = sMAD>m
+    else:
+        MAD = np.abs(data - np.ma.median(data))
+        sMAD = MAD/np.ma.median(MAD)   # scaled median absolute deviation
+        outliers = sMAD>m
+    
+    if side =='top':
+        outliers = outliers & (data > np.ma.median(data))
+    elif side =='bottom':
+        outliers = outliers & (data < np.ma.median(data))    
     
     return outliers
 
@@ -750,40 +764,40 @@ def make_experiment_plots(tracking_folder : str):
     plt.show()
 
     if len(speeds_on) >0:
-        # Time evolution and boxplots of Average Speed and Angular Velocity
-        fig = plt.figure(figsize=(9,4))
-        ax_sp = fig.add_gridspec(bottom=0.55, right=0.75).subplots()
-        ax_angv = fig.add_gridspec(top=0.45, right=0.75).subplots()
-        ax_sp_box = ax_sp.inset_axes([1.05, 0, 0.25, 1], sharey=ax_sp)
-        ax_sp_box.tick_params(axis="y", labelleft=False)
-        ax_angv_box = ax_angv.inset_axes([1.05, 0, 0.25, 1], sharey=ax_angv)
-        ax_angv_box.tick_params(axis="y", labelleft=False)
-        #
-        ax_sp.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
-        ax_sp.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
-        ax_sp.set_ylabel('$v$ [$\mu$m/s]')
-        ax_sp.set_xlim([0, totalT])
-        ax_sp.set_ylim([0, np.max(speeds_smooth)*0.9])
-        ax_sp.grid()
-        DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_sp)
-        data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
-        ax_sp_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-        add_significance_bar(data=data_to_plot, axis=ax_sp_box)
-        #
-        ax_angv.plot(time_instants,np.ma.median(np.abs(ang_vel_smooth),axis=1))
-        ax_angv.fill_between(time_instants, np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
-        ax_angv.set_xlim([0, totalT])
-        ax_angv.set_ylim([0, 2])
-        ax_angv.set_ylabel('$|\omega|$ [rad/s]')
-        plt.xlabel('Time [s]')
-        ax_angv.grid()
-        DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_angv)
-        data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
-        ax_angv_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
-        add_significance_bar(data=data_to_plot, axis=ax_angv_box)
-        #
-        plt.savefig(os.path.join(plots_dir, 'time_evolution_boxplots.pdf'), bbox_inches = 'tight')
-        plt.show()
+        # # Time evolution and boxplots of Average Speed and Angular Velocity
+        # fig = plt.figure(figsize=(9,4))
+        # ax_sp = fig.add_gridspec(bottom=0.55, right=0.75).subplots()
+        # ax_angv = fig.add_gridspec(top=0.45, right=0.75).subplots()
+        # ax_sp_box = ax_sp.inset_axes([1.05, 0, 0.25, 1], sharey=ax_sp)
+        # ax_sp_box.tick_params(axis="y", labelleft=False)
+        # ax_angv_box = ax_angv.inset_axes([1.05, 0, 0.25, 1], sharey=ax_angv)
+        # ax_angv_box.tick_params(axis="y", labelleft=False)
+        # #
+        # ax_sp.plot(time_instants,np.ma.median(speeds_smooth,axis=1))
+        # ax_sp.fill_between(time_instants, np.min(speeds_smooth,axis=1), np.max(speeds_smooth,axis=1),alpha=0.5)
+        # ax_sp.set_ylabel('$v$ [$\mu$m/s]')
+        # ax_sp.set_xlim([0, totalT])
+        # ax_sp.set_ylim([0, np.max(speeds_smooth)*0.9])
+        # ax_sp.grid()
+        # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_sp)
+        # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1)]))
+        # ax_sp_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+        # add_significance_bar(data=data_to_plot, axis=ax_sp_box)
+        # #
+        # ax_angv.plot(time_instants,np.ma.median(np.abs(ang_vel_smooth),axis=1))
+        # ax_angv.fill_between(time_instants, np.min(np.abs(ang_vel_smooth),axis=1), np.max(np.abs(ang_vel_smooth),axis=1),alpha=0.5)
+        # ax_angv.set_xlim([0, totalT])
+        # ax_angv.set_ylim([0, 2])
+        # ax_angv.set_ylabel('$|\omega|$ [rad/s]')
+        # plt.xlabel('Time [s]')
+        # ax_angv.grid()
+        # DOMEgraphics.highligth_inputs(inputs[:,0], time_instants, axis=ax_angv)
+        # data_to_plot = list(map(lambda X: [x for x in X if x], [np.mean(ang_vel_on, axis=1), np.mean(ang_vel_off, axis=1)]))
+        # ax_angv_box.boxplot(data_to_plot,labels=['Light ON', 'Light OFF'])
+        # add_significance_bar(data=data_to_plot, axis=ax_angv_box)
+        # #
+        # plt.savefig(os.path.join(plots_dir, 'time_evolution_boxplots.pdf'), bbox_inches = 'tight')
+        # plt.show()
 
 
         # boxplots speed and ang vel of averages over the agents
@@ -955,30 +969,30 @@ def make_experiment_plots(tracking_folder : str):
     # plt.xlim([0, 20])
     # plt.show()
     
-    # corrplot speed and ang vel (per agent)
-    plt.figure(figsize=(9, 6))
-    agents_motion = pd.DataFrame(np.ma.array([np.ma.mean(speeds_smooth, axis=0), np.ma.mean(
-        abs_ang_vel_smooth, axis=0), np.ma.std(speeds_smooth, axis=0), np.ma.std(abs_ang_vel_smooth, axis=0)]).T)
-    agents_motion.columns = ['$<v>_t$',
-                             '$<|\omega|>_t$', 'std($v,t$)', 'std($|\omega|,t$)']
-    sns.pairplot(agents_motion)
-    plt.savefig(os.path.join(plots_dir, 'corrplot_speed_angv.pdf'),
-                bbox_inches='tight')
-    plt.show()
+    # # corrplot speed and ang vel (per agent)
+    # plt.figure(figsize=(9, 6))
+    # agents_motion = pd.DataFrame(np.ma.array([np.ma.mean(speeds_smooth, axis=0), np.ma.mean(
+    #     abs_ang_vel_smooth, axis=0), np.ma.std(speeds_smooth, axis=0), np.ma.std(abs_ang_vel_smooth, axis=0)]).T)
+    # agents_motion.columns = ['$<v>_t$',
+    #                          '$<|\omega|>_t$', 'std($v,t$)', 'std($|\omega|,t$)']
+    # sns.pairplot(agents_motion)
+    # plt.savefig(os.path.join(plots_dir, 'corrplot_speed_angv.pdf'),
+    #             bbox_inches='tight')
+    # plt.show()
     
-    # scatter plot MEAN speed and MEAN ang velocity (per agent)
-    plt.figure(figsize=(9, 6))
-    c = [np.ma.mean(speeds_smooth, axis=0)]  # colored by speed
-    #c = [np.array([i for i in range(speeds_smooth.shape[1])])] #colored by index
-    scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(
-        abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-    plt.xlabel('$<v>_t$ [$\mu$m/s]')
-    plt.ylabel('$<|\omega|>_t$ [rad/s]')
-    #plt.gca().set_xlim([0, 2.5])
-    plt.grid()
-    plt.savefig(os.path.join(
-        plots_dir, 'scatter_speed_angv_mean.pdf'), bbox_inches='tight')
-    plt.show()
+    # # scatter plot MEAN speed and MEAN ang velocity (per agent)
+    # plt.figure(figsize=(9, 6))
+    # c = [np.ma.mean(speeds_smooth, axis=0)]  # colored by speed
+    # #c = [np.array([i for i in range(speeds_smooth.shape[1])])] #colored by index
+    # scatter_hist([np.ma.mean(speeds_smooth, axis=0)], [np.ma.mean(
+    #     abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+    # plt.xlabel('$<v>_t$ [$\mu$m/s]')
+    # plt.ylabel('$<|\omega|>_t$ [rad/s]')
+    # #plt.gca().set_xlim([0, 2.5])
+    # plt.grid()
+    # plt.savefig(os.path.join(
+    #     plots_dir, 'scatter_speed_angv_mean.pdf'), bbox_inches='tight')
+    # plt.show()
     
     # scatter plot MEAN speed and STD speed (per agent)
     plt.figure(figsize=(9,6))
@@ -991,42 +1005,42 @@ def make_experiment_plots(tracking_folder : str):
     plt.savefig(os.path.join(plots_dir, 'scatter_speed_mean_std.pdf'), bbox_inches = 'tight')
     plt.show()
     
-    # scatter plot MEAN ang velocity and STD ang velocity (per agent)
-    plt.figure(figsize=(9,6))
-    c = [np.ma.mean(speeds_smooth, axis=0)]
-    scatter_hist([np.ma.mean(abs_ang_vel_smooth, axis=0)], [np.ma.std(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-    plt.xlabel('$<|\omega|>_t$ [rad/s]')
-    plt.ylabel('std($|\omega|,t$) [rad/s]')
-    #plt.gca().set_xlim([0, 2.5])
-    plt.grid()
-    plt.savefig(os.path.join(plots_dir, 'scatter_angv_mean_std.pdf'), bbox_inches = 'tight')
-    plt.show()
+    # # scatter plot MEAN ang velocity and STD ang velocity (per agent)
+    # plt.figure(figsize=(9,6))
+    # c = [np.ma.mean(speeds_smooth, axis=0)]
+    # scatter_hist([np.ma.mean(abs_ang_vel_smooth, axis=0)], [np.ma.std(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+    # plt.xlabel('$<|\omega|>_t$ [rad/s]')
+    # plt.ylabel('std($|\omega|,t$) [rad/s]')
+    # #plt.gca().set_xlim([0, 2.5])
+    # plt.grid()
+    # plt.savefig(os.path.join(plots_dir, 'scatter_angv_mean_std.pdf'), bbox_inches = 'tight')
+    # plt.show()
     
-    # scatter plot STD speed and STD ang velocity (per agent)
-    plt.figure(figsize=(9,6))
-    c = [np.ma.mean(speeds_smooth, axis=0)]
-    scatter_hist([np.ma.std(speeds_smooth, axis=0)], [np.ma.std(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-    plt.xlabel('std($v,t$) [$\mu$m/s]')
-    plt.ylabel('std($|\omega|,t$) [rad/s]')
-    #plt.gca().set_xlim([0, 2.5])
-    plt.grid()
-    plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_std.pdf'), bbox_inches = 'tight')
-    plt.show()
+    # # scatter plot STD speed and STD ang velocity (per agent)
+    # plt.figure(figsize=(9,6))
+    # c = [np.ma.mean(speeds_smooth, axis=0)]
+    # scatter_hist([np.ma.std(speeds_smooth, axis=0)], [np.ma.std(abs_ang_vel_smooth, axis=0)], c, n_bins=10, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+    # plt.xlabel('std($v,t$) [$\mu$m/s]')
+    # plt.ylabel('std($|\omega|,t$) [rad/s]')
+    # #plt.gca().set_xlim([0, 2.5])
+    # plt.grid()
+    # plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_std.pdf'), bbox_inches = 'tight')
+    # plt.show()
     
-    # scatter plot speed variation and ang velocity variation
-    fig=plt.figure(figsize=(9,6))
-    speed_variation = [np.log10(speeds_smooth/np.ma.mean(speeds_smooth, axis=0))]
-    ang_vel_variation = [np.log10(abs_ang_vel_smooth/np.ma.mean(abs_ang_vel_smooth, axis=0))]
-    c = np.ma.mean(speeds_smooth, axis=0)
-    color = [np.tile(c, (len(time_instants),1))]
-    scatter_hist(speed_variation, ang_vel_variation, color, n_bins=50, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
-    plt.xlabel('$v/<v>_t$   [log10]')
-    plt.ylabel('$|\omega|/<|\omega|>_t$   [log10]')
-    plt.gca().set_xlim([-2, 2])
-    plt.gca().set_ylim([-4, 2])
-    plt.grid()
-    plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_variation_all.pdf'), bbox_inches = 'tight')
-    plt.show()
+    # # scatter plot speed variation and ang velocity variation
+    # fig=plt.figure(figsize=(9,6))
+    # speed_variation = [np.log10(speeds_smooth/np.ma.mean(speeds_smooth, axis=0))]
+    # ang_vel_variation = [np.log10(abs_ang_vel_smooth/np.ma.mean(abs_ang_vel_smooth, axis=0))]
+    # c = np.ma.mean(speeds_smooth, axis=0)
+    # color = [np.tile(c, (len(time_instants),1))]
+    # scatter_hist(speed_variation, ang_vel_variation, color, n_bins=50, cmap=DOMEgraphics.cropCmap('Blues', 0.25, 1.2))
+    # plt.xlabel('$v/<v>_t$   [log10]')
+    # plt.ylabel('$|\omega|/<|\omega|>_t$   [log10]')
+    # plt.gca().set_xlim([-2, 2])
+    # plt.gca().set_ylim([-4, 2])
+    # plt.grid()
+    # plt.savefig(os.path.join(plots_dir, 'scatter_speed_angv_variation_all.pdf'), bbox_inches = 'tight')
+    # plt.show()
 
     # # scatter plot speed and ang velocity - cluster wrt tumbling
     # plt.figure(figsize=(9,6))
@@ -1526,11 +1540,11 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
 
     
     # reject outliers
-    outliers_speed  = detect_outliers(speeds_smooth, m=3, side='top')
-    outliers_acc    = detect_outliers(acc_smooth, m=variance_thresh, side='top')
-    outliers_omega  = detect_outliers(ang_vel_smooth, m=variance_thresh, side='both')
+    outliers_speed  = detect_outliers(speeds_smooth, m=variance_thresh, side='top', method=OutliersDetectMethod)
+    outliers_acc    = detect_outliers(acc_smooth, m=variance_thresh, side='top', method=OutliersDetectMethod)
+    outliers_omega  = detect_outliers(ang_vel_smooth, m=variance_thresh, side='both', method=OutliersDetectMethod)
     outliers_omega  = np.ma.concatenate([outliers_omega,np.zeros([1,number_of_agents],dtype=bool)])    
-    outliers_combo  = detect_outliers((acc_smooth-np.ma.mean(acc_smooth))/np.ma.std(acc_smooth) + (speeds_smooth-np.ma.mean(speeds_smooth))/np.ma.std(speeds_smooth), m=4, side='top')
+    outliers_combo  = detect_outliers((acc_smooth-np.ma.mean(acc_smooth))/np.ma.std(acc_smooth) + (speeds_smooth-np.ma.mean(speeds_smooth))/np.ma.std(speeds_smooth), m=4, side='top', method=OutliersDetectMethod)
     #outliers = outliers_speed * outliers_omega
     #outliers = outliers_speed * outliers_acc
     outliers = outliers_speed
@@ -1544,10 +1558,10 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
             acc_smooth = np.ma.array(acc_smooth, mask=np.isnan(acc_smooth))
             velocities[:,a,:]=np.nan
             interp_positions[:,a,:]= np.nan
-            print('Agent '+str(a)+' is an outlier at time(s) ' + str(time_instants[outliers[:,a]])+ 
-                  's and has been removed.')
+            outling_instants = time_instants[outliers[:,a]]
+            print('Agent '+str(a)+' is an outlier at time(s) [' + str(outling_instants[0])+', ..., ' + str(outling_instants[-1])+']\t total=' +str(len(outling_instants))+ ' and has been removed.')
             removed_agents = removed_agents+1;
-    print(f'{removed_agents} outliers removed.')
+    print(f'{removed_agents} outliers removed.\n')
 
     
     # autocorrelation of velocities
@@ -1592,13 +1606,13 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
                                   ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
                                   ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off, inputs=inputs)
     
+    current_experiment.save_data_txt(os.path.join(tracking_folder, 'inputs'), force=True, data=inputs)
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_smooth'), force=True, data=speeds_smooth)
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_smooth'), force=True, data=ang_vel_smooth)
-    current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_on'), force=True, data=speeds_on)
-    current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_off'), force=True, data=speeds_off)
-    current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_on'), force=True, data=ang_vel_on)
-    current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_off'), force=True, data=ang_vel_off)
-    current_experiment.save_data_txt(os.path.join(tracking_folder, 'inputs'), force=True, data=inputs)
+    # current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_on'), force=True, data=speeds_on)
+    # current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_off'), force=True, data=speeds_off)
+    # current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_on'), force=True, data=ang_vel_on)
+    # current_experiment.save_data_txt(os.path.join(tracking_folder, 'ang_vel_off'), force=True, data=ang_vel_off)
     
     print(f'Analysis data saved as {os.path.join(current_experiment.path, tracking_folder, "analysed_data.npz")}')
 
@@ -2024,33 +2038,37 @@ experiments_directory = '/Volumes/DOMEPEN/Experiments'
 # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
 
-experiments_off = ['2023_06_15_Euglena_1','2023_06_26_Euglena_13', '2023_06_26_Euglena_14',
+Euglena_off = ['2023_06_15_Euglena_1','2023_06_26_Euglena_13', '2023_06_26_Euglena_14',
                    '2023_07_10_Euglena_5','2023_07_10_Euglena_6']
     
-experiments_switch_10s = ['2023_06_15_Euglena_7','2023_06_26_Euglena_23','2023_06_26_Euglena_24',
+Euglena_switch_10s = ['2023_06_15_Euglena_7','2023_06_26_Euglena_23','2023_06_26_Euglena_24',
                           '2023_07_10_Euglena_15','2023_07_10_Euglena_16'];
 
-experiments_switch_5s = ['2023_06_15_Euglena_8','2023_06_15_Euglena_9','2023_06_15_Euglena_10',
+Euglena_switch_5s = ['2023_06_15_Euglena_8','2023_06_15_Euglena_9','2023_06_15_Euglena_10',
                           '2023_06_26_Euglena_25','2023_06_26_Euglena_26',
                           '2023_07_10_Euglena_17','2023_07_10_Euglena_18'];
 
-experiments_switch_1s = ['2023_06_15_Euglena_11','2023_06_26_Euglena_27','2023_06_26_Euglena_28',
+Euglena_switch_1s = ['2023_06_15_Euglena_11','2023_06_26_Euglena_27','2023_06_26_Euglena_28',
                           '2023_07_10_Euglena_19','2023_07_10_Euglena_20'];
 
-experiments_ramp = ['2023_06_15_Euglena_5','2023_06_15_Euglena_6',
+Euglena_ramp = ['2023_06_15_Euglena_5','2023_06_15_Euglena_6',
                     '2023_06_26_Euglena_22','2023_06_26_Euglena_21',
                     '2023_07_10_Euglena_13','2023_07_10_Euglena_14'];
     
-experiments_on255=['2023_06_15_Euglena_4','2023_06_26_Euglena_19','2023_06_26_Euglena_20',
+Euglena_on255=['2023_06_15_Euglena_4','2023_06_26_Euglena_19','2023_06_26_Euglena_20',
                    '2023_07_10_Euglena_11', '2023_07_10_Euglena_12']
 
-experiments_on150=['2023_06_15_Euglena_3','2023_06_26_Euglena_17','2023_06_26_Euglena_18',
+Euglena_on150=['2023_06_15_Euglena_3','2023_06_26_Euglena_17','2023_06_26_Euglena_18',
                    '2023_07_10_Euglena_9', '2023_07_10_Euglena_10']
 
-experiments_on75 =['2023_06_15_Euglena_2','2023_06_26_Euglena_15','2023_06_26_Euglena_16',
+Euglena_on75 =['2023_06_15_Euglena_2','2023_06_26_Euglena_15','2023_06_26_Euglena_16',
                   '2023_07_10_Euglena_7', '2023_07_10_Euglena_8']
 
-all_experiments = experiments_off +experiments_switch_10s+experiments_switch_5s+experiments_switch_1s +experiments_ramp+experiments_on255+experiments_on150+experiments_on75
+Euglena_all = Euglena_off +Euglena_switch_10s+Euglena_switch_5s+Euglena_switch_1s +Euglena_ramp+Euglena_on255+Euglena_on150+Euglena_on75
+
+Volvox_switch_10s = ['2023_07_05_Volvox_2','2023_07_06_Volvox_11','2023_07_06_Volvox_5']
+
+Volvox_on255 = ['2023_06_08_Volvox_3','2023_06_08_Volvox_4','2023_07_04_Volvox_8','2023_07_04_Volvox_9','2023_07_05_Volvox_5','2023_07_06_Volvox_21','2023_07_06_Volvox_22','2023_07_06_Volvox_23']
 
 experiment_name = "2023_07_10_Euglena_15"
 
@@ -2059,10 +2077,23 @@ experiment_name = "2023_07_10_Euglena_15"
 tracking_folder ='last'
 
 # parameters
+# OLD
+# min_traj_length = 5     # minimum length of the trajectories [s]
+# OutliersDetectMethod = 'sMAD' # outliers detection criterium
+# variance_thresh = 3     # variance threshold for outliers detection
+# px_size = 1.25          # conversion factor for 90X magnification [um/px]
+
+# Euglena
+# min_traj_length = 5     # minimum length of the trajectories [s]
+# OutliersDetectMethod = 'quartiles' # outliers detection criterium
+# variance_thresh = 1     # variance threshold for outliers detection
+# px_size = 1.25          # conversion factor for 90X magnification [um/px]
+
+# Volvox
 min_traj_length = 5     # minimum length of the trajectories [s]
-variance_thresh = 2.5   # variance threshold for outliers detection
-px_size = 1.25          # conversion factor for 90X magnification [um/px]
-#px_size = 4.44          # conversion factor for 9X magnification [um/px]
+OutliersDetectMethod = 'quartiles' # outliers detection criterium
+variance_thresh = 1.5   # variance threshold for outliers detection
+px_size = 4.44          # conversion factor for 9X magnification [um/px]
 
 
 print('Now use one of the following commands:'
