@@ -1308,7 +1308,7 @@ if __name__ == '__main__':
     Euglena_BCL = ['2023_07_10_Euglena_30','2023_07_10_Euglena_34','2023_07_10_Euglena_35',
                               '2023_07_10_Euglena_36','2023_07_10_Euglena_37','2023_07_10_Euglena_38']
     
-    Volvox_switch_10s = ['2023_07_05_Volvox_2','2023_07_06_Volvox_11','2023_07_06_Volvox_5']
+    Volvox_switch_10s = ['2023_07_04_Volvox_12','2023_07_04_Volvox_13','2023_07_05_Volvox_2','2023_07_05_Volvox_7','2023_07_06_Volvox_3','2023_07_06_Volvox_4','2023_07_06_Volvox_5','2023_07_06_Volvox_11']
     
     Volvox_on255 = ['2023_06_08_Volvox_3','2023_06_08_Volvox_4','2023_07_04_Volvox_8','2023_07_04_Volvox_9','2023_07_05_Volvox_5','2023_07_06_Volvox_21','2023_07_06_Volvox_22','2023_07_06_Volvox_23']
 
