@@ -1248,6 +1248,7 @@ if __name__ == '__main__':
     experiments_directory = '/Volumes/DOMEPEN/Experiments'
     # experiments_directory = 'D:\AndreaG_DATA\Experiments'
 
+    # Euglena experiments
     Euglena_off = ['2023_06_15_Euglena_1','2023_06_26_Euglena_13', '2023_06_26_Euglena_14',
                        '2023_07_10_Euglena_5','2023_07_10_Euglena_6']
         
@@ -1308,12 +1309,20 @@ if __name__ == '__main__':
     Euglena_BCL = ['2023_07_10_Euglena_30','2023_07_10_Euglena_34','2023_07_10_Euglena_35',
                               '2023_07_10_Euglena_36','2023_07_10_Euglena_37','2023_07_10_Euglena_38']
     
+    # Volvox experiments
     Volvox_switch_10s = ['2023_07_04_Volvox_12','2023_07_04_Volvox_13','2023_07_05_Volvox_2','2023_07_05_Volvox_7','2023_07_06_Volvox_3','2023_07_06_Volvox_4','2023_07_06_Volvox_5','2023_07_06_Volvox_11']
+    Volvox_switch_5s = ['2023_07_04_Volvox_14','2023_07_04_Volvox_15','2023_07_05_Volvox_8','2023_07_06_Volvox_12']
+    Volvox_switch_1s = ['2023_07_04_Volvox_16','2023_07_04_Volvox_17','2023_07_04_Volvox_18','2023_07_05_Volvox_9','2023_07_05_Volvox_10','2023_07_06_Volvox_13']
     
     Volvox_on255 = ['2023_06_08_Volvox_3','2023_06_08_Volvox_4','2023_07_04_Volvox_8','2023_07_04_Volvox_9','2023_07_05_Volvox_5','2023_07_06_Volvox_21','2023_07_06_Volvox_22','2023_07_06_Volvox_23']
+    Volvox_on150 = ['2023_06_08_Volvox_5','2023_06_08_Volvox_6','2023_07_04_Volvox_7','2023_07_05_Volvox_4','2023_07_06_Volvox_19','2023_07_06_Volvox_20']
+    Volvox_on75 = ['2023_06_08_Volvox_7','2023_07_04_Volvox_3','2023_07_04_Volvox_4','2023_07_05_Volvox_3','2023_07_06_Volvox_16','2023_07_06_Volvox_17','2023_07_06_Volvox_18']
+
+    Volvox_off = ['2023_07_04_Volvox_1','2023_07_04_Volvox_2','2023_07_05_Volvox_1','2023_07_06_Volvox_1','2023_07_06_Volvox_2','2023_07_06_Volvox_10']
+    Volvox_ramp = ['2023_06_08_Volvox_13','2023_07_04_Volvox_10','2023_07_04_Volvox_11','2023_07_05_Volvox_6','2023_07_06_Volvox_14','2023_07_06_Volvox_15']
 
     # Name of the experiment(s) to be tracked
-    experiment_names = ["2023_07_04_Volvox_9"]
+    experiment_names = Volvox_switch_5s + Volvox_switch_1s + Volvox_on150 + Volvox_on75 + Volvox_off + Volvox_ramp
     
     # Name of the folder to save tracking results
     output_folder = 'tracking_' + datetime.today().strftime('%Y_%m_%d')

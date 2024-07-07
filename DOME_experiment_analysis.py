@@ -1620,10 +1620,10 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     #scipy.stats.ttest_ind(np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1))
     
     # Save analysis data
-    current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
-                                  interp_positions=interp_positions, speeds_smooth=speeds_smooth, acc_smooth=acc_smooth,
-                                  ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
-                                  ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off, inputs=inputs)
+    # current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
+    #                               interp_positions=interp_positions, speeds_smooth=speeds_smooth, acc_smooth=acc_smooth,
+    #                               ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
+    #                               ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off, inputs=inputs)
     
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'inputs'), force=True, data=inputs)
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_smooth'), force=True, data=speeds_smooth)
