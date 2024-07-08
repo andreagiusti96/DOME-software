@@ -632,7 +632,7 @@ def make_experiment_plots(tracking_folder : str):
     plt.figure(figsize=(9,3))
     agents_number = np.count_nonzero(~np.isnan(interp_positions[:,:,0]), axis=1)
     plt.plot(time_instants,agents_number)
-    plt.title(f'Number of detected agents over time (total={np.sum(lengths>=min_traj_length)})')
+    plt.title(f'Number of detected agents over time (tot={np.sum(lengths>=min_traj_length)}, avg={np.round(np.mean(agents_number),1)})')
     plt.xlabel('Time [s]')
     plt.gca().set_xlim([0, totalT])
     plt.gca().set_ylim(0)
@@ -1620,10 +1620,10 @@ def analyse_trajectories(experiment : [str, DOMEexp.ExperimentManager], tracking
     #scipy.stats.ttest_ind(np.mean(speeds_on, axis=1), np.mean(speeds_off, axis=1))
     
     # Save analysis data
-    # current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
-    #                               interp_positions=interp_positions, speeds_smooth=speeds_smooth, acc_smooth=acc_smooth,
-    #                               ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
-    #                               ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off, inputs=inputs)
+    current_experiment.save_data(os.path.join(tracking_folder, 'analysed_data'), force=True, time_steps=time_steps, 
+                                  interp_positions=interp_positions, speeds_smooth=speeds_smooth, acc_smooth=acc_smooth,
+                                  ang_vel_smooth=ang_vel_smooth, speeds_on=speeds_on, speeds_off=speeds_off,
+                                  ang_vel_on=ang_vel_on, ang_vel_off=ang_vel_off, inputs=inputs)
     
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'inputs'), force=True, data=inputs)
     current_experiment.save_data_txt(os.path.join(tracking_folder, 'speeds_smooth'), force=True, data=speeds_smooth)
@@ -2085,10 +2085,21 @@ Euglena_on75 =['2023_06_15_Euglena_2','2023_06_26_Euglena_15','2023_06_26_Euglen
 
 Euglena_all = Euglena_off +Euglena_switch_10s+Euglena_switch_5s+Euglena_switch_1s +Euglena_ramp+Euglena_on255+Euglena_on150+Euglena_on75
 
+# Volvox experiments
 Volvox_switch_10s = ['2023_07_04_Volvox_12','2023_07_04_Volvox_13','2023_07_05_Volvox_2','2023_07_05_Volvox_7','2023_07_06_Volvox_3','2023_07_06_Volvox_4','2023_07_06_Volvox_5','2023_07_06_Volvox_11']
+Volvox_switch_5s = ['2023_07_04_Volvox_14','2023_07_04_Volvox_15','2023_07_05_Volvox_8','2023_07_06_Volvox_12']
+Volvox_switch_1s = ['2023_07_04_Volvox_16','2023_07_04_Volvox_17','2023_07_04_Volvox_18','2023_07_05_Volvox_9','2023_07_05_Volvox_10','2023_07_06_Volvox_13']
 
 Volvox_on255 = ['2023_06_08_Volvox_3','2023_06_08_Volvox_4','2023_07_04_Volvox_8','2023_07_04_Volvox_9','2023_07_05_Volvox_5','2023_07_06_Volvox_21','2023_07_06_Volvox_22','2023_07_06_Volvox_23']
+Volvox_on150 = ['2023_06_08_Volvox_5','2023_06_08_Volvox_6','2023_07_04_Volvox_7','2023_07_05_Volvox_4','2023_07_06_Volvox_19','2023_07_06_Volvox_20']
+Volvox_on75 = ['2023_06_08_Volvox_7','2023_07_04_Volvox_3','2023_07_04_Volvox_4','2023_07_05_Volvox_3','2023_07_06_Volvox_16','2023_07_06_Volvox_17','2023_07_06_Volvox_18']
 
+Volvox_off = ['2023_07_04_Volvox_1','2023_07_04_Volvox_2','2023_07_05_Volvox_1','2023_07_06_Volvox_1','2023_07_06_Volvox_2','2023_07_06_Volvox_10']
+Volvox_ramp = ['2023_06_08_Volvox_13','2023_07_04_Volvox_10','2023_07_04_Volvox_11','2023_07_05_Volvox_6','2023_07_06_Volvox_14','2023_07_06_Volvox_15']
+
+Volvox_all = Volvox_switch_10s+ Volvox_switch_5s+ Volvox_switch_1s+ Volvox_on255+ Volvox_on150+ Volvox_on75+ Volvox_off +Volvox_ramp
+
+# Name of the experiment(s) to be tracked
 experiment_name = "2023_07_10_Euglena_15"
 
 
@@ -2096,7 +2107,7 @@ experiment_name = "2023_07_10_Euglena_15"
 tracking_folder ='last'
 
 # parameters
-# OLD
+# Euglena OLD
 # min_traj_length = 5     # minimum length of the trajectories [s]
 # OutliersDetectMethod = 'sMAD' # outliers detection criterium
 # variance_thresh_t = 3     # variance threshold for outliers detection
@@ -2105,15 +2116,16 @@ tracking_folder ='last'
 # Euglena
 # min_traj_length = 5     # minimum length of the trajectories [s]
 # OutliersDetectMethod = 'quartiles' # outliers detection criterium
-# variance_thresh_t = 1     # variance threshold for outliers detection
+# variance_thresh_t = 1   # variance threshold for outliers detection, top of the distribution
+# variance_thresh_b = 1   # variance threshold for outliers detection, bottom of the distribution
 # px_size = 1.25          # conversion factor for 90X magnification [um/px]
 
 # Volvox
-min_traj_length = 5     # minimum length of the trajectories [s]
+min_traj_length = 5      # minimum length of the trajectories [s]
 OutliersDetectMethod = 'quartiles' # outliers detection criterium
-variance_thresh_t = 1.5 # variance threshold for outliers detection, top of the distribution
-variance_thresh_b = 0.25# variance threshold for outliers detection, bottom of the distribution
-px_size = 4.44          # conversion factor for 9X magnification [um/px]
+variance_thresh_t = 2    # variance threshold for outliers detection, top of the distribution
+variance_thresh_b = 0.25 # variance threshold for outliers detection, bottom of the distribution
+px_size = 4.44           # conversion factor for 9X magnification [um/px]
 
 
 print('Now use one of the following commands:'
