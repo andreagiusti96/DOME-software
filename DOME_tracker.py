@@ -1321,6 +1321,14 @@ if __name__ == '__main__':
     Volvox_off = ['2023_07_04_Volvox_1','2023_07_04_Volvox_2','2023_07_05_Volvox_1','2023_07_06_Volvox_1','2023_07_06_Volvox_2','2023_07_06_Volvox_10']
     Volvox_ramp = ['2023_06_08_Volvox_13','2023_07_04_Volvox_10','2023_07_04_Volvox_11','2023_07_05_Volvox_6','2023_07_06_Volvox_14','2023_07_06_Volvox_15']
 
+    Volvox_half_half = ['2023_06_08_Volvox_18','2023_07_04_Volvox_19','2023_07_04_Volvox_20','2023_07_05_Volvox_11','2023_07_05_Volvox_32','2023_07_05_Volvox_33','2023_07_07_Volvox_1','2023_07_07_Volvox_2']
+    Volvox_gradient_lateral = ['2023_06_08_Volvox_14','2023_06_08_Volvox_16','2023_07_04_Volvox_21','2023_07_04_Volvox_22','2023_07_05_Volvox_12','2023_07_05_Volvox_30','2023_07_05_Volvox_31','2023_07_07_Volvox_3']
+    Volvox_gradient_central_light = ['2023_06_08_Volvox_17','2023_07_04_Volvox_23','2023_07_04_Volvox_24','2023_07_05_Volvox_13','2023_07_05_Volvox_28','2023_07_05_Volvox_29','2023_07_06_Volvox_6','2023_07_07_Volvox_4']
+    Volvox_gradient_central_dark = ['2023_07_04_Volvox_25','2023_07_04_Volvox_26','2023_07_05_Volvox_14','2023_07_05_Volvox_26','2023_07_05_Volvox_27','2023_07_06_Volvox_7','2023_07_07_Volvox_5']
+    Volvox_circle_light = ['2023_06_08_Volvox_19','2023_06_08_Volvox_20','2023_07_04_Volvox_27','2023_07_04_Volvox_28','2023_07_05_Volvox_15','2023_07_05_Volvox_16','2023_07_05_Volvox_21','2023_07_05_Volvox_22','2023_07_05_Volvox_23','2023_07_05_Volvox_34','2023_07_07_Volvox_6']
+    Volvox_circle_dark = ['2023_07_04_Volvox_29','2023_07_04_Volvox_30','2023_07_05_Volvox_17','2023_07_05_Volvox_18','2023_07_05_Volvox_19','2023_07_05_Volvox_20','2023_07_05_Volvox_24','2023_07_05_Volvox_25','2023_07_05_Volvox_35','2023_07_07_Volvox_7']
+   
+
     # Name of the experiment(s) to be tracked
     experiment_names = Volvox_switch_5s + Volvox_switch_1s + Volvox_on150 + Volvox_on75 + Volvox_off + Volvox_ramp
     
