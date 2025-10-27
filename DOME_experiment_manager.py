@@ -1,12 +1,15 @@
-# DOME_experiment_manager.py
-# #################################################################################################
-# The ExperimentManager calss is provided to handle experiments and store the outputs, while
-# keeping a timestamped log.
-# #################################################################################################
-# Authors = Andrea Giusti <andrea.giusti@unina.it>
-# Affiliation = University of Naples Federico II
-# #################################################################################################
-# This work is licensed under a Creative Commons Attribution 4.0 International License.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DOME_experiment_manager.py
+The ExperimentManager calss is provided to handle experiments and store the outputs, while
+keeping a timestamped log.
+
+See also: DOME_experiment.
+
+Authors:    Andrea Giusti
+Created:    2023
+"""
 
 import time
 import os

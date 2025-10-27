@@ -1,14 +1,21 @@
-# This code is provided to guide users through the process of calibration to find a mathematical
-# transformation that describes the mapping of camera pixels to projector pixels in the DOME. The
-# DOME (Dynamic Optical Micro Environment) was developed by Ana Rubio Denniss. This code requires
-# the "DOME_caibration_projector.py" file to be run in parallel on the Raspberry Pi 0 connected to
-# the DOME projector. To calibrate the DOME, run this file and follow the on screen instructions.
-# #################################################################################################
-# Authors = Matthew Uppington <mu15531@bristol.ac.uk>
-# Affiliation = Farscope CDT, University of Bristol, University of West England
-# #################################################################################################
-# This work is licensed under a Creative Commons Attribution 4.0 International License.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DOME_calibration_camera.py
+This code is provided to guide users through the process of calibration to find a mathematical
+transformation that describes the mapping of camera pixels to projector pixels in the DOME. 
 
+This code must run on the Raspberry Pi connected to the DOME camera.
+This code requires the "DOME_caibration_projector.py" file to be run in parallel on the 
+Raspberry Pi 0 connected to the DOME projector. 
+
+To calibrate the DOME, run this file and follow the on screen instructions.
+
+See also: DOME_calibration_camera_v2.
+
+Authors:    Matthew Uppington
+Created:    2022
+"""
 import DOME_communication as DOMEcomm
 import DOME_imaging_utilities as DOMEutil
 import DOME_transformation as DOMEtran

@@ -1,15 +1,21 @@
-# DOME_experiment.py
-# #################################################################################################
-# This code is provided to easly control the DOME using the console and run experiments.
-# Up to date information about the DOME project are available at http://theopendome.org.
-# Up to date code is available at http://theopendome.org or https://github.com/andreagiusti96/DOME-software.
-# This code requires the "DOME_projection_interface.py" file to be run in parallel on the Raspberry Pi 0 connected to
-# the DOME projector.
-# #################################################################################################
-# Authors = Andrea Giusti <andrea.giusti@unina.it>
-# Affiliation = University of Naples Federico II
-# #################################################################################################
-# This work is licensed under a Creative Commons Attribution 4.0 International License.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DOME_experiment.py
+This code is provided to easly control the DOME using the console and execute experiments.
+Up to date information about the DOME project are available at http://theopendome.org.
+
+This code must run on the Raspberry Pi connected to the DOME camera.
+This code requires the "DOME_projection_interface.py" file to be run in parallel on the Raspberry Pi 0 connected to
+the DOME projector.
+
+Run this script, then follow instructions in the console.
+
+See also: DOME_tracker.
+
+Authors:    Andrea Giusti
+Created:    2023
+"""
 
 import DOME_communication as DOMEcomm
 import DOME_imaging_utilities as DOMEutil

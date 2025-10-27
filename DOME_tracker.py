@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+DOME_tracker.py
 This code reads data collected during a DOME experiment and performs objects detection and tracking.
 When you launch the tracking of an experiment the algorithm:
 1) Builds the background model representing static elements in the camera frame
@@ -9,6 +10,8 @@ When you launch the tracking of an experiment the algorithm:
 4) Saves the resulting tracking data.
 
 Run this script, then follow instructions in the console.
+
+See also: DOME_experiment and DOME_experiment_analysis.
 
 Author:     Andrea Giusti
 Created:    2023

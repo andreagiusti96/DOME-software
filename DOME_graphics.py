@@ -1,11 +1,14 @@
-# DOME_graphics.py
-# #################################################################################################
-# This code provides utility functions for plots and videos.
-# #################################################################################################
-# Authors = Andrea Giusti <andrea.giusti@unina.it>
-# Affiliation = University of Naples Federico II
-# #################################################################################################
-# This work is licensed under a Creative Commons Attribution 4.0 International License.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DOME_graphics.py
+This code provides utility functions for plots and videos.
+
+See also: DOME_experiment_manager and DOME_imaging_utilities.
+
+Author:     Andrea Giusti
+Created:    2023
+"""
 
 import cv2
 import numpy as np

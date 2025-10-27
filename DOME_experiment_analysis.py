@@ -1,10 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+DOME_experiment_analysis.py
+This code reads the tracking data of a DOME experiment and computes the kinematic 
+data of the microorganisms.
 
-Created by Andrea
+When you launch the analysis of an experiment the algorithm:
+1) Loads experimental and tracking data.
+2) Removes short trajectories.
+3) Interpolates missing points and smooths the trajectories.
+4) Computes kinematic data of the microorganisms (speed and angular velocity).
+5) Saves results to .npz and .csv files.
 
-@author: andrea
+Run this script, then follow instructions in the console.
+
+See also: DOME_tracker.
+
+Author:     Andrea Giusti
+Created:    2023
 """
 
 

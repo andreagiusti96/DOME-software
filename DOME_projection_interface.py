@@ -1,14 +1,15 @@
-# DOME_projection_interface.py
-# #################################################################################################
-# This code is intended to run on the projector Pi ZERO.
-# This code interprets the commands and update the projected pattern.
-# #################################################################################################
-# Authors = Matthew Uppington <mu15531@bristol.ac.uk>
-#           Andrea Giusti <andrea.giusti@unina.it>
-# Affiliation = Farscope CDT, University of Bristol, University of West England
-#               Universityof Naples Federico II
-# #################################################################################################
-# This work is licensed under a Creative Commons Attribution 4.0 International License.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DOME_projection_interface.py
+This code is intended to run on the Raspberry Pi ZERO connected to the projector.
+This code interprets the commands received over wifi and updates the projected pattern.
+
+See also: DOME_experiment.
+
+Authors:    Matthew Uppington and Andrea Giusti
+Created:    2023
+"""
 
 import DOME_communication as DOMEcomm
 import DOME_transformation as DOMEtran

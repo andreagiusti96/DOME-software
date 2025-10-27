@@ -1,20 +1,19 @@
-# This code is provided to assist with managing operations on the Raspberry Pi 4 connected to the
-# camera used in the DOME. The DOME (Dynamic Optical Micro Environment) was developed by Ana Rubio
-# Denniss. These include capturing images with the camera and managing gpio outputs on the
-# Raspberry Pi 4. Examples of how various operations are performed can be found in the "main()"
-# function below, which can be run with some default parameters by running this file as a script.
-# To access the functionalities in custom scripts, ensure that a copy of this file is stored in
-# the same directory. Then run the following command to import the code at the begining of the
-# custom files:
-#     import DOME_imaging_utilities as DOMEutil
-# The manager classes can then be accessed and used by replicating a similar code structure as in
-# the "main()" function below, where "CameraManager()" and "PinManager()" should be replaced with
-# "DOMEutil.CameraManager()" and "DOMEutil.PinManager()" respectively.
-# #################################################################################################
-# Authors = Matthew Uppington <mu15531@bristol.ac.uk>
-# Affiliation = Farscope CDT, University of Bristol, University of West England
-# #################################################################################################
-# This work is licensed under a Creative Commons Attribution 4.0 International License.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DOME_imaging_utilities.py
+This code is provided to assist with managing operations on the Raspberry Pi 4 connected to the
+camera used in the DOME. These include capturing images with the camera and managing gpio outputs on the
+Raspberry Pi 4. 
+
+Examples of how various operations are performed can be found in the "main()"
+function below, which can be run with some default parameters by running this file as a script.
+
+See also: DOME_graphics.
+
+Authors:    Matthew Uppington and Andrea Giusti
+Created:    2022
+"""
 
 from picamera import PiCamera
 from picamera.array import PiRGBArray

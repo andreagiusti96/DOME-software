@@ -1,6 +1,6 @@
 # DOME_transformation.py
 # #################################################################################################
-# This code is provided to assist with creating affine matrices to describe transformations or
+# This utility code is provided to assist with creating affine matrices to describe transformations or
 # poses of objects in the camera or projector frame of the DOME. The DOME (Dynamic Optical Micro
 # Environment) was developed by Ana Rubio Denniss. To access the functions in custom scripts,
 # ensure that a copy of this file is stored in the same directory. Then run the following command
