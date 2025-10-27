@@ -140,8 +140,7 @@ def agentMatching(new_positions: np.array, positions: np.array, inactivity: List
     
     # compute costs for the allocation of new IDs
     for i in range(new_positions.shape[0]):
-        cost_newid = np.min(
-            [distance_from_edges(new_positions[i]) / (TYPICAL_VEL*deltaT), NEW_ID_COST_DIST_CAP]) ** 2 + NEW_ID_COST_MIN
+        cost_newid = np.min([distance_from_edges(new_positions[i]) / (TYPICAL_VEL*deltaT), NEW_ID_COST_DIST_CAP]) ** 2 + NEW_ID_COST_MIN
         costs_newid[i, :] = np.ones([len(new_positions)]) * cost_newid
 
     costs = np.concatenate((costs_matching, costs_newid), axis=1)
@@ -1184,25 +1183,25 @@ if __name__ == '__main__':
     # }
     
     
-    # # Euglena
-    # PARAMETERS = {
-    #     "AREA_RANGE" : [175, 1500],
-    #     "COMPAC_RANGE" : [0.55, 0.90],
-    #     "BRIGHT_THRESH" : [85],
-    #     "TYPICAL_VEL" : 70,             # [px/s]
-    #     "INERTIA" : 0.9
-    # }
-    # NEW_ID_COST_MIN = 1
-    # NEW_ID_COST_DIST_CAP = 3
-    # DISTANCE_COST_FACTORS = [0, 1]
-    # INACTIVITY_COST_FACTORS = [0, 1]
-    # # IMAGE POROCESSING PARAMETERS
-    # AUTO_SCALING = -1       # value for automatic brightness adjustment
-    # DEFAULT_COLOR = "red"   # color channel used for gray-scale conversion "gray", "blue", "green" or "red"
-    # DEFAULT_BLUR = 9        # size of the blurring window [in pixels]
-    # # VISUALIZATION
-    # DRAW_TRAJECTORY_LENGTH = 5
-    # DRAW_MAX_INACTIVITY = 3
+    # Euglena
+    PARAMETERS = {
+        "AREA_RANGE" : [175, 1500],
+        "COMPAC_RANGE" : [0.55, 0.90],
+        "BRIGHT_THRESH" : [85],
+        "TYPICAL_VEL" : 70,             # [px/s]
+        "INERTIA" : 0.9
+    }
+    NEW_ID_COST_MIN = 1
+    NEW_ID_COST_DIST_CAP = 3
+    DISTANCE_COST_FACTORS = [0, 1]
+    INACTIVITY_COST_FACTORS = [0, 1]
+    # IMAGE POROCESSING PARAMETERS
+    AUTO_SCALING = -1       # value for automatic brightness adjustment
+    DEFAULT_COLOR = "red"   # color channel used for gray-scale conversion "gray", "blue", "green" or "red"
+    DEFAULT_BLUR = 9        # size of the blurring window [in pixels]
+    # VISUALIZATION
+    DRAW_TRAJECTORY_LENGTH = 5
+    DRAW_MAX_INACTIVITY = 3
 
     # # P. Caudatum
     # PARAMETERS = {
@@ -1222,26 +1221,26 @@ if __name__ == '__main__':
     #     "INERTIA" : 0.9
     # }
 
-    # Volvox
-    PARAMETERS = {
-        "AREA_RANGE" : [800, 6000],
-        "COMPAC_RANGE" : [0.65, 1.0],
-        "BRIGHT_THRESH" : [90],
-        "TYPICAL_VEL" : 30,
-        "INERTIA" : 0.9
-    }
-    # TRACKING
-    NEW_ID_COST_MIN = 1
-    NEW_ID_COST_DIST_CAP = 3
-    DISTANCE_COST_FACTORS = [0, 1]
-    INACTIVITY_COST_FACTORS = [0, 0.25]
-    # IMAGE POROCESSING PARAMETERS
-    AUTO_SCALING = -1       # value for automatic brightness adjustment
-    DEFAULT_COLOR = "red"   # color channel used for gray-scale conversion "gray", "blue", "green" or "red"
-    DEFAULT_BLUR = 15        # side of the blurring window [in pixels]
-    # VISUALIZATION
-    DRAW_TRAJECTORY_LENGTH = 10
-    DRAW_MAX_INACTIVITY = 7
+    # # Volvox
+    # PARAMETERS = {
+    #     "AREA_RANGE" : [800, 6000],
+    #     "COMPAC_RANGE" : [0.65, 1.0],
+    #     "BRIGHT_THRESH" : [90],
+    #     "TYPICAL_VEL" : 30,
+    #     "INERTIA" : 0.9
+    # }
+    # # TRACKING
+    # NEW_ID_COST_MIN = 1
+    # NEW_ID_COST_DIST_CAP = 3
+    # DISTANCE_COST_FACTORS = [0, 1]
+    # INACTIVITY_COST_FACTORS = [0, 0.25]
+    # # IMAGE POROCESSING PARAMETERS
+    # AUTO_SCALING = -1       # value for automatic brightness adjustment
+    # DEFAULT_COLOR = "red"   # color channel used for gray-scale conversion "gray", "blue", "green" or "red"
+    # DEFAULT_BLUR = 15        # side of the blurring window [in pixels]
+    # # VISUALIZATION
+    # DRAW_TRAJECTORY_LENGTH = 10
+    # DRAW_MAX_INACTIVITY = 7
     
     # Directory where DOME experiments folders are saved
     # experiments_directory = '/Users/andrea/Library/CloudStorage/OneDrive-UniversitàdiNapoliFedericoII/Andrea_Giusti/Projects/DOME/Experiments'

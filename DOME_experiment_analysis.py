@@ -2106,26 +2106,19 @@ experiment_name = "2023_07_10_Euglena_15"
 #tracking_folder ='tracking_2023_10_09'
 tracking_folder ='last'
 
-# parameters
-# Euglena OLD
-# min_traj_length = 5     # minimum length of the trajectories [s]
-# OutliersDetectMethod = 'sMAD' # outliers detection criterium
-# variance_thresh_t = 3     # variance threshold for outliers detection
-# px_size = 1.25          # conversion factor for 90X magnification [um/px]
-
 # Euglena
-# min_traj_length = 5     # minimum length of the trajectories [s]
-# OutliersDetectMethod = 'quartiles' # outliers detection criterium
-# variance_thresh_t = 1   # variance threshold for outliers detection, top of the distribution
-# variance_thresh_b = 1   # variance threshold for outliers detection, bottom of the distribution
-# px_size = 1.25          # conversion factor for 90X magnification [um/px]
-
-# Volvox
-min_traj_length = 5      # minimum length of the trajectories [s]
+min_traj_length = 5     # minimum length of the trajectories [s]
 OutliersDetectMethod = 'quartiles' # outliers detection criterium
-variance_thresh_t = 2    # variance threshold for outliers detection, top of the distribution
-variance_thresh_b = 0.25 # variance threshold for outliers detection, bottom of the distribution
-px_size = 4.44           # conversion factor for 9X magnification [um/px]
+variance_thresh_t = 1   # variance threshold for outliers detection, top of the distribution
+variance_thresh_b = 1   # variance threshold for outliers detection, bottom of the distribution
+px_size = 1.25          # conversion factor for 90X magnification [um/px]
+
+# # Volvox
+# min_traj_length = 5      # minimum length of the trajectories [s]
+# OutliersDetectMethod = 'quartiles' # outliers detection criterium
+# variance_thresh_t = 2    # variance threshold for outliers detection, top of the distribution
+# variance_thresh_b = 0.25 # variance threshold for outliers detection, bottom of the distribution
+# px_size = 4.44           # conversion factor for 9X magnification [um/px]
 
 
 print('Now use one of the following commands:'
