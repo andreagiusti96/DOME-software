@@ -11,6 +11,8 @@ To start your first experiment with the DOME run `DOME_experiment.py` on the Ras
   - Analise trajectories of the tracked agents and extract relevant kinemitic features (see `DOME_experiment_analysis`)
   - Calibration to map the camera and the projector frames (see `DOME_calibration_camera_v2.py`)
 
+<video src="https://github.com/user-attachments/assets/f410bdb5-bb8d-4e76-a73c-f1d2c03b91d1" controls></video>
+
 ## Main scripts
   - `DOME_experiment`: acquire video and images while controlling the projector. Use the console to input single commands or define an experiment as a sequence of actions. This is the main script to use the DOME.
   - `DOME_calibration`: automatic calibration of the camera-to-projector transformation.
