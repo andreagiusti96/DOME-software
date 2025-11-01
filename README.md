@@ -30,7 +30,7 @@ To start your first experiment with the DOME run `DOME_experiment.py` on the Ras
 
 ## External resources
   - The DOME is an open-source platform for the control of microscale agents using light. For more info visit http://theopendome.org.
-  - Example data captured with the DOME and analysed with this software is available at [Photomovement of Euglena and Volvox in the DOME](https://zenodo.org/records/13683456).
+  - Example data captured with the DOME and analysed with this software is available at [Photomovement of Euglena and Volvox in the DOME](https://zenodo.org/records/13683455).
   - Got the kinematic data of your microorganisms? 
   Now you can generate their digital twins and simulate their movement with [SwarmSim](https://github.com/diBernardoGroup/SwarmSimPublic).
   - For additional info contact andrea.giusti.96@gmail.com.
